@@ -426,21 +426,146 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
     const { venda_id, destinatario, itens } = req.body;
     db.get('SELECT * FROM movimentacoes WHERE id = ?', [venda_id], async (err, venda) => {
         if (err || !venda) return res.status(404).json({ error: "Venda não encontrada" });
-        db.get('SELECT valor FROM configs WHERE chave = ?', ['nfe_modo'], async (err2, modoRow) => {
-            const modo = modoRow ? modoRow.valor : 'homologacao';
+        
+        // Buscar configurações necessárias
+        db.all('SELECT chave, valor FROM configs', [], async (err2, configs) => {
+            const configMap = {};
+            configs?.forEach(c => configMap[c.chave] = c.valor);
+            
+            const modo = configMap['nfe_modo'] || 'homologacao';
+            const isProduction = modo === 'producao';
+            const certPassword = configMap['cert_password'] || '123';
+            const pfxPath = path.join(__dirname, '../certificado/certificado.pfx');
+            
             try {
-                const nfeService = new NFeService(db, modo);
-                const result = await nfeService.gerarNFe(venda, destinatario, itens);
-                const chave = result.chave || `NFe${Date.now()}`;
-                const xml = result.xml || '';
-                const data = new Date().toISOString();
-                db.run(`INSERT INTO nfe (venda_id, chave_acesso, xml_content, status, data_emissao) VALUES (?, ?, ?, ?, ?)`,
-                    [venda_id, chave, xml, 'autorizada', data], function (err3) {
+                const nfeService = new NFeService(pfxPath, certPassword, isProduction);
+                
+                // Gerar chave de acesso
+                const cNF = Math.floor(Math.random() * 100000000);
+                const chaveParams = {
+                    cUF: configMap['emit_uf_cod'] || '35',
+                    year: new Date().getFullYear().toString().slice(-2),
+                    month: String(new Date().getMonth() + 1).padStart(2, '0'),
+                    cnpj: (configMap['emit_cnpj'] || '56421395000150').replace(/\D/g, ''),
+                    mod: '55',
+                    serie: parseInt(configMap['nfe_serie'] || '1'),
+                    nNF: parseInt(configMap['nfe_prox_numero'] || venda_id),
+                    tpEmis: '1',
+                    cNF
+                };
+                const chaveAcesso = nfeService.generateChaveAcesso(chaveParams);
+                
+                // Montar dados da NF-e
+                const nfeData = {
+                    ide: {
+                        cUF: configMap['emit_uf_cod'] || '35',
+                        cNF,
+                        natOp: 'Venda de mercadoria adquirida de terceiros',
+                        mod: 55,
+                        serie: parseInt(configMap['nfe_serie'] || '1'),
+                        nNF: parseInt(configMap['nfe_prox_numero'] || venda_id),
+                        dhEmi: new Date().toISOString(),
+                        tpNF: '1',
+                        idDest: '1',
+                        cMunFG: configMap['emit_cmun'] || '3541406',
+                        tpImp: '2',
+                        tpEmis: '1',
+                        chaveAcesso,
+                        finNFe: '1',
+                        indFinal: '1',
+                        indPres: '1'
+                    },
+                    emit: {
+                        cnpj: (configMap['emit_cnpj'] || '56421395000150').replace(/\D/g, ''),
+                        xNome: configMap['emit_nome'] || 'M & M HF COMERCIO DE CEBOLAS LTDA',
+                        xFant: configMap['emit_fant'] || 'M & M HF COMERCIO DE CEBOLAS',
+                        ie: (configMap['emit_ie'] || '562696411110').replace(/\D/g, ''),
+                        crt: configMap['emit_crt'] || '3',
+                        enderEmit: {
+                            xLgr: configMap['emit_lgr'] || 'RUA MANOEL CRUZ',
+                            nro: configMap['emit_nro'] || '36',
+                            xBairro: configMap['emit_bairro'] || 'RESIDENCIAL MINERVA I',
+                            cMun: configMap['emit_cmun'] || '3541406',
+                            xMun: configMap['emit_xmun'] || 'PRESIDENTE PRUDENTE',
+                            UF: configMap['emit_uf'] || 'SP',
+                            CEP: (configMap['emit_cep'] || '19026168').replace(/\D/g, '')
+                        }
+                    },
+                    dest: {
+                        cnpj: (destinatario.documento || '').replace(/\D/g, ''),
+                        xNome: destinatario.nome || 'Consumidor Final',
+                        indIEDest: '9',
+                        enderDest: {
+                            xLgr: destinatario.endereco?.split(',')[0] || 'Endereço não informado',
+                            nro: '0',
+                            xBairro: 'Bairro',
+                            cMun: '3541406',
+                            xMun: 'PRESIDENTE PRUDENTE',
+                            UF: 'SP',
+                            CEP: '19000000'
+                        }
+                    },
+                    det: [{
+                        prod: {
+                            code: '001',
+                            xProd: venda.produto,
+                            NCM: '07031019',
+                            CFOP: configMap['nfe_cfop'] || '5102',
+                            uCom: 'CX',
+                            qCom: venda.qtd_caixas || 1,
+                            vUnCom: venda.valor / (venda.qtd_caixas || 1),
+                            vProd: venda.valor
+                        },
+                        imposto: {
+                            ICMS: { CST: '00', modBC: '0', vBC: '0', pICMS: '0', vICMS: '0' },
+                            PIS: { CST: '99', vPIS: '0' },
+                            COFINS: { CST: '99', vCOFINS: '0' }
+                        }
+                    }],
+                    total: {
+                        icmsTot: {
+                            vBC: '0',
+                            vICMS: '0',
+                            vICMSDeson: '0',
+                            vBCST: '0',
+                            vST: '0',
+                            vProd: venda.valor,
+                            vFrete: '0',
+                            vSeg: '0',
+                            vDesc: '0',
+                            vII: '0',
+                            vIPI: '0',
+                            vPIS: '0',
+                            vCOFINS: '0',
+                            vOutro: '0',
+                            vNF: venda.valor
+                        }
+                    },
+                    transp: {
+                        modFrete: '9'
+                    },
+                    infAdic: {
+                        infCpl: 'Documento emitido por ME ou EPP optante pelo Simples Nacional.'
+                    }
+                };
+                
+                // Gerar XML assinado
+                const xmlAssinado = nfeService.createNFeXML(nfeData);
+                
+                // Transmitir para SEFAZ
+                const transmissaoResult = await nfeService.transmitirSefaz(xmlAssinado, configMap['emit_uf_cod'] || '35');
+                
+                const dataEmissao = new Date().toISOString();
+                const status = transmissaoResult.status || 'assinada';
+                
+                db.run(`INSERT INTO nfe (venda_id, chave_acesso, xml_content, status, data_emissao, protocolo_autorizacao) VALUES (?, ?, ?, ?, ?, ?)`,
+                    [venda_id, chaveAcesso, xmlAssinado, status, dataEmissao, transmissaoResult.protocolo || ''], function (err3) {
                         if (err3) return res.status(500).json({ error: err3.message });
-                        registrarLog(req, 'NFE_GERAR', `NF-e gerada para venda #${venda_id}`);
-                        res.json({ id: this.lastID, chave });
+                        registrarLog(req, 'NFE_GERAR', `NF-e gerada para venda #${venda_id} - Status: ${status}`);
+                        res.json({ id: this.lastID, chave: chaveAcesso, status, message: transmissaoResult.message });
                     });
             } catch (nfeErr) {
+                console.error('Erro ao gerar NF-e:', nfeErr);
                 res.status(500).json({ error: "Erro ao gerar NF-e: " + nfeErr.message });
             }
         });

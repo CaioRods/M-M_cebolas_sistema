@@ -1424,3 +1424,63 @@ function globalDashSearch(val) {
         row.style.display = row.textContent.toLowerCase().includes(val.toLowerCase()) ? '' : 'none';
     });
 }
+
+
+// =============================================
+// FUNÇÃO AUXILIAR: Preencher Destinatário NF-e
+// =============================================
+function preencherDestNFe(select) {
+    const clienteId = select.value;
+    if (!clienteId) {
+        document.getElementById('nfe-dest-nome').value = '';
+        document.getElementById('nfe-dest-doc').value = '';
+        return;
+    }
+    
+    const cliente = appData.clients.find(c => c.id == clienteId);
+    if (cliente) {
+        document.getElementById('nfe-dest-nome').value = cliente.nome || '';
+        document.getElementById('nfe-dest-doc').value = cliente.documento || '';
+    }
+}
+
+// =============================================
+// FUNÇÃO AUXILIAR: Fechar Modal de Busca
+// =============================================
+function closeSearchModal() {
+    document.getElementById('modal-search')?.classList.remove('active');
+}
+
+function filterSearchModal(val) {
+    const tbody = document.getElementById('search-results');
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll('tr');
+    rows.forEach(row => {
+        row.style.display = row.textContent.toLowerCase().includes(val.toLowerCase()) ? '' : 'none';
+    });
+}
+
+// =============================================
+// FUNÇÃO AUXILIAR: Abrir Modal de Usuário
+// =============================================
+function openUsuarioModal(data = null) {
+    const modal = document.getElementById('modal-usuario');
+    if (!modal) return;
+    modal.classList.add('active');
+    
+    const title = document.getElementById('user-modal-title');
+    if (title) title.innerText = data ? 'Editar Acesso' : 'Novo Acesso';
+    
+    document.getElementById('user-id').value = data ? data.id : '';
+    document.getElementById('user-label').value = data ? data.label : '';
+    document.getElementById('user-username').value = data ? data.username : '';
+    document.getElementById('user-password').value = '';
+    document.getElementById('user-role').value = data ? data.role : 'funcionario';
+    
+    const passHint = document.getElementById('pass-hint');
+    if (passHint) passHint.style.display = data ? 'none' : 'inline';
+}
+
+function closeUsuarioModal() {
+    document.getElementById('modal-usuario')?.classList.remove('active');
+}
