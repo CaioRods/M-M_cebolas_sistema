@@ -859,3 +859,437 @@ tr:hover td { background-color: #f8fafc; }
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
+
+
+/* --- MELHORIAS DE RESPONSIVIDADE PARA ADMIN --- */
+@media (max-width: 1200px) {
+    .analysis-row { grid-template-columns: 1fr; }
+    .data-row { grid-template-columns: 1fr; }
+    .kpi-grid-pro { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+}
+
+@media (max-width: 1024px) {
+    .panel-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .panel-header > div {
+        margin-bottom: 0;
+    }
+
+    .panel-header button {
+        align-self: flex-start;
+    }
+
+    .search-box-pro {
+        width: 100%;
+        max-width: 300px;
+    }
+
+    .top-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .nfe-list-item {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 12px 16px;
+    }
+
+    .nfe-list-item .date,
+    .nfe-list-item .info,
+    .nfe-list-item .value,
+    .nfe-list-item .status,
+    .nfe-list-item .actions {
+        text-align: left;
+    }
+}
+
+@media (max-width: 768px) {
+    .panel {
+        border-radius: 14px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+
+    .panel-header {
+        padding: 16px 18px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .panel-header h4 {
+        font-size: 1rem;
+    }
+
+    .panel-header p {
+        font-size: 0.75rem;
+    }
+
+    .table-container {
+        margin: 0 -18px;
+        width: calc(100% + 36px);
+        border-radius: 0 0 14px 14px;
+    }
+
+    .table-pro th {
+        padding: 12px 14px;
+        font-size: 0.7rem;
+    }
+
+    .table-pro td {
+        padding: 12px 14px;
+        font-size: 0.8rem;
+    }
+
+    .btn-primary, .btn-danger {
+        width: 100%;
+        min-height: 44px;
+        font-size: 0.9rem;
+    }
+
+    .btn-icon {
+        padding: 8px 12px;
+        font-size: 0.8rem;
+    }
+
+    .search-box-pro {
+        width: 100%;
+    }
+
+    .search-box-pro input {
+        padding: 8px 12px 8px 36px;
+        font-size: 0.85rem;
+    }
+
+    .form-grid {
+        grid-template-columns: 1fr;
+        gap: 14px;
+        padding: 18px;
+    }
+
+    .span-2 {
+        grid-column: span 1;
+    }
+
+    input, select, textarea {
+        padding: 10px 14px;
+        font-size: 0.9rem;
+        border-radius: 8px;
+    }
+
+    label {
+        font-size: 0.8rem;
+    }
+
+    .badge {
+        padding: 4px 10px;
+        font-size: 0.6rem;
+    }
+
+    .kpi-grid-pro {
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 12px;
+    }
+
+    .product-grid {
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        gap: 12px;
+    }
+
+    .product-card {
+        padding: 14px 10px;
+        border-radius: 12px;
+    }
+
+    .product-icon-circle {
+        width: 50px;
+        height: 50px;
+        font-size: 1.4rem;
+    }
+
+    .product-name {
+        font-size: 0.85rem;
+    }
+
+    .product-stock {
+        font-size: 0.7rem;
+        padding: 3px 8px;
+    }
+
+    .edit-modal {
+        max-width: 95%;
+        border-radius: 16px;
+    }
+
+    .modal-header {
+        padding: 16px 18px;
+    }
+
+    .modal-header h3 {
+        font-size: 1rem;
+    }
+
+    .page-title {
+        font-size: 1.3rem;
+    }
+
+    .top-bar {
+        padding: 16px;
+    }
+
+    .main-content {
+        padding: 14px 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    .panel {
+        border-radius: 12px;
+        margin-bottom: 14px;
+    }
+
+    .panel-header {
+        padding: 14px 16px;
+        gap: 10px;
+    }
+
+    .panel-header h4 {
+        font-size: 0.95rem;
+    }
+
+    .panel-header p {
+        font-size: 0.7rem;
+    }
+
+    .table-container {
+        margin: 0 -16px;
+        width: calc(100% + 32px);
+    }
+
+    .table-pro {
+        min-width: 350px;
+    }
+
+    .table-pro th {
+        padding: 10px 12px;
+        font-size: 0.65rem;
+    }
+
+    .table-pro td {
+        padding: 10px 12px;
+        font-size: 0.75rem;
+    }
+
+    .btn-primary, .btn-danger {
+        width: 100%;
+        min-height: 40px;
+        font-size: 0.85rem;
+        padding: 10px 16px;
+        border-radius: 8px;
+    }
+
+    .btn-icon {
+        padding: 6px 10px;
+        font-size: 0.75rem;
+        border-radius: 6px;
+    }
+
+    .form-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+        padding: 14px;
+    }
+
+    input, select, textarea {
+        padding: 10px 12px;
+        font-size: 0.9rem;
+        border-radius: 6px;
+    }
+
+    label {
+        font-size: 0.75rem;
+    }
+
+    .badge {
+        padding: 3px 8px;
+        font-size: 0.55rem;
+    }
+
+    .kpi-grid-pro {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .product-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+
+    .product-card {
+        padding: 12px 8px;
+        border-radius: 10px;
+        min-height: 90px;
+    }
+
+    .product-icon-circle {
+        width: 45px;
+        height: 45px;
+        font-size: 1.2rem;
+        margin-bottom: 8px;
+    }
+
+    .product-name {
+        font-size: 0.8rem;
+    }
+
+    .product-stock {
+        font-size: 0.65rem;
+        padding: 2px 6px;
+    }
+
+    .edit-modal {
+        max-width: 100%;
+        border-radius: 14px;
+        max-height: calc(100vh - 60px);
+    }
+
+    .modal-header {
+        padding: 14px 16px;
+    }
+
+    .modal-header h3 {
+        font-size: 0.95rem;
+    }
+
+    .page-title {
+        font-size: 1.1rem;
+        margin-bottom: 12px;
+    }
+
+    .top-bar {
+        padding: 12px;
+        gap: 10px;
+    }
+
+    .main-content {
+        padding: 12px 14px;
+    }
+
+    .search-box-pro {
+        width: 100%;
+    }
+
+    .search-box-pro input {
+        padding: 8px 10px 8px 32px;
+        font-size: 0.8rem;
+    }
+
+    .nfe-list-item {
+        grid-template-columns: 1fr;
+        gap: 6px;
+        padding: 10px 12px;
+    }
+
+    .filter-btn {
+        padding: 4px 12px;
+        font-size: 0.7rem;
+    }
+
+    .minimal-select {
+        padding: 4px 8px;
+        font-size: 0.75rem;
+    }
+
+    .toggle-btn {
+        padding: 4px 8px;
+        font-size: 0.8rem;
+    }
+
+    .chart-body {
+        height: 250px;
+        padding: 12px;
+    }
+
+    .chart-body.compact {
+        height: 180px;
+    }
+
+    .search-box-mini {
+        width: 100%;
+    }
+
+    .search-box-mini input {
+        padding: 6px 8px 6px 28px;
+        font-size: 0.75rem;
+    }
+}
+
+/* --- SUPORTE A NOTCH DO IPHONE --- */
+@supports (padding: env(safe-area-inset-top)) {
+    @media (max-width: 768px) {
+        .main-content {
+            padding-bottom: max(14px, env(safe-area-inset-bottom));
+        }
+
+        .sidebar {
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+    }
+}
+
+/* --- ANIMAÇÕES SUAVES --- */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* --- MODO ESCURO (FUTURO) --- */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-body: #1a1a1a;
+        --bg-panel: #2d2d2d;
+        --text-main: #f5f5f5;
+        --text-muted: #a0a0a0;
+        --border: #3d3d3d;
+    }
+
+    body {
+        background-color: var(--bg-body);
+        color: var(--text-main);
+    }
+
+    .panel {
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+    }
+
+    table {
+        background: var(--bg-panel);
+    }
+
+    th {
+        background: #1a1a1a;
+    }
+
+    input, select, textarea {
+        background: #3d3d3d;
+        color: var(--text-main);
+        border-color: var(--border);
+    }
+
+    .modal-overlay {
+        background: rgba(0, 0, 0, 0.6);
+    }
+
+    .edit-modal {
+        background: var(--bg-panel);
+    }
+}

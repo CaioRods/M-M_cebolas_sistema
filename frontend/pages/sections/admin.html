@@ -1,27 +1,29 @@
 <header class="top-bar">
     <div>
-        <h2 class="page-title" style="color: #1e40af;"><i class="fas fa-shield-alt" style="margin-right:10px;"></i>Painel do Administrador</h2>
+        <h2 class="page-title" style="color: #2563eb;"><i class="fas fa-shield-alt" style="margin-right:10px;"></i>Painel do Administrador</h2>
         <p style="color: var(--text-muted); font-size: 0.9rem;">Controle total do sistema, usuários e dados.</p>
     </div>
 </header>
 
-<!-- TABS ADMIN -->
-<div style="display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap;">
-    <button class="admin-tab-btn active" onclick="switchAdminTab('usuarios', this)">
-        <i class="fas fa-users-cog"></i> Usuários
-    </button>
-    <button class="admin-tab-btn" onclick="switchAdminTab('cadastros', this)">
-        <i class="fas fa-address-book"></i> Cadastros
-    </button>
-    <button class="admin-tab-btn" onclick="switchAdminTab('logs', this)">
-        <i class="fas fa-history"></i> Logs
-    </button>
-    <button class="admin-tab-btn" onclick="switchAdminTab('nfe-config', this)">
-        <i class="fas fa-file-invoice"></i> Config NF-e
-    </button>
-    <button class="admin-tab-btn danger-tab" onclick="switchAdminTab('danger', this)">
-        <i class="fas fa-exclamation-triangle"></i> Zona de Perigo
-    </button>
+<!-- TABS ADMIN - DESIGN MODERNO -->
+<div class="admin-tabs-container">
+    <div class="admin-tabs-scroll">
+        <button class="admin-tab-btn active" onclick="switchAdminTab('usuarios', this)">
+            <i class="fas fa-users-cog"></i> <span>Usuários</span>
+        </button>
+        <button class="admin-tab-btn" onclick="switchAdminTab('cadastros', this)">
+            <i class="fas fa-address-book"></i> <span>Cadastros</span>
+        </button>
+        <button class="admin-tab-btn" onclick="switchAdminTab('logs', this)">
+            <i class="fas fa-history"></i> <span>Logs</span>
+        </button>
+        <button class="admin-tab-btn" onclick="switchAdminTab('nfe-config', this)">
+            <i class="fas fa-file-invoice"></i> <span>Config NF-e</span>
+        </button>
+        <button class="admin-tab-btn danger-tab" onclick="switchAdminTab('danger', this)">
+            <i class="fas fa-exclamation-triangle"></i> <span>Zona de Perigo</span>
+        </button>
+    </div>
 </div>
 
 <!-- USUÁRIOS -->
@@ -29,16 +31,16 @@
     <div class="panel">
         <div class="panel-header">
             <div>
-                <h4 style="font-weight: 700;"><i class="fas fa-users-cog" style="color:#2563eb"></i> Gerenciamento de Usuários</h4>
+                <h4 style="font-weight: 700;"><i class="fas fa-users-cog" style="color:#2563eb;margin-right:8px;"></i>Gerenciamento de Usuários</h4>
                 <p style="font-size:0.8rem;color:var(--text-muted)">Crie e gerencie acessos ao sistema</p>
             </div>
-            <button class="btn-primary" onclick="openUsuarioModal()" style="background:#2563eb;">
+            <button class="btn-primary" onclick="openUsuarioModal()" style="background:#2563eb;white-space:nowrap;">
                 <i class="fas fa-user-plus"></i> Novo Usuário
             </button>
         </div>
 
         <div class="table-container">
-            <table>
+            <table class="table-pro">
                 <thead>
                     <tr>
                         <th>Nome</th>
@@ -53,44 +55,57 @@
     </div>
 
     <!-- Legenda de níveis -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-top:16px;">
-        <div class="panel" style="padding:16px;border-left:4px solid #dc2626;">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+    <div class="admin-levels-grid">
+        <div class="admin-level-card admin-level-admin">
+            <div class="admin-level-icon"><i class="fas fa-crown"></i></div>
+            <div>
                 <span class="badge admin">ADMIN</span>
                 <strong>Administrador</strong>
+                <p>Acesso total: gerencia usuários, configurações, pode resetar sistema e alterar modo NF-e.</p>
             </div>
-            <p style="font-size:0.8rem;color:var(--text-muted)">Acesso total: gerencia usuários, configurações, pode resetar sistema e alterar modo NF-e.</p>
         </div>
-        <div class="panel" style="padding:16px;border-left:4px solid #059669;">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <div class="admin-level-card admin-level-chefe">
+            <div class="admin-level-icon"><i class="fas fa-user-tie"></i></div>
+            <div>
                 <span class="badge entrada">CHEFE</span>
                 <strong>Chefe</strong>
+                <p>Acesso completo às operações, relatórios e cadastros. Não gerencia usuários.</p>
             </div>
-            <p style="font-size:0.8rem;color:var(--text-muted)">Acesso completo às operações, relatórios e cadastros. Não gerencia usuários.</p>
         </div>
-        <div class="panel" style="padding:16px;border-left:4px solid #64748b;">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <div class="admin-level-card admin-level-func">
+            <div class="admin-level-icon"><i class="fas fa-user"></i></div>
+            <div>
                 <span class="badge operador">FUNCIONÁRIO</span>
                 <strong>Funcionário</strong>
+                <p>Acesso básico: registra entradas e saídas. Não vê configurações sensíveis.</p>
             </div>
-            <p style="font-size:0.8rem;color:var(--text-muted)">Acesso básico: registra entradas e saídas. Não vê configurações sensíveis.</p>
         </div>
     </div>
 </div>
 
 <!-- CADASTROS -->
 <div id="admin-tab-cadastros" class="admin-tab-content" style="display:none;">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px;">
+    <div class="admin-cadastros-grid">
         <!-- Clientes -->
         <div class="panel">
             <div class="panel-header">
-                <h4 style="font-weight:700;"><i class="fas fa-users" style="color:var(--primary)"></i> Clientes</h4>
-                <button class="btn-primary" onclick="openEditModal('cliente')" style="padding:8px 16px;font-size:0.8rem;">
+                <div>
+                    <h4 style="font-weight:700;"><i class="fas fa-users" style="color:var(--primary);margin-right:8px;"></i>Clientes</h4>
+                    <p style="font-size:0.8rem;color:var(--text-muted)">Gestão de clientes cadastrados</p>
+                </div>
+                <button class="btn-primary" onclick="openEditModal('cliente')" style="padding:8px 16px;font-size:0.8rem;white-space:nowrap;">
                     <i class="fas fa-plus"></i> Novo
                 </button>
             </div>
-            <div class="table-container" style="max-height:350px;overflow-y:auto;">
-                <table>
+            <div class="table-container">
+                <table class="table-pro">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Documento</th>
+                            <th style="text-align:right;">Ações</th>
+                        </tr>
+                    </thead>
                     <tbody id="admin-list-clientes"></tbody>
                 </table>
             </div>
@@ -99,13 +114,23 @@
         <!-- Fornecedores -->
         <div class="panel">
             <div class="panel-header">
-                <h4 style="font-weight:700;"><i class="fas fa-truck-moving" style="color:var(--accent)"></i> Fornecedores</h4>
-                <button class="btn-primary" onclick="openEditModal('fornecedor')" style="padding:8px 16px;font-size:0.8rem;">
+                <div>
+                    <h4 style="font-weight:700;"><i class="fas fa-truck-moving" style="color:var(--accent);margin-right:8px;"></i>Fornecedores</h4>
+                    <p style="font-size:0.8rem;color:var(--text-muted)">Gestão de fornecedores cadastrados</p>
+                </div>
+                <button class="btn-primary" onclick="openEditModal('fornecedor')" style="padding:8px 16px;font-size:0.8rem;white-space:nowrap;">
                     <i class="fas fa-plus"></i> Novo
                 </button>
             </div>
-            <div class="table-container" style="max-height:350px;overflow-y:auto;">
-                <table>
+            <div class="table-container">
+                <table class="table-pro">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Documento</th>
+                            <th style="text-align:right;">Ações</th>
+                        </tr>
+                    </thead>
                     <tbody id="admin-list-fornecedores"></tbody>
                 </table>
             </div>
@@ -113,15 +138,26 @@
     </div>
 
     <!-- Produtos -->
-    <div class="panel">
+    <div class="panel" style="margin-top:24px;">
         <div class="panel-header">
-            <h4 style="font-weight:700;"><i class="fas fa-box-open" style="color:var(--primary)"></i> Produtos / Variedades</h4>
-            <button class="btn-primary" onclick="openProdutoModal(null)" style="padding:8px 16px;font-size:0.8rem;">
+            <div>
+                <h4 style="font-weight:700;"><i class="fas fa-box-open" style="color:var(--primary);margin-right:8px;"></i>Produtos / Variedades</h4>
+                <p style="font-size:0.8rem;color:var(--text-muted)">Gestão de produtos cadastrados</p>
+            </div>
+            <button class="btn-primary" onclick="openProdutoModal(null)" style="padding:8px 16px;font-size:0.8rem;white-space:nowrap;">
                 <i class="fas fa-plus"></i> Novo Produto
             </button>
         </div>
         <div class="table-container">
-            <table>
+            <table class="table-pro">
+                <thead>
+                    <tr>
+                        <th>Produto</th>
+                        <th>NCM</th>
+                        <th>Preço Base</th>
+                        <th style="text-align:right;">Ações</th>
+                    </tr>
+                </thead>
                 <tbody id="admin-list-produtos"></tbody>
             </table>
         </div>
@@ -132,13 +168,16 @@
 <div id="admin-tab-logs" class="admin-tab-content" style="display:none;">
     <div class="panel">
         <div class="panel-header">
-            <h4 style="font-weight:700;"><i class="fas fa-history"></i> Log de Atividades</h4>
-            <button class="btn-icon" onclick="loadLogs()" title="Atualizar">
-                <i class="fas fa-sync-alt"></i> Atualizar
+            <div>
+                <h4 style="font-weight:700;"><i class="fas fa-history" style="margin-right:8px;"></i>Log de Atividades</h4>
+                <p style="font-size:0.8rem;color:var(--text-muted)">Histórico de ações do sistema</p>
+            </div>
+            <button class="btn-icon" onclick="loadLogs()" title="Atualizar" style="padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:white;">
+                <i class="fas fa-sync-alt"></i>
             </button>
         </div>
-        <div class="table-container" style="max-height:500px;overflow-y:auto;">
-            <table>
+        <div class="table-container">
+            <table class="table-pro">
                 <thead>
                     <tr>
                         <th>Data/Hora</th>
@@ -155,33 +194,34 @@
 
 <!-- CONFIG NF-E -->
 <div id="admin-tab-nfe-config" class="admin-tab-content" style="display:none;">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+    <div class="admin-nfe-grid">
         <!-- Modo NF-e -->
         <div class="panel">
             <div class="panel-header">
-                <h4 style="font-weight:700;"><i class="fas fa-toggle-on" style="color:var(--primary)"></i> Ambiente NF-e</h4>
+                <h4 style="font-weight:700;"><i class="fas fa-toggle-on" style="color:var(--primary);margin-right:8px;"></i>Ambiente NF-e</h4>
             </div>
             <div style="padding:24px;">
                 <div class="nfe-modo-alert" id="nfe-modo-alert" style="display:none;margin-bottom:16px;padding:12px 16px;border-radius:10px;font-weight:600;font-size:0.85rem;"></div>
                 
-                <label class="radio-option" style="display:flex;align-items:flex-start;gap:12px;padding:16px;border:2px solid var(--border);border-radius:12px;cursor:pointer;margin-bottom:12px;transition:all 0.2s;">
-                    <input type="radio" name="nfe_modo" value="homologacao" onchange="updateNFeModo('homologacao')" style="width:auto;margin-top:3px;">
-                    <div>
-                        <strong style="display:block;margin-bottom:4px;">🧪 Homologação (Testes)</strong>
-                        <span style="color:var(--text-muted);font-size:0.8rem;">As notas não possuem valor fiscal. Use para testar o sistema.</span>
+                <label class="nfe-radio-option">
+                    <input type="radio" name="nfe_modo" value="homologacao" onchange="updateNFeModo('homologacao')">
+                    <div class="nfe-radio-content">
+                        <strong>🧪 Homologação (Testes)</strong>
+                        <span>As notas não possuem valor fiscal. Use para testar o sistema.</span>
                     </div>
                 </label>
                 
-                <label class="radio-option" style="display:flex;align-items:flex-start;gap:12px;padding:16px;border:2px solid var(--border);border-radius:12px;cursor:pointer;margin-bottom:12px;transition:all 0.2s;">
-                    <input type="radio" name="nfe_modo" value="producao" onchange="updateNFeModo('producao')" style="width:auto;margin-top:3px;">
-                    <div>
-                        <strong style="display:block;margin-bottom:4px;">🏭 Produção (Real)</strong>
-                        <span style="color:var(--text-muted);font-size:0.8rem;">Ambiente real. As notas possuem validade jurídica e fiscal perante a SEFAZ.</span>
+                <label class="nfe-radio-option">
+                    <input type="radio" name="nfe_modo" value="producao" onchange="updateNFeModo('producao')">
+                    <div class="nfe-radio-content">
+                        <strong>🏭 Produção (Real)</strong>
+                        <span>Ambiente real. As notas possuem validade jurídica e fiscal perante a SEFAZ.</span>
                     </div>
                 </label>
                 
-                <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:10px;padding:12px;margin-top:16px;">
-                    <p style="font-size:0.8rem;font-weight:600;color:#92400e;"><i class="fas fa-exclamation-triangle"></i> Atenção: Somente administradores podem alterar o ambiente. Em produção, todas as NF-es emitidas têm valor fiscal real.</p>
+                <div class="nfe-warning-box">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>Atenção: Somente administradores podem alterar o ambiente. Em produção, todas as NF-es emitidas têm valor fiscal real.</p>
                 </div>
             </div>
         </div>
@@ -189,20 +229,20 @@
         <!-- Certificado Digital -->
         <div class="panel">
             <div class="panel-header">
-                <h4 style="font-weight:700;"><i class="fas fa-certificate" style="color:#7c3aed"></i> Certificado Digital</h4>
+                <h4 style="font-weight:700;"><i class="fas fa-certificate" style="color:#7c3aed;margin-right:8px;"></i>Certificado Digital</h4>
             </div>
             <div style="padding:24px;display:flex;flex-direction:column;gap:16px;">
-                <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px;">
-                    <p style="font-size:0.85rem;font-weight:600;color:#166534;margin-bottom:4px;"><i class="fas fa-info-circle"></i> Localização do Certificado</p>
-                    <code style="font-size:0.8rem;color:#374151;background:#dcfce7;padding:4px 8px;border-radius:4px;">/server/certificado/certificado.pfx</code>
-                    <p style="font-size:0.75rem;color:#059669;margin-top:8px;">Coloque o arquivo .pfx na pasta acima e configure a senha abaixo.</p>
+                <div class="nfe-info-box">
+                    <p><i class="fas fa-info-circle"></i> Localização do Certificado</p>
+                    <code>/server/certificado/certificado.pfx</code>
+                    <small>Coloque o arquivo .pfx na pasta acima e configure a senha abaixo.</small>
                 </div>
                 
                 <div class="form-group">
                     <label>Senha do Certificado (.pfx)</label>
                     <div style="display:flex;gap:8px;">
                         <input type="password" id="cert-password" placeholder="Digite a senha do certificado" style="flex:1;">
-                        <button class="btn-primary" onclick="saveCertPassword()" style="padding:10px 16px;">
+                        <button class="btn-primary" onclick="saveCertPassword()" style="padding:10px 16px;white-space:nowrap;">
                             <i class="fas fa-save"></i> Salvar
                         </button>
                     </div>
@@ -213,7 +253,7 @@
                     <div style="display:flex;gap:8px;align-items:center;">
                         <input type="number" id="config-peso-cx" placeholder="20" step="0.1" min="0.1" style="flex:1;">
                         <span style="background:#dbeafe;color:#1e40af;padding:10px 14px;border-radius:8px;font-weight:700;white-space:nowrap;">Kg/Cx</span>
-                        <button class="btn-primary" onclick="savePesoPorCaixa()" style="padding:10px 16px;">
+                        <button class="btn-primary" onclick="savePesoPorCaixa()" style="padding:10px 16px;white-space:nowrap;">
                             <i class="fas fa-save"></i>
                         </button>
                     </div>
@@ -225,30 +265,48 @@
 
 <!-- ZONA DE PERIGO -->
 <div id="admin-tab-danger" class="admin-tab-content" style="display:none;">
-    <div class="panel" style="border:2px solid #fee2e2;">
-        <div class="panel-header" style="background:#fff1f2;border-bottom:1px solid #fee2e2;">
-            <h4 style="color:#991b1b;font-weight:800;"><i class="fas fa-skull-crossbones"></i> ZONA DE PERIGO — ADMINISTRADOR</h4>
+    <div class="panel admin-danger-panel">
+        <div class="panel-header admin-danger-header">
+            <h4 style="color:#991b1b;font-weight:800;"><i class="fas fa-skull-crossbones" style="margin-right:8px;"></i>ZONA DE PERIGO — ADMINISTRADOR</h4>
         </div>
         <div style="padding:32px;">
-            <div style="display:grid;grid-template-columns:1fr auto;gap:24px;align-items:center;padding:24px;background:#fff5f5;border:1px solid #fecaca;border-radius:12px;">
+            <div class="admin-danger-card">
                 <div>
-                    <h4 style="color:#991b1b;margin-bottom:8px;"><i class="fas fa-trash-alt"></i> Resetar Todos os Dados</h4>
-                    <p style="color:#b91c1c;font-size:0.9rem;">Esta ação é <strong>IRREVERSÍVEL</strong>. Apagará permanentemente todas as movimentações, NF-es, clientes, fornecedores e produtos do banco de dados.</p>
-                    <p style="color:#7f1d1d;font-size:0.8rem;margin-top:8px;"><i class="fas fa-shield-alt"></i> Usuários e configurações do sistema serão mantidos.</p>
+                    <h5 style="color:#991b1b;font-weight:700;margin-bottom:8px;"><i class="fas fa-trash"></i> Resetar Banco de Dados</h5>
+                    <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:12px;">Limpe completamente o banco de dados e retorne ao estado inicial. Esta ação é irreversível!</p>
+                    <button class="btn-danger" onclick="if(confirm('ATENÇÃO: Isto vai deletar TODOS os dados. Tem certeza?')) resetDatabase()" style="width:100%;max-width:200px;">
+                        <i class="fas fa-exclamation-circle"></i> Resetar Banco
+                    </button>
                 </div>
-                <button class="btn-danger" onclick="resetSystem()" style="background:#dc2626;color:white;padding:16px 28px;font-weight:800;border-radius:10px;white-space:nowrap;box-shadow:0 4px 12px rgba(220,38,38,0.3);">
-                    <i class="fas fa-trash-alt"></i><br>APAGAR TUDO
-                </button>
             </div>
         </div>
     </div>
 </div>
 
 <style>
-.admin-tab-btn {
-    padding: 10px 20px;
-    border: 2px solid var(--border);
+/* --- ADMIN TABS MODERNO --- */
+.admin-tabs-container {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
     background: white;
+    padding: 12px;
+    border-radius: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.admin-tabs-scroll {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.admin-tab-btn {
+    padding: 10px 18px;
+    border: 2px solid transparent;
+    background: #f1f5f9;
     border-radius: 10px;
     cursor: pointer;
     font-weight: 600;
@@ -258,53 +316,461 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
-}
-.admin-tab-btn:hover { border-color: #2563eb; color: #2563eb; }
-.admin-tab-btn.active { background: #2563eb; border-color: #2563eb; color: white; }
-.admin-tab-btn.danger-tab:hover { border-color: #dc2626; color: #dc2626; }
-.admin-tab-btn.danger-tab.active { background: #dc2626; border-color: #dc2626; color: white; }
-
-.radio-option:has(input:checked) {
-    border-color: var(--primary) !important;
-    background: #f0fdf4 !important;
-}
-</style>
-
-<script>
-function switchAdminTab(tab, btn) {
-    document.querySelectorAll('.admin-tab-content').forEach(t => t.style.display = 'none');
-    document.querySelectorAll('.admin-tab-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('admin-tab-' + tab).style.display = 'block';
-    btn.classList.add('active');
-    
-    // Load specific data
-    if (tab === 'logs') loadLogs();
-    if (tab === 'nfe-config') loadNFeAdminConfig();
+    white-space: nowrap;
 }
 
-function loadNFeAdminConfig() {
-    const modo = (typeof appData !== 'undefined' && appData.configs) ? (appData.configs.nfe_modo || 'homologacao') : 'homologacao';
-    document.querySelectorAll('input[name="nfe_modo"]').forEach(r => r.checked = r.value === modo);
-    const pesoCxEl = document.getElementById('config-peso-cx');
-    if (pesoCxEl && typeof appData !== 'undefined') pesoCxEl.value = appData.configs.peso_por_caixa_padrao || 20;
-    
-    // Show mode indicator
-    const alert = document.getElementById('nfe-modo-alert');
-    if (alert) {
-        alert.style.display = 'flex';
-        alert.style.alignItems = 'center';
-        alert.style.gap = '10px';
-        if (modo === 'producao') {
-            alert.style.background = '#fef2f2';
-            alert.style.border = '1px solid #fecaca';
-            alert.style.color = '#991b1b';
-            alert.innerHTML = '<i class="fas fa-exclamation-circle"></i> Modo PRODUÇÃO ativo — NF-es emitidas têm valor fiscal REAL!';
-        } else {
-            alert.style.background = '#f0fdf4';
-            alert.style.border = '1px solid #bbf7d0';
-            alert.style.color = '#166534';
-            alert.innerHTML = '<i class="fas fa-check-circle"></i> Modo HOMOLOGAÇÃO ativo — Apenas para testes, sem valor fiscal.';
-        }
+.admin-tab-btn:hover {
+    background: #e2e8f0;
+    color: var(--text-main);
+}
+
+.admin-tab-btn.active {
+    background: #2563eb;
+    color: white;
+    border-color: #2563eb;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.admin-tab-btn.danger-tab {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.admin-tab-btn.danger-tab:hover {
+    background: #fecaca;
+}
+
+.admin-tab-btn.danger-tab.active {
+    background: #dc2626;
+    color: white;
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
+/* --- GRID DE NÍVEIS DE USUÁRIO --- */
+.admin-levels-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin-top: 24px;
+}
+
+.admin-level-card {
+    display: flex;
+    gap: 16px;
+    padding: 18px;
+    border-radius: 12px;
+    border-left: 4px solid;
+    background: white;
+    transition: var(--transition);
+}
+
+.admin-level-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.admin-level-admin {
+    border-left-color: #2563eb;
+    background: #eff6ff;
+}
+
+.admin-level-chefe {
+    border-left-color: #059669;
+    background: #ecfdf5;
+}
+
+.admin-level-func {
+    border-left-color: #64748b;
+    background: #f8fafc;
+}
+
+.admin-level-icon {
+    font-size: 1.8rem;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.6);
+    flex-shrink: 0;
+}
+
+.admin-level-admin .admin-level-icon { color: #2563eb; }
+.admin-level-chefe .admin-level-icon { color: #059669; }
+.admin-level-func .admin-level-icon { color: #64748b; }
+
+.admin-level-card strong {
+    display: block;
+    font-size: 0.95rem;
+    margin-bottom: 4px;
+}
+
+.admin-level-card p {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+/* --- GRID DE CADASTROS --- */
+.admin-cadastros-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+    gap: 24px;
+}
+
+/* --- GRID NF-E CONFIG --- */
+.admin-nfe-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+    gap: 24px;
+}
+
+/* --- NF-E RADIO OPTION --- */
+.nfe-radio-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+    margin-bottom: 12px;
+    transition: var(--transition);
+}
+
+.nfe-radio-option:hover {
+    border-color: #2563eb;
+    background: #eff6ff;
+}
+
+.nfe-radio-option input[type="radio"] {
+    width: 20px;
+    height: 20px;
+    margin-top: 2px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.nfe-radio-option input[type="radio"]:checked + .nfe-radio-content {
+    color: #2563eb;
+}
+
+.nfe-radio-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.nfe-radio-content strong {
+    display: block;
+    font-weight: 700;
+}
+
+.nfe-radio-content span {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+/* --- NF-E WARNING BOX --- */
+.nfe-warning-box {
+    background: #fef3c7;
+    border: 1px solid #f59e0b;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-top: 16px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+}
+
+.nfe-warning-box i {
+    color: #92400e;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.nfe-warning-box p {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #92400e;
+    line-height: 1.4;
+    margin: 0;
+}
+
+/* --- NF-E INFO BOX --- */
+.nfe-info-box {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 10px;
+    padding: 16px;
+}
+
+.nfe-info-box p {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #166534;
+    margin-bottom: 8px;
+}
+
+.nfe-info-box code {
+    font-size: 0.8rem;
+    color: #374151;
+    background: #dcfce7;
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.nfe-info-box small {
+    color: #059669;
+    font-size: 0.75rem;
+    display: block;
+}
+
+/* --- ADMIN DANGER PANEL --- */
+.admin-danger-panel {
+    border: 2px solid #fee2e2;
+}
+
+.admin-danger-header {
+    background: #fff1f2;
+    border-bottom: 1px solid #fee2e2;
+}
+
+.admin-danger-card {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    padding: 24px;
+    background: #fff5f5;
+    border: 1px solid #fecaca;
+    border-radius: 12px;
+}
+
+.admin-danger-card h5 {
+    margin: 0;
+}
+
+/* --- RESPONSIVIDADE --- */
+@media (max-width: 1024px) {
+    .admin-tabs-container {
+        padding: 10px;
+    }
+
+    .admin-tabs-scroll {
+        gap: 6px;
+    }
+
+    .admin-tab-btn {
+        padding: 8px 14px;
+        font-size: 0.8rem;
+    }
+
+    .admin-tab-btn span {
+        display: none;
+    }
+
+    .admin-cadastros-grid,
+    .admin-nfe-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-levels-grid {
+        grid-template-columns: 1fr;
     }
 }
-</script>
+
+@media (max-width: 768px) {
+    .admin-tabs-container {
+        padding: 8px;
+        margin-bottom: 16px;
+    }
+
+    .admin-tabs-scroll {
+        gap: 4px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .admin-tab-btn {
+        padding: 8px 12px;
+        font-size: 0.75rem;
+        border-radius: 8px;
+    }
+
+    .admin-tab-btn i {
+        font-size: 0.9rem;
+    }
+
+    .admin-tab-btn span {
+        display: none;
+    }
+
+    .admin-level-card {
+        padding: 14px;
+        gap: 12px;
+    }
+
+    .admin-level-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 1.4rem;
+    }
+
+    .admin-level-card strong {
+        font-size: 0.85rem;
+    }
+
+    .admin-level-card p {
+        font-size: 0.75rem;
+    }
+
+    .table-container {
+        margin: 0 -16px;
+        width: calc(100% + 32px);
+        border-radius: 0;
+    }
+
+    .table-container table {
+        min-width: 400px;
+    }
+
+    th, td {
+        padding: 12px 10px;
+        font-size: 0.8rem;
+    }
+
+    .nfe-radio-option {
+        padding: 12px;
+        margin-bottom: 10px;
+    }
+
+    .admin-danger-card {
+        flex-direction: column;
+        gap: 12px;
+        padding: 16px;
+    }
+
+    .btn-primary, .btn-danger {
+        width: 100%;
+        min-height: 44px;
+    }
+}
+
+@media (max-width: 480px) {
+    .admin-tab-btn {
+        padding: 6px 10px;
+        font-size: 0.7rem;
+    }
+
+    .admin-tab-btn i {
+        font-size: 0.8rem;
+    }
+
+    .panel-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .panel-header > div {
+        margin-bottom: 8px;
+    }
+
+    .admin-level-card {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .admin-level-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 1.2rem;
+        margin: 0 auto;
+    }
+
+    .nfe-radio-option {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .nfe-radio-option input[type="radio"] {
+        margin-top: 0;
+    }
+}
+
+/* --- ESTILOS PARA TABELAS RESPONSIVAS --- */
+.table-pro {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table-pro thead {
+    background: #f8fafc;
+}
+
+.table-pro th {
+    padding: 14px 16px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    border-bottom: 2px solid var(--border);
+    text-align: left;
+}
+
+.table-pro td {
+    padding: 14px 16px;
+    font-size: 0.9rem;
+    color: var(--text-main);
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+}
+
+.table-pro tbody tr:hover {
+    background-color: #f8fafc;
+}
+
+.table-pro tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* --- BOTÕES ICON --- */
+.btn-icon {
+    background: white;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-icon:hover {
+    background: #f1f5f9;
+    color: var(--text-main);
+}
+
+.btn-text {
+    background: none;
+    border: none;
+    color: #2563eb;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.85rem;
+    transition: var(--transition);
+}
+
+.btn-text:hover {
+    color: #1d4ed8;
+    text-decoration: underline;
+}
+</style>
