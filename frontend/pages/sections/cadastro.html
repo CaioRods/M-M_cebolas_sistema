@@ -177,10 +177,29 @@
 
 <script>
 function switchCadTab(tab, btn) {
-    document.querySelectorAll('.cad-tab').forEach(t => t.style.display = 'none');
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('tab-' + tab).style.display = 'block';
-    btn.classList.add('active');
+    console.log('Switching to tab:', tab);
+    // Esconder todas as abas de cadastro
+    document.querySelectorAll('.cad-tab').forEach(t => {
+        t.style.display = 'none';
+    });
+    
+    // Remover classe active de todos os botões de aba de cadastro
+    document.querySelectorAll('.tab-btn').forEach(b => {
+        b.classList.remove('active');
+    });
+    
+    // Mostrar a aba selecionada
+    const targetTab = document.getElementById('tab-' + tab);
+    if (targetTab) {
+        targetTab.style.display = 'block';
+    } else {
+        console.error('Tab not found: tab-' + tab);
+    }
+    
+    // Adicionar classe active ao botão clicado
+    if (btn) {
+        btn.classList.add('active');
+    }
 }
 
 function filterCadTable(tableId, val) {

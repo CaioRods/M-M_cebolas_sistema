@@ -382,7 +382,7 @@ function renderClientesTable() {
             <td>${c.telefone || '-'}</td>
             <td>${c.email || '-'}</td>
             <td>
-                <button class="btn-icon" onclick="openEditModal('cliente', ${JSON.stringify(c).replace(/"/g, '&quot;')})"><i class="fas fa-edit"></i></button>
+                <button class="btn-icon" onclick='openEditModal("cliente", ${JSON.stringify(c).replace(/'/g, "&#39;")})'><i class="fas fa-edit"></i></button>
                 <button class="btn-icon text-danger" onclick="deleteCadastro('cliente', ${c.id})"><i class="fas fa-trash"></i></button>
             </td>
         </tr>`).join('') 
@@ -399,7 +399,7 @@ function renderFornecedoresTable() {
             <td>${f.telefone || '-'}</td>
             <td>${f.email || '-'}</td>
             <td>
-                <button class="btn-icon" onclick="openEditModal('fornecedor', ${JSON.stringify(f).replace(/"/g, '&quot;')})"><i class="fas fa-edit"></i></button>
+                <button class="btn-icon" onclick='openEditModal("fornecedor", ${JSON.stringify(f).replace(/'/g, "&#39;")})'><i class="fas fa-edit"></i></button>
                 <button class="btn-icon text-danger" onclick="deleteCadastro('fornecedor', ${f.id})"><i class="fas fa-trash"></i></button>
             </td>
         </tr>`).join('')
@@ -821,7 +821,13 @@ async function confirmarGerarNFe(event) {
     
     if (!vendaId) { showError('Venda não identificada'); return; }
     
-    const destinatario = destId ? appData.clients.find(c => c.id == destId) : { nome: destNome, documento: destDoc };
+    const destinatario = destId ? appData.clients.find(c => c.id == destId) : { 
+        nome: destNome, 
+        documento: destDoc,
+        endereco: document.getElementById('nfe-dest-end')?.value || '',
+        uf: document.getElementById('nfe-dest-uf')?.value || 'SP',
+        cep: document.getElementById('nfe-dest-cep')?.value || ''
+    };
     
     if (!destinatario?.nome) { showError('Informe o destinatário'); return; }
     
@@ -1441,6 +1447,9 @@ function preencherDestNFe(select) {
     if (cliente) {
         document.getElementById('nfe-dest-nome').value = cliente.nome || '';
         document.getElementById('nfe-dest-doc').value = cliente.documento || '';
+        if (document.getElementById('nfe-dest-end')) document.getElementById('nfe-dest-end').value = cliente.endereco || '';
+        if (document.getElementById('nfe-dest-uf')) document.getElementById('nfe-dest-uf').value = cliente.uf || 'SP';
+        if (document.getElementById('nfe-dest-cep')) document.getElementById('nfe-dest-cep').value = cliente.cep || '';
     }
 }
 
@@ -1490,8 +1499,15 @@ function closeUsuarioModal() {
 // FUNÇÃO AUXILIAR: Alternar abas do painel admin
 // =============================================
 function switchAdminTab(tab, btn) {
+    console.log('Switching admin tab to:', tab);
     document.querySelectorAll('.admin-tab-content').forEach(t => t.style.display = 'none');
     document.querySelectorAll('.admin-tab-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('admin-tab-' + tab).style.display = 'block';
-    btn.classList.add('active');
+    
+    const target = document.getElementById('admin-tab-' + tab);
+    if (target) {
+        target.style.display = 'block';
+        if (btn) btn.classList.add('active');
+    } else {
+        console.error('Admin tab content not found:', 'admin-tab-' + tab);
+    }
 }

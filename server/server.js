@@ -363,7 +363,22 @@ app.get('/api/consultar/:type/:doc', authenticateToken, async (req, res) => {
             const response = await fetch(`https://receitaws.com.br/v1/cnpj/${cleanDoc}`);
             const data = await response.json();
             if (data.status === 'ERROR') return res.status(400).json({ error: data.message });
-            res.json(data);
+            
+            // Mapear campos do ReceitaWS para o formato esperado pelo frontend
+            const mappedData = {
+                nome: data.nome,
+                razao_social: data.nome,
+                fantasia: data.fantasia,
+                telefone: data.telefone,
+                email: data.email,
+                logradouro: data.logradouro,
+                numero: data.numero,
+                bairro: data.bairro,
+                municipio: data.municipio,
+                uf: data.uf,
+                cep: data.cep
+            };
+            res.json(mappedData);
         } else if (type === 'CPF') {
             res.status(400).json({ error: "Consulta de CPF requer API paga." });
         } else {
@@ -507,12 +522,12 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                         indIEDest: '9',
                         enderDest: {
                             xLgr: destinatario.endereco?.split(',')[0] || 'Endereço não informado',
-                            nro: '0',
-                            xBairro: 'Bairro',
-                            cMun: '3541406',
-                            xMun: 'PRESIDENTE PRUDENTE',
-                            UF: 'SP',
-                            CEP: '19000000'
+                            nro: destinatario.endereco?.split(',')[1]?.trim() || 'S/N',
+                            xBairro: destinatario.endereco?.split(',')[2]?.trim() || 'Bairro',
+                            cMun: '3541406', // Ideal seria buscar pelo município
+                            xMun: destinatario.endereco?.split(',')[3]?.trim() || 'PRESIDENTE PRUDENTE',
+                            UF: destinatario.uf || 'SP',
+                            CEP: (destinatario.cep || '19000000').replace(/\D/g, '')
                         }
                     },
                     det: [{
@@ -520,7 +535,7 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                             code: '001',
                             xProd: venda.produto,
                             NCM: '07031019',
-                            CFOP: configMap['nfe_cfop'] || '5102',
+                            CFOP: (destinatario.uf && destinatario.uf !== (configMap['emit_uf'] || 'SP')) ? '6102' : '5102',
                             uCom: 'CX',
                             qCom: venda.qtd_caixas || 1,
                             vUnCom: venda.valor / (venda.qtd_caixas || 1),
@@ -622,14 +637,27 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
             doc.setFont("helvetica", "bold");
             doc.text("DANFE - DOCUMENTO AUXILIAR DA NOTA FISCAL ELETRÔNICA", 105, Y_HEAD + 3.5, { align: 'center' });
 
+            // Buscar configurações da emitente
+            const configs = await new Promise((resolve) => {
+                db.all('SELECT chave, valor FROM configs', [], (err, rows) => {
+                    const map = {};
+                    rows?.forEach(r => map[r.chave] = r.valor);
+                    resolve(map);
+                });
+            });
+
             // Emitente
             const Y_EMIT = 15;
             doc.rect(10, Y_EMIT, 130, 30);
             doc.setFontSize(10);
-            doc.text("M&M CEBOLAS", 12, Y_EMIT + 8);
+            doc.setFont("helvetica", "bold");
+            doc.text(configs['emit_nome'] || "M&M CEBOLAS", 12, Y_EMIT + 8);
             doc.setFontSize(7);
             doc.setFont("helvetica", "normal");
-            doc.text("Comércio de Cebolas", 12, Y_EMIT + 13);
+            doc.text(configs['emit_fant'] || "Comércio de Cebolas", 12, Y_EMIT + 13);
+            doc.text(`${configs['emit_lgr'] || 'RUA MANOEL CRUZ'}, ${configs['emit_nro'] || '36'}`, 12, Y_EMIT + 18);
+            doc.text(`${configs['emit_bairro'] || 'RESIDENCIAL MINERVA I'} - ${configs['emit_xmun'] || 'PRESIDENTE PRUDENTE'} / ${configs['emit_uf'] || 'SP'}`, 12, Y_EMIT + 23);
+            doc.text(`CNPJ: ${configs['emit_cnpj'] || '56.421.395/0001-50'}  IE: ${configs['emit_ie'] || '562.696.411.110'}`, 12, Y_EMIT + 28);
 
             // Caixa NF-e
             doc.rect(140, Y_EMIT, 60, 30);
@@ -638,8 +666,8 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
             doc.text("NF-e", 170, Y_EMIT + 8, { align: 'center' });
             doc.setFontSize(7);
             doc.setFont("helvetica", "normal");
-            doc.text(`Nº: ${row.venda_id}`, 170, Y_EMIT + 14, { align: 'center' });
-            doc.text(`Série: 001`, 170, Y_EMIT + 19, { align: 'center' });
+            doc.text(`Nº: ${row.numero_nfe || row.venda_id}`, 170, Y_EMIT + 14, { align: 'center' });
+            doc.text(`Série: ${row.serie_nfe || '001'}`, 170, Y_EMIT + 19, { align: 'center' });
 
             // Chave de Acesso
             const Y_CHAVE = Y_EMIT + 30;
@@ -652,7 +680,7 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
 
             // Destinatário
             const Y_DEST = Y_CHAVE + 10;
-            doc.rect(10, Y_DEST, 190, 20);
+            doc.rect(10, Y_DEST, 190, 25);
             doc.setFillColor(240, 240, 240);
             doc.rect(10, Y_DEST, 190, 5, 'F');
             doc.setFont("helvetica", "bold");
@@ -660,11 +688,28 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
             doc.text("DESTINATÁRIO / REMETENTE", 12, Y_DEST + 3.5);
             doc.setFont("helvetica", "normal");
             doc.setFontSize(7);
-            doc.text(`NOME / RAZÃO SOCIAL: ${row.descricao || ''}`, 12, Y_DEST + 10);
+            
+            // Tentar extrair dados do destinatário do XML se disponível, ou usar o que temos
+            let destNome = row.descricao || '';
+            let destDoc = '';
+            let destEnd = '';
+            
+            if (row.xml_content) {
+                const xNomeMatch = row.xml_content.match(/<dest>.*?<xNome>(.*?)<\/xNome>/);
+                const cnpjMatch = row.xml_content.match(/<dest>.*?<CNPJ>(.*?)<\/CNPJ>/);
+                const cpfMatch = row.xml_content.match(/<dest>.*?<CPF>(.*?)<\/CPF>/);
+                if (xNomeMatch) destNome = xNomeMatch[1];
+                if (cnpjMatch) destDoc = cnpjMatch[1];
+                else if (cpfMatch) destDoc = cpfMatch[1];
+            }
+
+            doc.text(`NOME / RAZÃO SOCIAL: ${destNome}`, 12, Y_DEST + 10);
+            doc.text(`CNPJ / CPF: ${destDoc}`, 130, Y_DEST + 10);
             doc.text(`DATA DE EMISSÃO: ${new Date(row.data_emissao).toLocaleDateString('pt-BR')}`, 12, Y_DEST + 15);
+            doc.text(`PROTOCOLO: ${row.protocolo_autorizacao || 'ASSINADA LOCALMENTE'}`, 12, Y_DEST + 20);
 
             // Impostos
-            const Y_IMP = Y_DEST + 20;
+            const Y_IMP = Y_DEST + 25;
             doc.rect(10, Y_IMP, 190, 5, 'F');
             doc.setFillColor(240, 240, 240);
             doc.rect(10, Y_IMP, 190, 5, 'F');

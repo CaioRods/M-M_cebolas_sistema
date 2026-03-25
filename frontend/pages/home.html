@@ -340,6 +340,20 @@
                     <label>CNPJ / CPF</label>
                     <input type="text" id="nfe-dest-doc" placeholder="Documento do destinatário">
                 </div>
+                <div class="form-group">
+                    <label>Endereço</label>
+                    <input type="text" id="nfe-dest-end" placeholder="Rua, Número, Bairro, Cidade">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div class="form-group">
+                        <label>UF</label>
+                        <input type="text" id="nfe-dest-uf" placeholder="SP" maxlength="2">
+                    </div>
+                    <div class="form-group">
+                        <label>CEP</label>
+                        <input type="text" id="nfe-dest-cep" placeholder="00000-000">
+                    </div>
+                </div>
                 
                 <div style="display:flex;gap:12px;margin-top:8px;">
                     <button type="button" class="btn-danger" onclick="closeNFeModal()" style="flex:1;">Cancelar</button>
