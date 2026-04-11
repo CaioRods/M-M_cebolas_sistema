@@ -39,8 +39,8 @@ body {
 #titlebar {
     display: flex;
     align-items: center;
-    background-color: #f1f5f9;
-    border-bottom: 1px solid var(--border);
+    background-color: rgba(32, 32, 32, 0.95);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     min-height: 38px;
     padding: 0 15px;
     padding-top: env(safe-area-inset-top, 0);
@@ -64,7 +64,7 @@ body {
 .control-btn.close { background: #ff5f56; }
 .control-btn.minimize { background: #ffbd2e; }
 .control-btn.maximize { background: #27c93f; }
-.window-title { flex: 1; text-align: center; color: var(--text-muted); font-size: 11px; font-weight: 600; letter-spacing: 1px; }
+.window-title { flex: 1; text-align: center; color: #888; font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
 
 /* Placeholder inicial: logo centralizado na área do main-content */
 .main-content-placeholder {
@@ -106,6 +106,27 @@ body {
 .sidebar-title { font-size: 1.2rem; font-weight: 800; letter-spacing: 1px; color: var(--accent); }
 
 .sidebar-nav { flex: 1; padding: 10px 0; overflow-y: auto; }
+
+/* Estilização da barra de rolagem do menu lateral */
+.sidebar-nav::-webkit-scrollbar {
+    width: 8px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+    background: var(--accent);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-light);
+    background-clip: padding-box;
+}
 .nav-group { margin-bottom: 25px; }
 .nav-label { padding: 0 25px; font-size: 0.7rem; font-weight: 700; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px; display: block; }
 
