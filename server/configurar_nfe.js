@@ -12,7 +12,7 @@ console.log("=== Configurando Dados da M&M HF COMERCIO DE CEBOLAS ===");
 const CONFIGS = {
     // --- 1. CERTIFICADO ---
     // ATENÇÃO: Troque '123' pela senha real do seu arquivo .pfx se for diferente
-    'cert_password': '123', 
+    'cert_password': '12345678', 
     
     // --- 2. AMBIENTE ---
     // 'producao' = Nota vale de verdade. 'homologacao' = Teste.

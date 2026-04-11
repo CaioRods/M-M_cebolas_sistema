@@ -459,7 +459,7 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
             
             const modo = configMap['nfe_modo'] || 'homologacao';
             const isProduction = modo === 'producao';
-            const certPassword = configMap['cert_password'] || '123';
+            const certPassword = configMap['cert_password'] || '12345678';
             const pfxPath = path.join(__dirname, '../certificado/certificado.pfx');
             
             try {

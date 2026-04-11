@@ -137,6 +137,24 @@ function showSection(id) {
         });
 }
 
+function switchCadTab(tab, btn) {
+    console.log('Switching to tab:', tab);
+    document.querySelectorAll('.cad-tab').forEach(t => t.style.display = 'none');
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    const targetTab = document.getElementById('tab-' + tab);
+    if (targetTab) targetTab.style.display = 'block';
+    if (btn) btn.classList.add('active');
+}
+
+function filterCadTable(tableId, val) {
+    const table = document.getElementById(tableId);
+    if (!table) return;
+    const rows = table.querySelectorAll('tbody tr');
+    rows.forEach(row => {
+        row.style.display = row.textContent.toLowerCase().includes(val.toLowerCase()) ? '' : 'none';
+    });
+}
+
 function initSection(id) {
     const userData = JSON.parse(localStorage.getItem('mm_user') || '{}');
     const userRole = userData.role || (userData.user ? userData.user.role : null);

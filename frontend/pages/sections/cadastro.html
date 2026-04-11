@@ -175,39 +175,4 @@
 }
 </style>
 
-<script>
-function switchCadTab(tab, btn) {
-    console.log('Switching to tab:', tab);
-    // Esconder todas as abas de cadastro
-    document.querySelectorAll('.cad-tab').forEach(t => {
-        t.style.display = 'none';
-    });
-    
-    // Remover classe active de todos os botões de aba de cadastro
-    document.querySelectorAll('.tab-btn').forEach(b => {
-        b.classList.remove('active');
-    });
-    
-    // Mostrar a aba selecionada
-    const targetTab = document.getElementById('tab-' + tab);
-    if (targetTab) {
-        targetTab.style.display = 'block';
-    } else {
-        console.error('Tab not found: tab-' + tab);
-    }
-    
-    // Adicionar classe active ao botão clicado
-    if (btn) {
-        btn.classList.add('active');
-    }
-}
-
-function filterCadTable(tableId, val) {
-    const table = document.getElementById(tableId);
-    if (!table) return;
-    const rows = table.querySelectorAll('tbody tr');
-    rows.forEach(row => {
-        row.style.display = row.textContent.toLowerCase().includes(val.toLowerCase()) ? '' : 'none';
-    });
-}
-</script>
+<!-- Scripts movidos para script.js para garantir funcionamento global -->

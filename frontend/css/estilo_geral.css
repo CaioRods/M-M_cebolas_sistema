@@ -39,7 +39,8 @@ body {
 #titlebar {
     display: flex;
     align-items: center;
-    background-color: #202020;
+    background-color: #f1f5f9;
+    border-bottom: 1px solid var(--border);
     min-height: 38px;
     padding: 0 15px;
     padding-top: env(safe-area-inset-top, 0);
@@ -63,7 +64,7 @@ body {
 .control-btn.close { background: #ff5f56; }
 .control-btn.minimize { background: #ffbd2e; }
 .control-btn.maximize { background: #27c93f; }
-.window-title { flex: 1; text-align: center; color: #888; font-size: 11px; font-weight: 600; letter-spacing: 1px; }
+.window-title { flex: 1; text-align: center; color: var(--text-muted); font-size: 11px; font-weight: 600; letter-spacing: 1px; }
 
 /* Placeholder inicial: logo centralizado na área do main-content */
 .main-content-placeholder {
@@ -1251,45 +1252,4 @@ tr:hover td { background-color: #f8fafc; }
     }
 }
 
-/* --- MODO ESCURO (FUTURO) --- */
-@media (prefers-color-scheme: dark) {
-    :root {
-        --bg-body: #1a1a1a;
-        --bg-panel: #2d2d2d;
-        --text-main: #f5f5f5;
-        --text-muted: #a0a0a0;
-        --border: #3d3d3d;
-    }
-
-    body {
-        background-color: var(--bg-body);
-        color: var(--text-main);
-    }
-
-    .panel {
-        background: var(--bg-panel);
-        border: 1px solid var(--border);
-    }
-
-    table {
-        background: var(--bg-panel);
-    }
-
-    th {
-        background: #1a1a1a;
-    }
-
-    input, select, textarea {
-        background: #3d3d3d;
-        color: var(--text-main);
-        border-color: var(--border);
-    }
-
-    .modal-overlay {
-        background: rgba(0, 0, 0, 0.6);
-    }
-
-    .edit-modal {
-        background: var(--bg-panel);
-    }
-}
+/* MODO ESCURO REMOVIDO - SISTEMA SEMPRE EM MODO CLARO */
