@@ -62,23 +62,39 @@
 
 <!-- TABELAS DE GESTÃO ORGANIZADAS -->
 <div class="data-row">
-    <!-- RANKING DE FORNECEDORES (Novo) -->
+    <!-- RANKING DE CLIENTES (Vendas) -->
+    <div class="panel">
+        <div class="panel-header">
+            <h4 style="font-weight: 700;"><i class="fas fa-users" style="color: var(--primary);"></i> Principais Clientes (Vendas)</h4>
+        </div>
+        <div class="table-container">
+            <table class="table-pro">
+                <thead>
+                    <tr>
+                        <th>Cliente</th>
+                        <th style="text-align: center;">Vol. (Cx)</th>
+                        <th style="text-align: right;">Total (R$)</th>
+                    </tr>
+                </thead>
+                <tbody id="dash-client-ranking">
+                    <!-- Injetado via JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- RANKING DE FORNECEDORES -->
     <div class="panel">
         <div class="panel-header">
             <h4 style="font-weight: 700;"><i class="fas fa-medal" style="color: #f59e0b;"></i> Principais Fornecedores</h4>
-            <div class="search-box-mini">
-                <i class="fas fa-search"></i>
-                <input type="text" placeholder="Filtrar..." onkeyup="filterDashTable('supplier-rank-table', this.value)">
-            </div>
         </div>
         <div class="table-container">
-            <table id="supplier-rank-table" class="table-pro">
+            <table class="table-pro">
                 <thead>
                     <tr>
                         <th>Fornecedor</th>
                         <th style="text-align: center;">Vol. (Cx)</th>
                         <th style="text-align: right;">Total (R$)</th>
-                        <th>Status</th>
                     </tr>
                 </thead>
                 <tbody id="dash-supplier-ranking">
@@ -87,28 +103,28 @@
             </table>
         </div>
     </div>
+</div>
 
-    <!-- ESTOQUE DETALHADO -->
-    <div class="panel">
-        <div class="panel-header">
-            <h4 style="font-weight: 700;"><i class="fas fa-warehouse" style="color: var(--primary);"></i> Inventário em Tempo Real</h4>
-            <button class="btn-text" onclick="showSection('estoque')">Ver Detalhes</button>
-        </div>
-        <div class="table-container">
-            <table class="table-pro">
-                <thead>
-                    <tr>
-                        <th>Produto</th>
-                        <th style="text-align: center;">Cx</th>
-                        <th style="text-align: center;">Kg</th>
-                        <th>Tendência</th>
-                    </tr>
-                </thead>
-                <tbody id="dash-inventory-table">
-                    <!-- Injetado via JS -->
-                </tbody>
-            </table>
-        </div>
+<!-- ESTOQUE DETALHADO -->
+<div class="panel" style="margin-bottom: 24px;">
+    <div class="panel-header">
+        <h4 style="font-weight: 700;"><i class="fas fa-warehouse" style="color: var(--primary);"></i> Inventário em Tempo Real</h4>
+        <button class="btn-text" onclick="showSection('estoque')">Ver Detalhes</button>
+    </div>
+    <div class="table-container">
+        <table class="table-pro">
+            <thead>
+                <tr>
+                    <th>Produto</th>
+                    <th style="text-align: center;">Caixas em Estoque</th>
+                    <th style="text-align: center;">Peso Total (Kg)</th>
+                    <th>Tendência</th>
+                </tr>
+            </thead>
+            <tbody id="dash-inventory-table">
+                <!-- Injetado via JS -->
+            </tbody>
+        </table>
     </div>
 </div>
 

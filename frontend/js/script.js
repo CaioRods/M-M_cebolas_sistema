@@ -267,6 +267,7 @@ function renderDashboardPro(data) {
     renderKPIs(data);
     renderMainChart(data);
     renderDistributionChart(data);
+    renderClientRanking(data);
     renderSupplierRanking(data);
     renderInventoryTable(data);
     renderRecentOps(data.ultimasMovimentacoes);
@@ -308,13 +309,13 @@ function renderMainChart(data) {
     let datasets = [];
     if (metric === 'financeiro') {
         datasets = [
-            { label: 'Receita', data: values.map(v => v.receita), backgroundColor: '#22c55e', borderColor: '#22c55e', tension: 0.4 },
-            { label: 'Despesas', data: values.map(v => v.despesa), backgroundColor: '#ef4444', borderColor: '#ef4444', tension: 0.4 }
+            { label: 'Receita', data: values.map(v => v.receita), backgroundColor: 'rgba(26, 86, 50, 0.8)', borderColor: '#1A5632', borderWeight: 2, tension: 0.4, fill: true },
+            { label: 'Despesas', data: values.map(v => v.despesa), backgroundColor: 'rgba(232, 156, 49, 0.8)', borderColor: '#E89C31', borderWeight: 2, tension: 0.4, fill: true }
         ];
     } else {
         datasets = [
             { label: 'Entrada', data: values.map(v => metric === 'volume_cx' ? v.caixas_entrada : v.kg_entrada), backgroundColor: '#1A5632', borderColor: '#1A5632' },
-            { label: 'Saída', data: values.map(v => metric === 'volume_cx' ? v.caixas_saida : v.kg_saida), backgroundColor: '#f59e0b', borderColor: '#f59e0b' }
+            { label: 'Saída', data: values.map(v => metric === 'volume_cx' ? v.caixas_saida : v.kg_saida), backgroundColor: '#E89C31', borderColor: '#E89C31' }
         ];
     }
     mainChart = new Chart(ctx, { type: dashboardChartType, data: { labels, datasets }, options: { responsive: true, maintainAspectRatio: false } });
@@ -328,9 +329,23 @@ function renderDistributionChart(data) {
     if (prods.length === 0) return;
     distributionChart = new Chart(ctx, {
         type: 'doughnut',
-        data: { labels: prods.map(p => p.nome), datasets: [{ data: prods.map(p => p.caixas), backgroundColor: ['#1A5632', '#22c55e', '#3b82f6', '#f59e0b', '#ef4444'], borderWidth: 0 }] },
+        data: { labels: prods.map(p => p.nome), datasets: [{ data: prods.map(p => p.caixas), backgroundColor: ['#1A5632', '#E89C31', '#22c55e', '#3b82f6', '#ef4444'], borderWidth: 0 }] },
         options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { display: false } } }
     });
+}
+
+function renderClientRanking(data) {
+    const tbody = document.getElementById('dash-client-ranking');
+    if (!tbody) return;
+    const ranking = {};
+    appData.transactions.filter(t => t.tipo === 'saida').forEach(t => {
+        if (!ranking[t.descricao]) ranking[t.descricao] = { nome: t.descricao, caixas: 0, valor: 0 };
+        ranking[t.descricao].caixas += (t.qtd_caixas || 0);
+        ranking[t.descricao].valor += t.valor;
+    });
+    const sorted = Object.values(ranking).sort((a, b) => b.valor - a.valor).slice(0, 5);
+    tbody.innerHTML = sorted.length > 0 ? sorted.map(s => `<tr><td><strong>${s.nome || '-'}</strong></td><td style="text-align:center;">${s.caixas}</td><td style="text-align:right; font-weight:700; color:var(--primary);">R$ ${s.valor.toLocaleString('pt-BR')}</td></tr>`).join('') 
+    : '<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--text-muted)">Nenhum dado</td></tr>';
 }
 
 function renderSupplierRanking(data) {
@@ -343,8 +358,8 @@ function renderSupplierRanking(data) {
         ranking[t.descricao].valor += t.valor;
     });
     const sorted = Object.values(ranking).sort((a, b) => b.valor - a.valor).slice(0, 5);
-    tbody.innerHTML = sorted.length > 0 ? sorted.map(s => `<tr><td><strong>${s.nome || '-'}</strong></td><td style="text-align:center;">${s.caixas}</td><td style="text-align:right; font-weight:700; color:var(--primary);">R$ ${s.valor.toLocaleString('pt-BR')}</td><td><span class="badge entrada">Ativo</span></td></tr>`).join('') 
-    : '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted)">Nenhum dado</td></tr>';
+    tbody.innerHTML = sorted.length > 0 ? sorted.map(s => `<tr><td><strong>${s.nome || '-'}</strong></td><td style="text-align:center;">${s.caixas}</td><td style="text-align:right; font-weight:700; color:var(--primary);">R$ ${s.valor.toLocaleString('pt-BR')}</td></tr>`).join('') 
+    : '<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--text-muted)">Nenhum dado</td></tr>';
 }
 
 function renderInventoryTable(data) {
@@ -433,7 +448,7 @@ function renderProdutosTable() {
     if (!tbody) return;
     tbody.innerHTML = appData.products.length > 0 ? appData.products.map(p => `
         <tr style="border-left: 4px solid ${p.cor || '#1A5632'}">
-            <td>${(p.icone && p.icone.includes('.png')) ? `<img src="../Imgs/${p.icone}" style="width:24px;height:24px;vertical-align:middle;margin-right:8px;">` : `<i class="fas ${p.icone || 'fa-box'}" style="color:${p.cor};margin-right:8px;"></i>`} <strong>${p.nome}</strong></td>
+            <td><i class="fas ${p.icone || 'fa-box'}" style="color:${p.cor};margin-right:8px;"></i> <strong>${p.nome}</strong></td>
             <td>${p.ncm || '-'}</td>
             <td>R$ ${(p.preco_venda || 0).toLocaleString('pt-BR', {minimumFractionDigits:2})}</td>
             <td>${p.peso_por_caixa || 20} Kg/Cx</td>
@@ -986,7 +1001,7 @@ function renderAdminProdutosTable() {
             <td>
                 <div style="display:flex;align-items:center;gap:10px;">
                     <div style="width:32px;height:32px;background:${p.cor || '#1A5632'}20;color:${p.cor || '#1A5632'};border-radius:8px;display:flex;align-items:center;justify-content:center;">
-                        ${(p.icone && p.icone.includes('.png')) ? `<img src="../Imgs/${p.icone}" style="width:20px;height:20px;object-fit:contain;">` : `<i class="fas ${p.icone || 'fa-box'}"></i>`}
+                        <i class="fas ${p.icone || 'fa-box'}"></i>
                     </div>
                     <strong>${p.nome}</strong>
                 </div>
@@ -1329,7 +1344,7 @@ function renderProductShowcase(section) {
     }
     container.innerHTML = appData.products.map(p => `
         <div class="product-card" onclick="selectProductPro('${p.nome}', '${section}', event)">
-            <div class="product-icon-circle" style="background:${p.cor || '#1A5632'}20; color:${p.cor || '#1A5632'}">${(p.icone && p.icone.includes('.png')) ? `<img src="../Imgs/${p.icone}" style="width:40px;height:40px;object-fit:contain;">` : `<i class="fas ${p.icone || 'fa-box'}"></i>`}</div>
+            <div class="product-icon-circle" style="background:${p.cor || '#1A5632'}20; color:${p.cor || '#1A5632'}"><i class="fas ${p.icone || 'fa-box'}"></i></div>
             <div class="product-name">${p.nome}</div>
             <div class="product-stock">${p.peso_por_caixa || 20} Kg/Cx</div>
         </div>`).join('');

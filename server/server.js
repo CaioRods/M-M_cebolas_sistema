@@ -622,22 +622,23 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
 
         try {
             const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            
+            // --- Helper for Barcode ---
+            const generateBarcode = (text) => {
+                return new Promise((resolve, reject) => {
+                    bwipjs.toBuffer({
+                        bcid: 'code128',       // Barcode type
+                        text: text,            // Text to encode
+                        scale: 3,              // 3x scaling factor
+                        height: 10,            // Bar height, in millimeters
+                        includetext: false,    // Don't show text below barcode
+                    }, (err, png) => {
+                        if (err) reject(err);
+                        else resolve(png);
+                    });
+                });
+            };
 
-            // --- DANFE SIMPLIFICADO ---
-            doc.setFontSize(8);
-            doc.setFont("helvetica", "normal");
-
-            // Borda externa
-            doc.rect(10, 10, 190, 277);
-
-            // Cabeçalho
-            const Y_HEAD = 10;
-            doc.setFillColor(240, 240, 240);
-            doc.rect(10, Y_HEAD, 190, 5, 'F');
-            doc.setFont("helvetica", "bold");
-            doc.text("DANFE - DOCUMENTO AUXILIAR DA NOTA FISCAL ELETRÔNICA", 105, Y_HEAD + 3.5, { align: 'center' });
-
-            // Buscar configurações da emitente
             const configs = await new Promise((resolve) => {
                 db.all('SELECT chave, valor FROM configs', [], (err, rows) => {
                     const map = {};
@@ -646,153 +647,231 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
                 });
             });
 
-            // Emitente
-            const Y_EMIT = 15;
-            doc.rect(10, Y_EMIT, 130, 30);
-            doc.setFontSize(10);
+            // --- DANFE LAYOUT ---
+            doc.setFont("helvetica", "normal");
+            
+            // 1. RECEBEMOS DE... (Topo)
+            doc.rect(10, 10, 155, 12);
+            doc.setFontSize(6);
+            doc.text("RECEBEMOS DE " + (configs['emit_nome'] || "M&M HF COMERCIO DE CEBOLAS LTDA") + " OS PRODUTOS/SERVIÇOS CONSTANTES DA NOTA FISCAL INDICADA AO LADO", 12, 13);
+            doc.text("DATA DE RECEBIMENTO", 12, 20);
+            doc.text("IDENTIFICAÇÃO E ASSINATURA DO RECEBEDOR", 50, 20);
+            
+            doc.rect(165, 10, 35, 12);
             doc.setFont("helvetica", "bold");
-            doc.text(configs['emit_nome'] || "M&M CEBOLAS", 12, Y_EMIT + 8);
+            doc.setFontSize(10);
+            doc.text("NF-e", 182.5, 15, { align: 'center' });
+            doc.setFontSize(7);
+            doc.text(`Nº ${row.numero_nfe || row.venda_id}`, 182.5, 19, { align: 'center' });
+            doc.text(`SÉRIE ${row.serie_nfe || '1'}`, 182.5, 21, { align: 'center' });
+
+            // 2. IDENTIFICAÇÃO DO EMITENTE
+            doc.rect(10, 22, 90, 28);
+            doc.setFontSize(10);
+            doc.text(configs['emit_nome'] || "M&M HF COMERCIO DE CEBOLAS LTDA", 55, 28, { align: 'center' });
             doc.setFontSize(7);
             doc.setFont("helvetica", "normal");
-            doc.text(configs['emit_fant'] || "Comércio de Cebolas", 12, Y_EMIT + 13);
-            doc.text(`${configs['emit_lgr'] || 'RUA MANOEL CRUZ'}, ${configs['emit_nro'] || '36'}`, 12, Y_EMIT + 18);
-            doc.text(`${configs['emit_bairro'] || 'RESIDENCIAL MINERVA I'} - ${configs['emit_xmun'] || 'PRESIDENTE PRUDENTE'} / ${configs['emit_uf'] || 'SP'}`, 12, Y_EMIT + 23);
-            doc.text(`CNPJ: ${configs['emit_cnpj'] || '56.421.395/0001-50'}  IE: ${configs['emit_ie'] || '562.696.411.110'}`, 12, Y_EMIT + 28);
+            doc.text(configs['emit_lgr'] || "RUA MANOEL CRUZ, 36", 55, 33, { align: 'center' });
+            doc.text(`${configs['emit_bairro'] || 'RESIDENCIAL MINERVA I'} - ${configs['emit_cep'] || '19026-168'}`, 55, 37, { align: 'center' });
+            doc.text(`${configs['emit_xmun'] || 'PRESIDENTE PRUDENTE'} - ${configs['emit_uf'] || 'SP'}`, 55, 41, { align: 'center' });
+            doc.text("Fone: " + (configs['emit_tel'] || "(18) 9999-9999"), 55, 45, { align: 'center' });
 
-            // Caixa NF-e
-            doc.rect(140, Y_EMIT, 60, 30);
+            // 3. DANFE BOX
+            doc.rect(100, 22, 25, 28);
             doc.setFont("helvetica", "bold");
             doc.setFontSize(9);
-            doc.text("NF-e", 170, Y_EMIT + 8, { align: 'center' });
+            doc.text("DANFE", 112.5, 28, { align: 'center' });
+            doc.setFontSize(6);
+            doc.setFont("helvetica", "normal");
+            doc.text("Documento Auxiliar da", 112.5, 32, { align: 'center' });
+            doc.text("Nota Fiscal Eletrônica", 112.5, 35, { align: 'center' });
+            doc.text("0 - Entrada", 102, 40);
+            doc.text("1 - Saída", 102, 43);
+            doc.rect(116, 38, 5, 5);
+            doc.setFontSize(10);
+            doc.text("1", 118.5, 42, { align: 'center' });
             doc.setFontSize(7);
-            doc.setFont("helvetica", "normal");
-            doc.text(`Nº: ${row.numero_nfe || row.venda_id}`, 170, Y_EMIT + 14, { align: 'center' });
-            doc.text(`Série: ${row.serie_nfe || '001'}`, 170, Y_EMIT + 19, { align: 'center' });
-
-            // Chave de Acesso
-            const Y_CHAVE = Y_EMIT + 30;
-            doc.rect(10, Y_CHAVE, 190, 10);
             doc.setFont("helvetica", "bold");
-            doc.text("CHAVE DE ACESSO:", 12, Y_CHAVE + 4);
-            doc.setFont("helvetica", "normal");
-            doc.setFontSize(6.5);
-            doc.text(row.chave_acesso || '', 12, Y_CHAVE + 8);
+            doc.text(`Nº ${row.numero_nfe || row.venda_id}`, 112.5, 46, { align: 'center' });
+            doc.text(`SÉRIE ${row.serie_nfe || '1'}`, 112.5, 49, { align: 'center' });
 
-            // Destinatário
-            const Y_DEST = Y_CHAVE + 10;
-            doc.rect(10, Y_DEST, 190, 25);
-            doc.setFillColor(240, 240, 240);
-            doc.rect(10, Y_DEST, 190, 5, 'F');
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(8);
-            doc.text("DESTINATÁRIO / REMETENTE", 12, Y_DEST + 3.5);
-            doc.setFont("helvetica", "normal");
-            doc.setFontSize(7);
-            
-            // Tentar extrair dados do destinatário do XML se disponível, ou usar o que temos
-            let destNome = row.descricao || '';
-            let destDoc = '';
-            let destEnd = '';
-            
-            if (row.xml_content) {
-                const xNomeMatch = row.xml_content.match(/<dest>.*?<xNome>(.*?)<\/xNome>/);
-                const cnpjMatch = row.xml_content.match(/<dest>.*?<CNPJ>(.*?)<\/CNPJ>/);
-                const cpfMatch = row.xml_content.match(/<dest>.*?<CPF>(.*?)<\/CPF>/);
-                if (xNomeMatch) destNome = xNomeMatch[1];
-                if (cnpjMatch) destDoc = cnpjMatch[1];
-                else if (cpfMatch) destDoc = cpfMatch[1];
-            }
-
-            doc.text(`NOME / RAZÃO SOCIAL: ${destNome}`, 12, Y_DEST + 10);
-            doc.text(`CNPJ / CPF: ${destDoc}`, 130, Y_DEST + 10);
-            doc.text(`DATA DE EMISSÃO: ${new Date(row.data_emissao).toLocaleDateString('pt-BR')}`, 12, Y_DEST + 15);
-            doc.text(`PROTOCOLO: ${row.protocolo_autorizacao || 'ASSINADA LOCALMENTE'}`, 12, Y_DEST + 20);
-
-            // Impostos
-            const Y_IMP = Y_DEST + 25;
-            doc.rect(10, Y_IMP, 190, 5, 'F');
-            doc.setFillColor(240, 240, 240);
-            doc.rect(10, Y_IMP, 190, 5, 'F');
-            doc.setFont("helvetica", "bold");
-            doc.text("CÁLCULO DO IMPOSTO", 12, Y_IMP + 3.5);
-
-            const box = (x, y, w, h, label) => {
-                doc.rect(x, y, w, h);
-                doc.setFont("helvetica", "bold");
+            // 4. CHAVE DE ACESSO / BARCODE
+            doc.rect(125, 22, 75, 28);
+            if (row.chave_acesso) {
+                const barcodeBuffer = await generateBarcode(row.chave_acesso);
+                const barcodeBase64 = `data:image/png;base64,${barcodeBuffer.toString('base64')}`;
+                doc.addImage(barcodeBase64, 'PNG', 127, 24, 71, 12);
                 doc.setFontSize(6);
-                doc.text(label, x + 1, y + 3);
-            };
-            const field = (x, y, w, h, label, value, align = 'left', size = 7) => {
-                doc.rect(x, y, w, h);
-                doc.setFont("helvetica", "bold");
-                doc.setFontSize(6);
-                doc.text(label, x + 1, y + 3);
                 doc.setFont("helvetica", "normal");
-                doc.setFontSize(size);
-                if (align === 'right') doc.text(String(value), x + w - 1, y + h - 2, { align: 'right' });
-                else if (align === 'center') doc.text(String(value), x + w / 2, y + h - 2, { align: 'center' });
-                else doc.text(String(value), x + 1, y + h - 2);
+                doc.text("CHAVE DE ACESSO", 127, 38);
+                doc.setFontSize(7);
+                // Split chave into 4 groups for better reading
+                const c = row.chave_acesso;
+                const chaveFormatada = `${c.slice(0,4)} ${c.slice(4,8)} ${c.slice(8,12)} ${c.slice(12,16)} ${c.slice(16,20)} ${c.slice(20,24)} ${c.slice(24,28)} ${c.slice(28,32)} ${c.slice(32,36)} ${c.slice(36,40)} ${c.slice(40,44)}`;
+                doc.text(chaveFormatada, 127, 41);
+            }
+            doc.setFontSize(6);
+            doc.text("Consulta de autenticidade no portal nacional da NF-e", 127, 45);
+            doc.text("www.nfe.fazenda.gov.br/portal ou no site da Sefaz Autorizadora", 127, 48);
+
+            // 5. NATUREZA DA OPERAÇÃO
+            doc.rect(10, 50, 190, 8);
+            doc.text("NATUREZA DA OPERAÇÃO", 12, 53);
+            doc.setFontSize(8);
+            doc.text("Venda de mercadoria adquirida de terceiros", 12, 57);
+            doc.setFontSize(6);
+            doc.text("PROTOCOLO DE AUTORIZAÇÃO DE USO", 125, 53);
+            doc.setFontSize(8);
+            doc.text(row.protocolo_autorizacao || "ASSINADA LOCALMENTE", 125, 57);
+
+            // 6. IE / CNPJ
+            doc.rect(10, 58, 63, 8);
+            doc.setFontSize(6); doc.text("INSCRIÇÃO ESTADUAL", 12, 61);
+            doc.setFontSize(8); doc.text(configs['emit_ie'] || "562.696.411.110", 12, 65);
+            
+            doc.rect(73, 58, 63, 8);
+            doc.setFontSize(6); doc.text("INSC. ESTADUAL DO SUBST. TRIBUTÁRIO", 75, 61);
+            
+            doc.rect(136, 58, 64, 8);
+            doc.setFontSize(6); doc.text("CNPJ", 138, 61);
+            doc.setFontSize(8); doc.text(configs['emit_cnpj'] || "56.421.395/0001-50", 138, 65);
+
+            // 7. DESTINATÁRIO
+            doc.setFillColor(240, 240, 240);
+            doc.rect(10, 68, 190, 5, 'F');
+            doc.rect(10, 68, 190, 5);
+            doc.setFontSize(7); doc.setFont("helvetica", "bold");
+            doc.text("DESTINATÁRIO / REMETENTE", 12, 71.5);
+            
+            doc.rect(10, 73, 140, 8);
+            doc.setFontSize(6); doc.setFont("helvetica", "normal"); doc.text("NOME / RAZÃO SOCIAL", 12, 76);
+            doc.setFontSize(8); doc.text(row.descricao || "CONSUMIDOR FINAL", 12, 80);
+
+            doc.rect(150, 73, 40, 8);
+            doc.setFontSize(6); doc.text("CNPJ / CPF", 152, 76);
+            
+            doc.rect(190, 73, 10, 8); // empty
+
+            doc.rect(10, 81, 120, 8);
+            doc.setFontSize(6); doc.text("ENDEREÇO", 12, 84);
+            
+            doc.rect(130, 81, 30, 8);
+            doc.setFontSize(6); doc.text("BAIRRO / DISTRITO", 132, 84);
+            
+            doc.rect(160, 81, 20, 8);
+            doc.setFontSize(6); doc.text("CEP", 162, 84);
+            
+            doc.rect(180, 81, 20, 8);
+            doc.setFontSize(6); doc.text("DATA DA EMISSÃO", 182, 84);
+            doc.setFontSize(7); doc.text(new Date(row.data_emissao).toLocaleDateString('pt-BR'), 182, 88);
+
+            // 8. CÁLCULO DO IMPOSTO
+            const Y_IMP = 95;
+            doc.setFillColor(240, 240, 240);
+            doc.rect(10, Y_IMP, 190, 5, 'F');
+            doc.rect(10, Y_IMP, 190, 5);
+            doc.setFont("helvetica", "bold"); doc.text("CÁLCULO DO IMPOSTO", 12, Y_IMP + 3.5);
+            
+            const field = (x, y, w, h, label, value, align = 'right') => {
+                doc.rect(x, y, w, h);
+                doc.setFontSize(5); doc.setFont("helvetica", "normal");
+                doc.text(label, x + 1, y + 2.5);
+                doc.setFontSize(8);
+                if (align === 'right') doc.text(value, x + w - 1, y + h - 1.5, { align: 'right' });
+                else doc.text(value, x + 1, y + h - 1.5);
             };
 
-            field(10, Y_IMP + 5, 38, 8, "BASE CÁLC. ICMS", "0,00", 'right');
-            field(48, Y_IMP + 5, 38, 8, "VALOR DO ICMS", "0,00", 'right');
-            field(86, Y_IMP + 5, 38, 8, "BASE CÁLC. ICMS S.T.", "0,00", 'right');
-            field(124, Y_IMP + 5, 38, 8, "VALOR DO ICMS S.T.", "0,00", 'right');
-            field(162, Y_IMP + 5, 38, 8, "VALOR TOTAL PRODUTOS", row.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), 'right');
+            field(10, Y_IMP+5, 38, 8, "BASE DE CÁLCULO DO ICMS", "0,00");
+            field(48, Y_IMP+5, 38, 8, "VALOR DO ICMS", "0,00");
+            field(86, Y_IMP+5, 38, 8, "BASE DE CÁLCULO DO ICMS S.T.", "0,00");
+            field(124, Y_IMP+5, 38, 8, "VALOR DO ICMS S.T.", "0,00");
+            field(162, Y_IMP+5, 38, 8, "VALOR TOTAL DOS PRODUTOS", row.valor.toLocaleString('pt-BR', {minimumFractionDigits:2}));
 
-            field(10, Y_IMP + 13, 38, 8, "VALOR DO FRETE", "0,00", 'right');
-            field(48, Y_IMP + 13, 38, 8, "VALOR DO SEGURO", "0,00", 'right');
-            field(86, Y_IMP + 13, 38, 8, "DESCONTO", "0,00", 'right');
-            field(124, Y_IMP + 13, 38, 8, "OUTRAS DESP. ACESS.", "0,00", 'right');
-            field(162, Y_IMP + 13, 38, 8, "VALOR TOTAL DA NOTA", row.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), 'right');
+            field(10, Y_IMP+13, 30, 8, "VALOR DO FRETE", "0,00");
+            field(40, Y_IMP+13, 30, 8, "VALOR DO SEGURO", "0,00");
+            field(70, Y_IMP+13, 30, 8, "DESCONTO", "0,00");
+            field(100, Y_IMP+13, 31, 8, "OUTRAS DESPESAS ACESSÓRIAS", "0,00");
+            field(131, Y_IMP+13, 31, 8, "VALOR DO IPI", "0,00");
+            field(162, Y_IMP+13, 38, 8, "VALOR TOTAL DA NOTA", row.valor.toLocaleString('pt-BR', {minimumFractionDigits:2}));
 
-            // Transportador
-            const Y_TRA = Y_IMP + 21 + 10;
-            doc.setFillColor(240, 240, 240); doc.rect(10, Y_TRA, 190, 5, 'F');
-            doc.setFont("helvetica", "bold"); doc.setFontSize(8);
-            doc.text("TRANSPORTADOR / VOLUMES TRANSPORTADOS", 12, Y_TRA + 3.5);
-            field(10, Y_TRA + 5, 80, 8, "RAZÃO SOCIAL", "O MESMO");
-            field(90, Y_TRA + 5, 20, 8, "FRETE", "9-Sem Frete", 'center', 6);
-            field(110, Y_TRA + 5, 20, 8, "CÓDIGO ANTT", "");
-            field(130, Y_TRA + 5, 20, 8, "PLACA", "");
-            field(150, Y_TRA + 5, 10, 8, "UF", "");
-            field(160, Y_TRA + 5, 40, 8, "CNPJ/CPF", "");
+            // 9. TRANSPORTADOR
+            const Y_TRA = 113;
+            doc.setFillColor(240, 240, 240); doc.rect(10, Y_TRA, 190, 5, 'F'); doc.rect(10, Y_TRA, 190, 5);
+            doc.setFont("helvetica", "bold"); doc.text("TRANSPORTADOR / VOLUMES TRANSPORTADOS", 12, Y_TRA + 3.5);
+            
+            field(10, Y_TRA+5, 80, 8, "RAZÃO SOCIAL", "O MESMO", 'left');
+            field(90, Y_TRA+5, 25, 8, "FRETE POR CONTA", "9-Sem Frete", 'left');
+            field(115, Y_TRA+5, 20, 8, "CÓDIGO ANTT", "", 'left');
+            field(135, Y_TRA+5, 20, 8, "PLACA DO VEÍCULO", "", 'left');
+            field(155, Y_TRA+5, 10, 8, "UF", "", 'left');
+            field(165, Y_TRA+5, 35, 8, "CNPJ / CPF", "", 'left');
 
-            // Produtos
-            const Y_PROD = Y_TRA + 13 + 10;
-            doc.setFillColor(240, 240, 240); doc.rect(10, Y_PROD, 190, 5, 'F');
-            doc.setFont("helvetica", "bold"); doc.setFontSize(8);
-            doc.text("DADOS DO PRODUTO / SERVIÇO", 12, Y_PROD + 3.5);
-            const yH = Y_PROD + 5;
-            box(10, yH, 15, 5, "CÓDIGO"); box(25, yH, 70, 5, "DESCRIÇÃO"); box(95, yH, 15, 5, "NCM/SH");
-            box(110, yH, 10, 5, "CST"); box(120, yH, 10, 5, "CFOP"); box(130, yH, 10, 5, "UN");
-            box(140, yH, 15, 5, "QTD"); box(155, yH, 20, 5, "V.UNIT"); box(175, yH, 25, 5, "V.TOTAL");
+            // 10. DADOS DOS PRODUTOS
+            const Y_PROD = 130;
+            doc.setFillColor(240, 240, 240); doc.rect(10, Y_PROD, 190, 5, 'F'); doc.rect(10, Y_PROD, 190, 5);
+            doc.setFont("helvetica", "bold"); doc.text("DADOS DO PRODUTO / SERVIÇO", 12, Y_PROD + 3.5);
+            
+            const columns = [
+                { header: 'CÓDIGO', dataKey: 'cod' },
+                { header: 'DESCRIÇÃO DO PRODUTO / SERVIÇO', dataKey: 'desc' },
+                { header: 'NCM/SH', dataKey: 'ncm' },
+                { header: 'CST', dataKey: 'cst' },
+                { header: 'CFOP', dataKey: 'cfop' },
+                { header: 'UN', dataKey: 'un' },
+                { header: 'QTD', dataKey: 'qtd' },
+                { header: 'V.UNIT', dataKey: 'vunit' },
+                { header: 'V.TOTAL', dataKey: 'vtotal' }
+            ];
+            
+            const unidadeLabel = row.unidade === 'AMBOS' ? `${row.qtd_caixas}CX/${row.peso_kg}KG` : (row.unidade || 'CX');
+            const qtdValue = row.unidade === 'AMBOS' ? row.qtd_caixas : row.quantidade;
 
-            const yR = yH + 5;
-            const unidadeLabel = row.unidade === 'AMBOS'
-                ? `${row.qtd_caixas}CX/${row.peso_kg}KG`
-                : (row.unidade || 'CX');
-            const qtdLabel = row.unidade === 'AMBOS' ? row.qtd_caixas : row.quantidade;
+            const tableData = [{
+                cod: '001',
+                desc: row.produto || "CEBOLA",
+                ncm: '07031019',
+                cst: '0102',
+                cfop: '5102',
+                un: unidadeLabel,
+                qtd: (qtdValue || 1).toString(),
+                vunit: (row.valor / (qtdValue || 1)).toLocaleString('pt-BR', {minimumFractionDigits:2}),
+                vtotal: row.valor.toLocaleString('pt-BR', {minimumFractionDigits:2})
+            }];
 
-            field(10, yR, 15, 8, "", "001");
-            field(25, yR, 70, 8, "", row.produto);
-            field(95, yR, 15, 8, "", "07031019", 'center', 7);
-            field(110, yR, 10, 8, "", "0102", 'center', 7);
-            field(120, yR, 10, 8, "", "5102", 'center', 7);
-            field(130, yR, 10, 8, "", unidadeLabel, 'center', 7);
-            field(140, yR, 15, 8, "", qtdLabel, 'center');
-            field(155, yR, 20, 8, "", (row.valor / (qtdLabel || 1)).toFixed(2), 'right');
-            field(175, yR, 25, 8, "", row.valor.toFixed(2), 'right');
+            doc.autoTable({
+                startY: Y_PROD + 5,
+                margin: { left: 10, right: 10 },
+                columns: columns,
+                body: tableData,
+                theme: 'plain',
+                styles: { fontSize: 7, cellPadding: 1, lineColor: [0, 0, 0], lineWidth: 0.1 },
+                headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 6 },
+                columnStyles: {
+                    cod: { cellWidth: 15 },
+                    desc: { cellWidth: 'auto' },
+                    ncm: { cellWidth: 15, halign: 'center' },
+                    cst: { cellWidth: 10, halign: 'center' },
+                    cfop: { cellWidth: 10, halign: 'center' },
+                    un: { cellWidth: 15, halign: 'center' },
+                    qtd: { cellWidth: 15, halign: 'center' },
+                    vunit: { cellWidth: 20, halign: 'right' },
+                    vtotal: { cellWidth: 25, halign: 'right' }
+                }
+            });
 
-            // Adicionais
-            const Y_ADI = yR + 8 + 15;
-            doc.setFillColor(240, 240, 240); doc.rect(10, Y_ADI, 190, 5, 'F');
-            doc.setFont("helvetica", "bold"); doc.setFontSize(8);
-            doc.text("DADOS ADICIONAIS", 12, Y_ADI + 3.5);
-            box(10, Y_ADI + 5, 125, 25, "INFORMAÇÕES COMPLEMENTARES");
-            doc.setFontSize(7); doc.setFont("helvetica", "bold");
-            doc.text("Documento emitido por ME ou EPP optante pelo Simples Nacional.\nNão gera direito a crédito fiscal de IPI.", 12, Y_ADI + 15);
-            box(135, Y_ADI + 5, 65, 25, "RESERVADO AO FISCO");
+            // 11. DADOS ADICIONAIS
+            const Y_FINAL = doc.lastAutoTable.finalY + 5;
+            doc.setFillColor(240, 240, 240); doc.rect(10, Y_FINAL, 190, 5, 'F'); doc.rect(10, Y_FINAL, 190, 5);
+            doc.setFont("helvetica", "bold"); doc.text("DADOS ADICIONAIS", 12, Y_FINAL + 3.5);
+            
+            doc.rect(10, Y_FINAL + 5, 130, 30);
+            doc.setFontSize(5); doc.setFont("helvetica", "normal");
+            doc.text("INFORMAÇÕES COMPLEMENTARES", 11, Y_FINAL + 8);
+            doc.setFontSize(7);
+            doc.text("Documento emitido por ME ou EPP optante pelo Simples Nacional.\nNão gera direito a crédito fiscal de IPI.\n\n" + (row.protocolo_autorizacao ? "Protocolo: " + row.protocolo_autorizacao : ""), 11, Y_FINAL + 13);
+            
+            doc.rect(140, Y_FINAL + 5, 60, 30);
+            doc.setFontSize(5); doc.text("RESERVADO AO FISCO", 141, Y_FINAL + 8);
 
             const pdfOutput = doc.output('arraybuffer');
             res.setHeader('Content-Type', 'application/pdf');
@@ -800,6 +879,7 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
             res.send(Buffer.from(new Uint8Array(pdfOutput)));
 
         } catch (pdfErr) {
+            console.error("Erro ao gerar PDF:", pdfErr);
             res.status(500).send('Erro ao gerar PDF: ' + pdfErr.message);
         }
     });
