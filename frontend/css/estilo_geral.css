@@ -575,7 +575,7 @@ tr:hover td { background-color: #f8fafc; }
 .badge.entrada { background: #ecfdf5; color: #059669; border: 1px solid #10b98133; }
 .badge.saida { background: #fef2f2; color: #dc2626; border: 1px solid #ef444433; }
 .badge.despesa { background: #fffbeb; color: #d97706; border: 1px solid #f59e0b33; }
-.badge.admin { background: #eff6ff; color: #2563eb; border: 1px solid #3b82f633; }
+.badge.admin { background: #fef3c7; color: #d97706; border: 1px solid #f59e0b33; }
 .badge.operador { background: #f8fafc; color: #475569; border: 1px solid #64748b33; }
 
 .cadastro-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 24px; }

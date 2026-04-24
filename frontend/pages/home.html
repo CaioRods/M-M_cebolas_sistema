@@ -18,27 +18,37 @@
         body.loaded .main-content { filter: blur(0); }
         
         /* User info in sidebar */
-        .sidebar-user {
-            padding: 12px 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+        .sidebar-user-card {
+            margin: 0 16px 20px 16px;
+            padding: 16px;
+            border-radius: 16px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 14px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
         }
-        .user-avatar {
-            width: 36px;
-            height: 36px;
-            border-radius: 10px;
-            background: rgba(255,255,255,0.15);
+        .sidebar-user-card:hover {
+            background: rgba(255,255,255,0.1);
+            transform: translateY(-2px);
+        }
+        .user-avatar-modern {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--accent) 0%, #fcd34d 100%);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1rem;
-            color: white;
+            font-size: 1.2rem;
+            color: var(--primary-dark);
             flex-shrink: 0;
+            box-shadow: 0 4px 10px rgba(232, 156, 49, 0.4);
         }
-        .user-info { flex: 1; min-width: 0; }
-        .user-info strong { display: block; font-size: 0.85rem; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .user-info-modern { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+        .user-info-modern strong { display: block; font-size: 0.95rem; color: white; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1; }
     </style>
 </head>
 <body>
@@ -62,11 +72,11 @@
         </div>
         
         <!-- User info -->
-        <div class="sidebar-user">
-            <div class="user-avatar"><i class="fas fa-user"></i></div>
-            <div class="user-info">
+        <div class="sidebar-user-card">
+            <div class="user-avatar-modern"><i class="fas fa-user-tie"></i></div>
+            <div class="user-info-modern">
                 <strong id="user-name">Usuário</strong>
-                <span id="user-role-badge" class="badge operador" style="font-size:0.6rem;">OPERADOR</span>
+                <span id="user-role-badge" class="badge operador" style="font-size:0.6rem; align-self: flex-start;">OPERADOR</span>
             </div>
         </div>
         
@@ -106,8 +116,8 @@
                 <button class="nav-item" onclick="showSection('config')">
                     <i class="fas fa-cog"></i> Configurações
                 </button>
-                <button class="nav-item admin-only" onclick="showSection('admin')" style="background:rgba(37,99,235,0.15);color:rgba(147,197,253,0.9);">
-                    <i class="fas fa-shield-alt" style="color:#60a5fa;"></i> Admin
+                <button class="nav-item admin-only" onclick="showSection('admin')" style="background:rgba(232, 156, 49, 0.15);color:#E89C31;">
+                    <i class="fas fa-shield-alt" style="color:#E89C31;"></i> Admin
                 </button>
             </div>
         </nav>
@@ -222,12 +232,11 @@
                 <div class="form-group span-2">
                     <label>Escolha um Ícone</label>
                     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:5px;">
-                        <div class="icon-option active" onclick="selectIcon(this,'fa-box')"><i class="fas fa-box"></i></div>
-                        <div class="icon-option" onclick="selectIcon(this,'fa-seedling')"><i class="fas fa-seedling"></i></div>
-                        <div class="icon-option" onclick="selectIcon(this,'fa-leaf')"><i class="fas fa-leaf"></i></div>
-                        <div class="icon-option" onclick="selectIcon(this,'fa-shopping-basket')"><i class="fas fa-shopping-basket"></i></div>
-                        <div class="icon-option" onclick="selectIcon(this,'fa-circle')"><i class="fas fa-circle"></i></div>
-                        <div class="icon-option" onclick="selectIcon(this,'fa-lemon')"><i class="fas fa-lemon"></i></div>
+                        <div class="icon-option active" onclick="selectIcon(this,'cebola_amarela.png')"><img src="../Imgs/cebola_amarela.png" style="width:28px;height:28px;object-fit:contain;"></div>
+                        <div class="icon-option" onclick="selectIcon(this,'cebola_roxa.png')"><img src="../Imgs/cebola_roxa.png" style="width:28px;height:28px;object-fit:contain;"></div>
+                        <div class="icon-option" onclick="selectIcon(this,'cebola_branca.png')"><img src="../Imgs/cebola_branca.png" style="width:28px;height:28px;object-fit:contain;"></div>
+                        <div class="icon-option" onclick="selectIcon(this,'cebola_diversas.png')"><img src="../Imgs/cebola_diversas.png" style="width:28px;height:28px;object-fit:contain;"></div>
+                    </div>
                         <div class="icon-option" onclick="selectIcon(this,'fa-apple-alt')"><i class="fas fa-apple-alt"></i></div>
                         <div class="icon-option" onclick="selectIcon(this,'fa-carrot')"><i class="fas fa-carrot"></i></div>
                     </div>
@@ -256,7 +265,7 @@
     <!-- Modal de Usuário -->
     <div id="modal-usuario" class="modal-overlay">
         <div class="edit-modal" style="max-width:500px;">
-            <div class="modal-header" style="background:#2563eb;color:white;padding:20px 24px;border-radius:20px 20px 0 0;display:flex;justify-content:space-between;align-items:center;">
+            <div class="modal-header" style="background:var(--primary);color:white;padding:20px 24px;border-radius:20px 20px 0 0;display:flex;justify-content:space-between;align-items:center;">
                 <h3 id="user-modal-title" style="margin:0;font-size:1.1rem;">Gestão de Acesso</h3>
                 <button onclick="closeUsuarioModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:white;line-height:1;">&times;</button>
             </div>
@@ -284,7 +293,7 @@
                 </div>
                 <div style="display:flex;gap:12px;margin-top:8px;">
                     <button type="button" class="btn-danger" onclick="closeUsuarioModal()" style="flex:1;">Cancelar</button>
-                    <button type="submit" class="btn-primary" style="flex:2;background:#2563eb;">
+                    <button type="submit" class="btn-primary" style="flex:2;">
                         <i class="fas fa-save"></i> Salvar Acesso
                     </button>
                 </div>

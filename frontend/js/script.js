@@ -211,7 +211,7 @@ function calcularDashboardLocal() {
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
-    let totalCaixas = 0, totalKg = 0, receitaMes = 0, despesasMes = 0;
+    let totalCaixas = 0, totalKg = 0, receitaMes = 0, despesasMes = 0, qtdVendasMes = 0;
     const stockByCaixas = {}, stockByKg = {};
     const monthlyData = {};
     
@@ -242,7 +242,10 @@ function calcularDashboardLocal() {
             stockByKg[t.produto] -= kg;
             totalCaixas -= caixas;
             totalKg -= kg;
-            if (isCurrentMonth) receitaMes += t.valor;
+            if (isCurrentMonth) {
+                receitaMes += t.valor;
+                qtdVendasMes++;
+            }
             if (monthlyData[monthKey]) { monthlyData[monthKey].receita += t.valor; monthlyData[monthKey].caixas_saida += caixas; monthlyData[monthKey].kg_saida += kg; }
         }
     });
@@ -253,7 +256,7 @@ function calcularDashboardLocal() {
 
     return {
         estoque: { totalCaixas: Math.round(totalCaixas * 10) / 10, totalKg: Math.round(totalKg * 10) / 10, porProduto: topProdutos },
-        financeiro: { receitaMes, despesasMes, lucroMes: receitaMes - despesasMes, receitaTotal: 0, despesasTotal: 0, lucroTotal: 0 },
+        financeiro: { receitaMes, despesasMes, lucroMes: receitaMes - despesasMes, ticketMedio: qtdVendasMes > 0 ? receitaMes / qtdVendasMes : 0, receitaTotal: 0, despesasTotal: 0, lucroTotal: 0 },
         mensal: monthlyData,
         ultimasMovimentacoes: appData.transactions.slice(0, 10)
     };
@@ -276,7 +279,8 @@ function renderKPIs(data) {
         { label: 'Volume em Caixas', value: `${(data.estoque.totalCaixas || 0).toLocaleString('pt-BR')} Cx`, icon: 'fa-boxes', color: '#166534', bg: '#dcfce7' },
         { label: 'Volume em Peso', value: `${(data.estoque.totalKg || 0).toLocaleString('pt-BR')} Kg`, icon: 'fa-weight-hanging', color: '#1e40af', bg: '#dbeafe' },
         { label: 'Receita (Mês)', value: `R$ ${(data.financeiro.receitaMes || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: 'fa-hand-holding-usd', color: '#065f46', bg: '#d1fae5' },
-        { label: 'Lucro Estimado', value: `R$ ${(data.financeiro.lucroMes || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: 'fa-coins', color: '#92400e', bg: '#fef3c7' }
+        { label: 'Lucro Estimado', value: `R$ ${(data.financeiro.lucroMes || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: 'fa-coins', color: '#92400e', bg: '#fef3c7' },
+        { label: 'Ticket Médio', value: `R$ ${(data.financeiro.ticketMedio || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: 'fa-receipt', color: '#1e40af', bg: '#dbeafe' }
     ];
     container.innerHTML = kpis.map(kpi => `
         <div class="panel" style="padding: 20px; display: flex; align-items: center; gap: 16px; border-left: 4px solid ${kpi.color};">
@@ -428,15 +432,8 @@ function renderProdutosTable() {
     const tbody = document.getElementById('list-produtos');
     if (!tbody) return;
     tbody.innerHTML = appData.products.length > 0 ? appData.products.map(p => `
-        <tr>
-            <td>
-                <div style="display:flex;align-items:center;gap:10px;">
-                    <div style="width:32px;height:32px;background:${p.cor || '#1A5632'}20;color:${p.cor || '#1A5632'};border-radius:8px;display:flex;align-items:center;justify-content:center;">
-                        <i class="fas ${p.icone || 'fa-box'}"></i>
-                    </div>
-                    <strong>${p.nome}</strong>
-                </div>
-            </td>
+        <tr style="border-left: 4px solid ${p.cor || '#1A5632'}">
+            <td>${(p.icone && p.icone.includes('.png')) ? `<img src="../Imgs/${p.icone}" style="width:24px;height:24px;vertical-align:middle;margin-right:8px;">` : `<i class="fas ${p.icone || 'fa-box'}" style="color:${p.cor};margin-right:8px;"></i>`} <strong>${p.nome}</strong></td>
             <td>${p.ncm || '-'}</td>
             <td>R$ ${(p.preco_venda || 0).toLocaleString('pt-BR', {minimumFractionDigits:2})}</td>
             <td>${p.peso_por_caixa || 20} Kg/Cx</td>
@@ -985,13 +982,13 @@ function renderAdminProdutosTable() {
     const tbody = document.getElementById('admin-list-produtos');
     if (!tbody) return;
     tbody.innerHTML = appData.products.map(p => `
-        <tr>
+        <tr style="border-left: 4px solid ${p.cor || '#1A5632'}">
             <td>
-                <div style="display:flex;align-items:center;gap:8px;">
-                    <div style="width:28px;height:28px;background:${p.cor||'#1A5632'}20;color:${p.cor||'#1A5632'};border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:0.8rem;">
-                        <i class="fas ${p.icone||'fa-box'}"></i>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div style="width:32px;height:32px;background:${p.cor || '#1A5632'}20;color:${p.cor || '#1A5632'};border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                        ${(p.icone && p.icone.includes('.png')) ? `<img src="../Imgs/${p.icone}" style="width:20px;height:20px;object-fit:contain;">` : `<i class="fas ${p.icone || 'fa-box'}"></i>`}
                     </div>
-                    <div><strong>${p.nome}</strong><br><small style="color:var(--text-muted)">${p.peso_por_caixa||20} Kg/Cx</small></div>
+                    <strong>${p.nome}</strong>
                 </div>
             </td>
             <td style="text-align:right;">
@@ -1332,7 +1329,7 @@ function renderProductShowcase(section) {
     }
     container.innerHTML = appData.products.map(p => `
         <div class="product-card" onclick="selectProductPro('${p.nome}', '${section}', event)">
-            <div class="product-icon-circle" style="background:${p.cor || '#1A5632'}20; color:${p.cor || '#1A5632'}"><i class="fas ${p.icone || 'fa-box'}"></i></div>
+            <div class="product-icon-circle" style="background:${p.cor || '#1A5632'}20; color:${p.cor || '#1A5632'}">${(p.icone && p.icone.includes('.png')) ? `<img src="../Imgs/${p.icone}" style="width:40px;height:40px;object-fit:contain;">` : `<i class="fas ${p.icone || 'fa-box'}"></i>`}</div>
             <div class="product-name">${p.nome}</div>
             <div class="product-stock">${p.peso_por_caixa || 20} Kg/Cx</div>
         </div>`).join('');
