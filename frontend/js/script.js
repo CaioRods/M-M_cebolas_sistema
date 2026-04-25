@@ -952,11 +952,20 @@ async function previewPDF(id, event) {
             return; 
         }
         const blob = await res.blob();
-        const objectUrl = URL.createObjectURL(blob);
         
-        window.open(objectUrl, '_blank');
-        
-        setTimeout(() => URL.revokeObjectURL(objectUrl), 30000); // Libera após 30s
+        // Converte blob para Base64 para garantir abertura em todos os browsers/Electron
+        const reader = new FileReader();
+        reader.readAsDataURL(blob);
+        reader.onloadend = () => {
+            const base64data = reader.result;
+            const win = window.open();
+            if (win) {
+                win.document.write(`<iframe src="${base64data}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+                win.document.title = "Visualização DANFE";
+            } else {
+                showError('Bloqueador de popups detectado. Por favor, autorize popups.');
+            }
+        };
         
     } catch (e) { 
         showError('Erro ao conectar: ' + e.message); 
@@ -1414,17 +1423,89 @@ function renderStockTable() {
 function renderEstoqueResumo() {
     const container = document.getElementById('estoque-resumo');
     if (!container) return;
-    const totalCx = appData.transactions.reduce((acc, t) => acc + (t.tipo === 'entrada' ? (t.qtd_caixas || 0) : -(t.qtd_caixas || 0)), 0);
-    const totalKg = appData.transactions.reduce((acc, t) => acc + (t.tipo === 'entrada' ? (t.peso_kg || 0) : -(t.peso_kg || 0)), 0);
-    container.innerHTML = `
-        <div class="panel" style="padding:16px; border-left:4px solid #166534">
-            <p style="font-size:0.7rem; font-weight:700; color:var(--text-muted)">TOTAL CAIXAS</p>
-            <h4 style="font-size:1.4rem;font-weight:800;color:#166534">${Math.round(totalCx * 10) / 10} Cx</h4>
-        </div>
-        <div class="panel" style="padding:16px; border-left:4px solid #1e40af">
-            <p style="font-size:0.7rem; font-weight:700; color:var(--text-muted)">TOTAL KG</p>
-            <h4 style="font-size:1.4rem;font-weight:800;color:#1e40af">${Math.round(totalKg * 10) / 10} Kg</h4>
+
+    if (appData.products.length === 0) {
+        container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-muted)">Nenhum produto para exibir o estoque.</div>';
+        return;
+    }
+
+    const totalCxAll = appData.transactions.reduce((acc, t) => acc + (t.tipo === 'entrada' ? (t.qtd_caixas || 0) : -(t.qtd_caixas || 0)), 0);
+    const totalKgAll = appData.transactions.reduce((acc, t) => acc + (t.tipo === 'entrada' ? (t.peso_kg || 0) : -(t.peso_kg || 0)), 0);
+    
+    const cxEl = document.getElementById('total-global-cx');
+    const kgEl = document.getElementById('total-global-kg');
+    if (cxEl) cxEl.innerText = totalCxAll.toLocaleString('pt-BR');
+    if (kgEl) kgEl.innerText = totalKgAll.toLocaleString('pt-BR');
+
+    container.style.display = 'grid';
+    container.style.gridTemplateColumns = 'repeat(auto-fill, minmax(300px, 1fr))';
+    container.style.gap = '20px';
+
+    container.innerHTML = appData.products.map(p => {
+        const trans = appData.transactions.filter(t => t.produto === p.nome);
+        const stockCx = trans.reduce((acc, t) => acc + (t.tipo === 'entrada' ? (t.qtd_caixas || 0) : -(t.qtd_caixas || 0)), 0);
+        const stockKg = trans.reduce((acc, t) => acc + (t.tipo === 'entrada' ? (t.peso_kg || 0) : -(t.peso_kg || 0)), 0);
+        
+        const totalIn = trans.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + (t.qtd_caixas || 0), 0);
+        const totalOut = trans.filter(t => t.tipo === 'saida').reduce((acc, t) => acc + (t.qtd_caixas || 0), 0);
+        
+        const lastTrans = trans.length > 0 ? new Date(Math.max(...trans.map(t => new Date(t.data)))).toLocaleDateString('pt-BR') : 'Sem mov.';
+        
+        const avgBuy = trans.filter(t => t.tipo === 'entrada').length > 0 
+            ? (trans.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + t.valor, 0) / totalIn).toLocaleString('pt-BR', {minimumFractionDigits:2})
+            : '0,00';
+
+        return `
+        <div class="panel" style="padding:0; overflow:hidden; border:none; box-shadow:0 4px 20px rgba(0,0,0,0.08); display:flex; flex-direction:column;">
+            <div style="background:${p.cor || '#1A5632'}; padding:20px; color:white; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <h4 style="font-weight:800; font-size:1.1rem; margin:0;">${p.nome}</h4>
+                    <span style="font-size:0.7rem; opacity:0.8; text-transform:uppercase; letter-spacing:1px;">Estoque Atual</span>
+                </div>
+                <div style="width:45px; height:45px; background:rgba(255,255,255,0.2); border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.4rem;">
+                    <i class="fas ${p.icone || 'fa-box'}"></i>
+                </div>
+            </div>
+            
+            <div style="padding:20px; flex:1;">
+                <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:15px;">
+                    <span style="font-size:2.5rem; font-weight:900; color:var(--primary-dark); line-height:1;">${stockCx}</span>
+                    <span style="font-size:1rem; font-weight:700; color:var(--text-muted);">Caixas</span>
+                </div>
+                
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:20px;">
+                    <div style="background:#f8fafc; padding:12px; border-radius:12px;">
+                        <p style="font-size:0.65rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; margin-bottom:4px;">Peso Total</p>
+                        <h5 style="font-weight:800; font-size:1rem; color:var(--text-main);">${stockKg.toLocaleString('pt-BR')} Kg</h5>
+                    </div>
+                    <div style="background:#f8fafc; padding:12px; border-radius:12px;">
+                        <p style="font-size:0.65rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; margin-bottom:4px;">Custo Médio/Cx</p>
+                        <h5 style="font-weight:800; font-size:1rem; color:var(--text-main);">R$ ${avgBuy}</h5>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom:15px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:0.7rem; font-weight:700;">
+                        <span>Fluxo de Saída</span>
+                        <span>${totalIn > 0 ? Math.round((totalOut/totalIn)*100) : 0}%</span>
+                    </div>
+                    <div style="height:8px; background:#f1f5f9; border-radius:4px; overflow:hidden;">
+                        <div style="width:${Math.min(100, totalIn > 0 ? (totalOut/totalIn)*100 : 0)}%; height:100%; background:linear-gradient(90deg, ${p.cor || '#1A5632'}, #e89c31); border-radius:4px;"></div>
+                    </div>
+                </div>
+
+                <div style="border-top:1px solid #f1f5f9; padding-top:15px; display:flex; justify-content:space-between; align-items:center;">
+                    <div style="display:flex; flex-direction:column;">
+                        <span style="font-size:0.65rem; color:var(--text-muted); font-weight:700;">ÚLTIMA MOV.</span>
+                        <span style="font-size:0.8rem; font-weight:600;">${lastTrans}</span>
+                    </div>
+                    <button class="btn-icon" style="background:#f1f5f9; color:var(--primary); width:32px; height:32px; border-radius:8px;" onclick="showSection('estoque')">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
         </div>`;
+    }).join('');
 }
 
 async function deleteMovimentacao(id) {
