@@ -1597,7 +1597,7 @@ function renderProductShowcase(section) {
              onclick="${isOutOfStock ? '' : `selectProductPro('${p.nome}', '${section}', event)`}"
              style="${isOutOfStock ? 'opacity:0.5; cursor:not-allowed; filter:grayscale(1);' : 'cursor:pointer;'}">
             <div class="product-icon-circle" style="background:${p.cor || '#1A5632'}20; color:${p.cor || '#1A5632'}">
-                <i class="fas ${p.icone || 'fa-box'}"></i>
+                ${p.icone === 'icon-cebola' ? `<div class="custom-icon icon-cebola"></div>` : `<i class="fas ${p.icone || 'fa-box'}"></i>`}
             </div>
             <div class="product-name" style="font-weight:700;">${p.nome}</div>
             <div style="display:flex; justify-content:space-between; width:100%; font-size:0.7rem; margin-top:4px;">
