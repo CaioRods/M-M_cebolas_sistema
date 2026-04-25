@@ -606,6 +606,40 @@ app.get('/api/nfe/:id/xml', authenticateToken, (req, res) => {
     });
 });
 
+app.post('/api/nfe/:id/transmitir', authenticateToken, async (req, res) => {
+    db.get('SELECT * FROM nfe WHERE id = ?', [req.params.id], async (err, nfe) => {
+        if (err || !nfe) return res.status(404).json({ error: "NF-e não encontrada" });
+        if (nfe.status === 'autorizada') return res.status(400).json({ error: "NF-e já está autorizada" });
+
+        db.all('SELECT chave, valor FROM configs', [], async (err2, configs) => {
+            const configMap = {};
+            configs?.forEach(c => configMap[c.chave] = c.valor);
+            
+            const modo = configMap['nfe_modo'] || 'homologacao';
+            const isProduction = modo === 'producao';
+            const certPassword = configMap['cert_password'] || '12345678';
+            const pfxPath = path.join(__dirname, '../certificado/certificado.pfx');
+            
+            try {
+                const nfeService = new NFeService(pfxPath, certPassword, isProduction);
+                const transmissaoResult = await nfeService.transmitirSefaz(nfe.xml_content, configMap['emit_uf_cod'] || '35');
+                
+                if (transmissaoResult.status === 'autorizada') {
+                    db.run(`UPDATE nfe SET status = ?, protocolo_autorizacao = ? WHERE id = ?`,
+                        [transmissaoResult.status, transmissaoResult.protocolo, req.params.id], (err3) => {
+                            if (err3) return res.status(500).json({ error: err3.message });
+                            res.json({ success: true, status: transmissaoResult.status, message: transmissaoResult.message });
+                        });
+                } else {
+                    res.json({ success: false, status: transmissaoResult.status, message: transmissaoResult.message });
+                }
+            } catch (nfeErr) {
+                res.status(500).json({ error: nfeErr.message });
+            }
+        });
+    });
+});
+
 app.delete('/api/nfe/:id', authenticateToken, (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
     db.run('DELETE FROM nfe WHERE id = ?', [req.params.id], (err) => {
@@ -623,15 +657,30 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
         try {
             const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
             
-            // --- Helper for Barcode ---
+            // --- Helpers for Barcodes ---
             const generateBarcode = (text) => {
                 return new Promise((resolve, reject) => {
                     bwipjs.toBuffer({
                         bcid: 'code128',       // Barcode type
                         text: text,            // Text to encode
                         scale: 3,              // 3x scaling factor
-                        height: 10,            // Bar height, in millimeters
+                        height: 12,            // Bar height
                         includetext: false,    // Don't show text below barcode
+                    }, (err, png) => {
+                        if (err) reject(err);
+                        else resolve(png);
+                    });
+                });
+            };
+
+            const generateQRCode = (text) => {
+                return new Promise((resolve, reject) => {
+                    bwipjs.toBuffer({
+                        bcid: 'qrcode',
+                        text: text,
+                        scale: 2,
+                        width: 25,
+                        height: 25
                     }, (err, png) => {
                         if (err) reject(err);
                         else resolve(png);
@@ -649,6 +698,17 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
 
             // --- DANFE LAYOUT ---
             doc.setFont("helvetica", "normal");
+
+            // 0. LOGO (Novo)
+            try {
+                const logoPath = path.join(__dirname, '../frontend/Imgs/Logo_M&M_Cebolas.png');
+                if (fs.existsSync(logoPath)) {
+                    const logoData = fs.readFileSync(logoPath).toString('base64');
+                    doc.addImage(`data:image/png;base64,${logoData}`, 'PNG', 12, 24, 25, 25);
+                }
+            } catch (logoErr) {
+                console.warn("Erro ao carregar logo para o PDF:", logoErr.message);
+            }
             
             // 1. RECEBEMOS DE... (Topo)
             doc.rect(10, 10, 155, 12);
@@ -667,14 +727,16 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
 
             // 2. IDENTIFICAÇÃO DO EMITENTE
             doc.rect(10, 22, 90, 28);
-            doc.setFontSize(10);
-            doc.text(configs['emit_nome'] || "M&M HF COMERCIO DE CEBOLAS LTDA", 55, 28, { align: 'center' });
+            const xText = 40; // Ajustado para não sobrepor o logo (que vai até x=37)
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(9);
+            doc.text(configs['emit_nome'] || "M&M HF COMERCIO DE CEBOLAS LTDA", xText, 28);
             doc.setFontSize(7);
             doc.setFont("helvetica", "normal");
-            doc.text(configs['emit_lgr'] || "RUA MANOEL CRUZ, 36", 55, 33, { align: 'center' });
-            doc.text(`${configs['emit_bairro'] || 'RESIDENCIAL MINERVA I'} - ${configs['emit_cep'] || '19026-168'}`, 55, 37, { align: 'center' });
-            doc.text(`${configs['emit_xmun'] || 'PRESIDENTE PRUDENTE'} - ${configs['emit_uf'] || 'SP'}`, 55, 41, { align: 'center' });
-            doc.text("Fone: " + (configs['emit_tel'] || "(18) 9999-9999"), 55, 45, { align: 'center' });
+            doc.text(configs['emit_lgr'] || "RUA MANOEL CRUZ, 36", xText, 33);
+            doc.text(`${configs['emit_bairro'] || 'RESIDENCIAL MINERVA I'} - ${configs['emit_cep'] || '19026-168'}`, xText, 37);
+            doc.text(`${configs['emit_xmun'] || 'PRESIDENTE PRUDENTE'} - ${configs['emit_uf'] || 'SP'}`, xText, 41);
+            doc.text("Fone: " + (configs['emit_tel'] || "(18) 9999-9999"), xText, 45);
 
             // 3. DANFE BOX
             doc.rect(100, 22, 25, 28);
@@ -698,19 +760,22 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
             // 4. CHAVE DE ACESSO / BARCODE
             doc.rect(125, 22, 75, 28);
             if (row.chave_acesso) {
-                const barcodeBuffer = await generateBarcode(row.chave_acesso);
-                const barcodeBase64 = `data:image/png;base64,${barcodeBuffer.toString('base64')}`;
-                doc.addImage(barcodeBase64, 'PNG', 127, 24, 71, 12);
-                doc.setFontSize(6);
-                doc.setFont("helvetica", "normal");
-                doc.text("CHAVE DE ACESSO", 127, 38);
-                doc.setFontSize(7);
-                // Split chave into 4 groups for better reading
-                const c = row.chave_acesso;
-                const chaveFormatada = `${c.slice(0,4)} ${c.slice(4,8)} ${c.slice(8,12)} ${c.slice(12,16)} ${c.slice(16,20)} ${c.slice(20,24)} ${c.slice(24,28)} ${c.slice(28,32)} ${c.slice(32,36)} ${c.slice(36,40)} ${c.slice(40,44)}`;
-                doc.text(chaveFormatada, 127, 41);
+                try {
+                    const barcodeBuffer = await generateBarcode(row.chave_acesso);
+                    const barcodeBase64 = `data:image/png;base64,${barcodeBuffer.toString('base64')}`;
+                    doc.addImage(barcodeBase64, 'PNG', 127, 24, 71, 10);
+                    doc.setFontSize(5);
+                    doc.setFont("helvetica", "normal");
+                    doc.text("CHAVE DE ACESSO", 127, 36);
+                    doc.setFontSize(7);
+                    doc.setFont("helvetica", "bold");
+                    const c = row.chave_acesso;
+                    const chaveFormatada = `${c.slice(0,4)} ${c.slice(4,8)} ${c.slice(8,12)} ${c.slice(12,16)} ${c.slice(16,20)} ${c.slice(20,24)} ${c.slice(24,28)} ${c.slice(28,32)} ${c.slice(32,36)} ${c.slice(36,40)} ${c.slice(40,44)}`;
+                    doc.text(chaveFormatada, 127, 39.5);
+                } catch (e) { console.error("Erro barcode:", e); }
             }
             doc.setFontSize(6);
+            doc.setFont("helvetica", "normal");
             doc.text("Consulta de autenticidade no portal nacional da NF-e", 127, 45);
             doc.text("www.nfe.fazenda.gov.br/portal ou no site da Sefaz Autorizadora", 127, 48);
 
@@ -864,14 +929,24 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
             doc.setFillColor(240, 240, 240); doc.rect(10, Y_FINAL, 190, 5, 'F'); doc.rect(10, Y_FINAL, 190, 5);
             doc.setFont("helvetica", "bold"); doc.text("DADOS ADICIONAIS", 12, Y_FINAL + 3.5);
             
-            doc.rect(10, Y_FINAL + 5, 130, 30);
+            doc.rect(10, Y_FINAL + 5, 150, 35);
             doc.setFontSize(5); doc.setFont("helvetica", "normal");
             doc.text("INFORMAÇÕES COMPLEMENTARES", 11, Y_FINAL + 8);
             doc.setFontSize(7);
-            doc.text("Documento emitido por ME ou EPP optante pelo Simples Nacional.\nNão gera direito a crédito fiscal de IPI.\n\n" + (row.protocolo_autorizacao ? "Protocolo: " + row.protocolo_autorizacao : ""), 11, Y_FINAL + 13);
+            doc.text("Documento emitido por ME ou EPP optante pelo Simples Nacional.\nNão gera direito a crédito fiscal de IPI.\nTransação vinculada à venda #" + row.venda_id + "\n\n" + (row.protocolo_autorizacao ? "Protocolo: " + row.protocolo_autorizacao : "EMISSÃO EM HOMOLOGAÇÃO"), 11, Y_FINAL + 13);
             
-            doc.rect(140, Y_FINAL + 5, 60, 30);
-            doc.setFontSize(5); doc.text("RESERVADO AO FISCO", 141, Y_FINAL + 8);
+            doc.rect(160, Y_FINAL + 5, 40, 35);
+            doc.setFontSize(5); doc.text("RESERVADO AO FISCO / QR CODE", 161, Y_FINAL + 8);
+            
+            // Gerar e adicionar QR Code no final
+            if (row.chave_acesso) {
+                try {
+                    const qrUrl = `https://www.nfe.fazenda.gov.br/portal/consultaRecaptcha.aspx?tipoConsulta=completa&chaveAcesso=${row.chave_acesso}`;
+                    const qrBuffer = await generateQRCode(qrUrl);
+                    const qrBase64 = `data:image/png;base64,${qrBuffer.toString('base64')}`;
+                    doc.addImage(qrBase64, 'PNG', 167, Y_FINAL + 10, 26, 26);
+                } catch (e) { console.error("Erro QR Code:", e); }
+            }
 
             const pdfOutput = doc.output('arraybuffer');
             res.setHeader('Content-Type', 'application/pdf');

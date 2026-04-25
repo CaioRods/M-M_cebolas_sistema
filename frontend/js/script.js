@@ -276,21 +276,48 @@ function renderDashboardPro(data) {
 function renderKPIs(data) {
     const container = document.getElementById('kpi-container');
     if (!container) return;
+    
+    // Calcular Crescimento MoM (Mês sobre Mês)
+    const monthlyEntries = Object.entries(data.mensal || {});
+    let growthLabel = 'Estável';
+    let growthColor = 'var(--text-muted)';
+    
+    if (monthlyEntries.length >= 2) {
+        const lastMonth = monthlyEntries[monthlyEntries.length - 1][1];
+        const prevMonth = monthlyEntries[monthlyEntries.length - 2][1];
+        if (prevMonth.receita > 0) {
+            const growth = ((lastMonth.receita - prevMonth.receita) / prevMonth.receita) * 100;
+            growthLabel = `${growth >= 0 ? '+' : ''}${growth.toFixed(1)}%`;
+            growthColor = growth >= 0 ? 'var(--success)' : 'var(--danger)';
+        }
+    }
+
+    const margemLucro = data.financeiro.receitaMes > 0 
+        ? (data.financeiro.lucroMes / data.financeiro.receitaMes) * 100 
+        : 0;
+
     const kpis = [
-        { label: 'Volume em Caixas', value: `${(data.estoque.totalCaixas || 0).toLocaleString('pt-BR')} Cx`, icon: 'fa-boxes', color: '#166534', bg: '#dcfce7' },
-        { label: 'Volume em Peso', value: `${(data.estoque.totalKg || 0).toLocaleString('pt-BR')} Kg`, icon: 'fa-weight-hanging', color: '#1e40af', bg: '#dbeafe' },
-        { label: 'Receita (Mês)', value: `R$ ${(data.financeiro.receitaMes || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: 'fa-hand-holding-usd', color: '#065f46', bg: '#d1fae5' },
-        { label: 'Lucro Estimado', value: `R$ ${(data.financeiro.lucroMes || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: 'fa-coins', color: '#92400e', bg: '#fef3c7' },
-        { label: 'Ticket Médio', value: `R$ ${(data.financeiro.ticketMedio || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: 'fa-receipt', color: '#1e40af', bg: '#dbeafe' }
+        { label: 'Volume em Caixas', value: `${(data.estoque.totalCaixas || 0).toLocaleString('pt-BR')} Cx`, icon: 'fa-boxes', color: '#166534', bg: '#dcfce7', trend: 'Estoque Total' },
+        { label: 'Receita (Mês)', value: `R$ ${(data.financeiro.receitaMes || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: 'fa-hand-holding-usd', color: '#065f46', bg: '#d1fae5', trend: growthLabel, trendColor: growthColor },
+        { label: 'Lucro Estimado', value: `R$ ${(data.financeiro.lucroMes || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: 'fa-coins', color: '#92400e', bg: '#fef3c7', trend: 'Líquido' },
+        { label: 'Margem de Lucro', value: `${margemLucro.toFixed(1)}%`, icon: 'fa-chart-pie', color: '#7c3aed', bg: '#f5f3ff', trend: 'Rentabilidade', trendColor: '#7c3aed' },
+        { label: 'Ticket Médio', value: `R$ ${(data.financeiro.ticketMedio || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: 'fa-receipt', color: '#1e40af', bg: '#dbeafe', trend: 'Por Venda' }
     ];
+    
     container.innerHTML = kpis.map(kpi => `
-        <div class="panel" style="padding: 20px; display: flex; align-items: center; gap: 16px; border-left: 4px solid ${kpi.color};">
-            <div style="width: 48px; height: 48px; background: ${kpi.bg}; color: ${kpi.color}; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink:0;">
-                <i class="fas ${kpi.icon}"></i>
+        <div class="panel" style="padding: 24px; position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 12px; border-top: 4px solid ${kpi.color};">
+            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                <div style="width: 54px; height: 54px; background: ${kpi.bg}; color: ${kpi.color}; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink:0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+                    <i class="fas ${kpi.icon}"></i>
+                </div>
+                ${kpi.trend ? `<span style="font-size: 0.7rem; font-weight: 800; color: ${kpi.trendColor || 'var(--text-muted)'}; background: ${kpi.trendColor ? kpi.trendColor + '10' : '#f1f5f9'}; padding: 4px 10px; border-radius: 100px; border: 1px solid ${kpi.trendColor ? kpi.trendColor + '20' : 'var(--border)'};">${kpi.trend}</span>` : ''}
             </div>
-            <div>
-                <p style="font-size: 0.65rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">${kpi.label}</p>
-                <h3 style="font-size: 1.3rem; font-weight: 800; color: ${kpi.color};">${kpi.value}</h3>
+            <div style="margin-top: 8px;">
+                <p style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">${kpi.label}</p>
+                <h3 style="font-size: 1.6rem; font-weight: 900; color: var(--text-main); letter-spacing: -0.5px;">${kpi.value}</h3>
+            </div>
+            <div style="position: absolute; right: -15px; bottom: -15px; font-size: 5rem; opacity: 0.03; color: ${kpi.color}; pointer-events: none;">
+                <i class="fas ${kpi.icon}"></i>
             </div>
         </div>
     `).join('');
@@ -300,25 +327,93 @@ function renderMainChart(data) {
     const ctx = document.getElementById('mainDashboardChart');
     if (!ctx) return;
     if (mainChart) mainChart.destroy();
+    
     const metric = document.getElementById('chart-metric-select')?.value || 'financeiro';
     const labels = Object.keys(data.mensal || {}).map(k => {
         const [year, month] = k.split('-');
         return new Date(parseInt(year), parseInt(month) - 1, 1).toLocaleDateString('pt-BR', { month: 'short' });
     });
     const values = Object.values(data.mensal || {});
+    
+    const canvasCtx = ctx.getContext('2d');
+    const gradientPrimary = canvasCtx.createLinearGradient(0, 0, 0, 400);
+    gradientPrimary.addColorStop(0, 'rgba(26, 86, 50, 0.4)');
+    gradientPrimary.addColorStop(1, 'rgba(26, 86, 50, 0.0)');
+    
+    const gradientAccent = canvasCtx.createLinearGradient(0, 0, 0, 400);
+    gradientAccent.addColorStop(0, 'rgba(232, 156, 49, 0.4)');
+    gradientAccent.addColorStop(1, 'rgba(232, 156, 49, 0.0)');
+
     let datasets = [];
     if (metric === 'financeiro') {
         datasets = [
-            { label: 'Receita', data: values.map(v => v.receita), backgroundColor: 'rgba(26, 86, 50, 0.8)', borderColor: '#1A5632', borderWeight: 2, tension: 0.4, fill: true },
-            { label: 'Despesas', data: values.map(v => v.despesa), backgroundColor: 'rgba(232, 156, 49, 0.8)', borderColor: '#E89C31', borderWeight: 2, tension: 0.4, fill: true }
+            { 
+                label: 'Receita', 
+                data: values.map(v => v.receita), 
+                backgroundColor: dashboardChartType === 'line' ? gradientPrimary : '#1A5632', 
+                borderColor: '#1A5632', 
+                borderWidth: 3, 
+                tension: 0.4, 
+                fill: true,
+                pointBackgroundColor: '#fff',
+                pointBorderColor: '#1A5632',
+                pointBorderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 6
+            },
+            { 
+                label: 'Despesas', 
+                data: values.map(v => v.despesa), 
+                backgroundColor: dashboardChartType === 'line' ? gradientAccent : '#E89C31', 
+                borderColor: '#E89C31', 
+                borderWidth: 3, 
+                tension: 0.4, 
+                fill: true,
+                pointBackgroundColor: '#fff',
+                pointBorderColor: '#E89C31',
+                pointBorderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 6
+            }
         ];
     } else {
         datasets = [
-            { label: 'Entrada', data: values.map(v => metric === 'volume_cx' ? v.caixas_entrada : v.kg_entrada), backgroundColor: '#1A5632', borderColor: '#1A5632' },
-            { label: 'Saída', data: values.map(v => metric === 'volume_cx' ? v.caixas_saida : v.kg_saida), backgroundColor: '#E89C31', borderColor: '#E89C31' }
+            { 
+                label: 'Entrada', 
+                data: values.map(v => metric === 'volume_cx' ? v.caixas_entrada : v.kg_entrada), 
+                backgroundColor: '#1A5632', 
+                borderColor: '#1A5632',
+                borderWidth: 0,
+                borderRadius: 6
+            },
+            { 
+                label: 'Saída', 
+                data: values.map(v => metric === 'volume_cx' ? v.caixas_saida : v.kg_saida), 
+                backgroundColor: '#E89C31', 
+                borderColor: '#E89C31',
+                borderWidth: 0,
+                borderRadius: 6
+            }
         ];
     }
-    mainChart = new Chart(ctx, { type: dashboardChartType, data: { labels, datasets }, options: { responsive: true, maintainAspectRatio: false } });
+    
+    mainChart = new Chart(ctx, { 
+        type: dashboardChartType, 
+        data: { labels, datasets }, 
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { position: 'top', align: 'end', labels: { usePointStyle: true, boxWidth: 8, font: { weight: '700', size: 11 } } },
+                tooltip: { backgroundColor: 'rgba(255, 255, 255, 0.95)', titleColor: '#0f172a', bodyColor: '#475569', borderColor: '#e2e8f0', borderWidth: 1, padding: 12, bodySpacing: 8, titleFont: { size: 13, weight: '800' }, bodyFont: { size: 12 }, usePointStyle: true, callbacks: { label: function(context) { let label = context.dataset.label || ''; if (label) label += ': '; if (context.parsed.y !== null) { if (metric === 'financeiro') label += new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(context.parsed.y); else label += context.parsed.y.toLocaleString('pt-BR') + (metric === 'volume_cx' ? ' Cx' : ' Kg'); } return label; } } }
+            },
+            scales: {
+                y: { grid: { borderDash: [5, 5], color: '#e2e8f0' }, ticks: { font: { weight: '600', size: 10 }, callback: function(value) { if (metric === 'financeiro') return 'R$ ' + value.toLocaleString('pt-BR'); return value; } } },
+                x: { grid: { display: false }, ticks: { font: { weight: '600', size: 10 } } }
+            }
+        } 
+    });
 }
 
 function renderDistributionChart(data) {
@@ -747,7 +842,10 @@ async function loadNFeTable() {
                             <span class="badge ${n.status === 'autorizada' ? 'entrada' : n.status === 'cancelada' ? 'saida' : 'despesa'}">${(n.status || 'pendente').toUpperCase()}</span>
                         </div>
                         <div class="actions" style="display:flex;gap:4px;justify-content:flex-end">
+                            <button class="btn-icon" onclick="copyToClipboard('${n.chave_acesso}')" title="Copiar Chave NFe"><i class="fas fa-copy"></i></button>
+                            ${n.status !== 'autorizada' ? `<button class="btn-icon text-primary" onclick="transmitirNFe(${n.id})" title="Transmitir para SEFAZ"><i class="fas fa-paper-plane"></i></button>` : ''}
                             <button class="btn-icon" onclick="downloadXML(${n.id})" title="Baixar XML"><i class="fas fa-code"></i></button>
+                            <button class="btn-icon" onclick="previewPDF(${n.id})" title="Visualizar DANFE" style="background:rgba(239, 68, 68, 0.1);color:#ef4444;"><i class="fas fa-eye"></i></button>
                             <button class="btn-icon" onclick="downloadPDF(${n.id})" title="Baixar PDF/DANFE"><i class="fas fa-file-pdf" style="color:#ef4444"></i></button>
                             <button class="btn-icon text-danger" onclick="deleteNFe(${n.id})" title="Excluir"><i class="fas fa-trash"></i></button>
                         </div>
@@ -801,9 +899,28 @@ async function downloadPDF(id) {
         if (!res.ok) { showError('Erro ao gerar DANFE'); return; }
         const blob = await res.blob();
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
+        const objectUrl = URL.createObjectURL(blob);
+        a.href = objectUrl;
         a.download = `DANFE_${id}.pdf`;
+        document.body.appendChild(a);
         a.click();
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(objectUrl);
+        }, 100);
+    } catch (e) { showError('Erro ao gerar DANFE'); }
+}
+
+async function previewPDF(id) {
+    const token = localStorage.getItem('token');
+    const url = `${API_URL}/nfe/${id}/pdf`;
+    showSuccess('Gerando visualização...');
+    try {
+        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!res.ok) { showError('Erro ao gerar DANFE'); return; }
+        const blob = await res.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        window.open(objectUrl, '_blank');
     } catch (e) { showError('Erro ao gerar DANFE'); }
 }
 
@@ -1540,4 +1657,36 @@ function switchAdminTab(tab, btn) {
     } else {
         console.error('Admin tab content not found:', 'admin-tab-' + tab);
     }
+}
+async function transmitirNFe(id) {
+    const btn = event.currentTarget;
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    btn.disabled = true;
+
+    try {
+        const res = await fetchWithAuth(`/nfe/${id}/transmitir`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            showSuccess(data.message || 'NF-e Autorizada!');
+            loadNFeSection();
+        } else {
+            showError(data.message || 'Erro na transmissão');
+        }
+    } catch (e) {
+        showError('Erro ao conectar com servidor');
+    } finally {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+    }
+}
+
+function copyToClipboard(text) {
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+        showSuccess('Chave copiada para a área de transferência!');
+    }).catch(err => {
+        console.error('Erro ao copiar:', err);
+        showError('Erro ao copiar chave.');
+    });
 }
