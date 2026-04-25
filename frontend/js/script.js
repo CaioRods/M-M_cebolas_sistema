@@ -846,16 +846,14 @@ async function loadNFeTable() {
                             <br><small style="color:var(--text-muted);font-size:0.7rem">${(n.chave_acesso || '').substring(0, 25)}...</small>
                         </div>
                         <span class="value" style="text-align:right; font-size:0.85rem; font-weight:700;">R$ ${(n.valor || 0).toLocaleString('pt-BR', {minimumFractionDigits:2})}</span>
-                        <div class="status">
+                        <div class="status" style="margin-right: 12px;">
                             <span class="badge ${n.status === 'autorizada' ? 'entrada' : n.status === 'cancelada' ? 'saida' : 'despesa'}">${(n.status || 'pendente').toUpperCase()}</span>
                         </div>
                         <div class="actions" style="display:flex;gap:4px;justify-content:flex-end">
-                            <button class="btn-icon" onclick="copyToClipboard('${n.chave_acesso}')" title="Copiar Chave NFe"><i class="fas fa-copy"></i></button>
-                            ${n.status !== 'autorizada' ? `<button class="btn-icon text-primary" onclick="transmitirNFe(${n.id})" title="Transmitir para SEFAZ"><i class="fas fa-paper-plane"></i></button>` : ''}
-                            <button class="btn-icon" onclick="downloadXML(${n.id})" title="Baixar XML"><i class="fas fa-code"></i></button>
-                            <button class="btn-icon" onclick="previewPDF(${n.id})" title="Visualizar DANFE" style="background:rgba(239, 68, 68, 0.1);color:#ef4444;"><i class="fas fa-eye"></i></button>
-                            <button class="btn-icon" onclick="downloadPDF(${n.id})" title="Baixar PDF/DANFE"><i class="fas fa-file-pdf" style="color:#ef4444"></i></button>
-                            <button class="btn-icon text-danger" onclick="deleteNFe(${n.id})" title="Excluir"><i class="fas fa-trash"></i></button>
+                            <button class="btn-icon" title="Ver PDF" onclick="previewPDF(${n.id}, event)"><i class="fas fa-eye"></i></button>
+                            <button class="btn-icon" title="Baixar PDF" onclick="downloadPDF(${n.id}, event)"><i class="fas fa-file-pdf"></i></button>
+                            <button class="btn-icon" title="Baixar XML" onclick="downloadXML(${n.id})"><i class="fas fa-file-code"></i></button>
+                            <button class="btn-icon text-danger" title="Excluir" onclick="deleteNFe(${n.id})"><i class="fas fa-trash"></i></button>
                         </div>
                     </div>
                 `).join('')}
@@ -899,32 +897,53 @@ async function downloadXML(id) {
     } catch (e) { showError('Erro ao baixar XML'); }
 }
 
-async function downloadPDF(id) {
+async function downloadPDF(id, event) {
     const token = localStorage.getItem('token');
     const url = `${API_URL}/nfe/${id}/pdf`;
+    
+    const btn = event?.currentTarget;
+    const origContent = btn ? btn.innerHTML : null;
+    if (btn) {
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        btn.disabled = true;
+    }
+
     try {
         const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
-        if (!res.ok) { showError('Erro ao gerar DANFE'); return; }
+        if (!res.ok) { showError('Erro ao gerar PDF'); return; }
+        
         const blob = await res.blob();
-        const a = document.createElement('a');
         const objectUrl = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
         a.href = objectUrl;
         a.download = `DANFE_${id}.pdf`;
         document.body.appendChild(a);
         a.click();
-        setTimeout(() => {
-            document.body.removeChild(a);
-            URL.revokeObjectURL(objectUrl);
-        }, 100);
-    } catch (e) { showError('Erro ao gerar DANFE'); }
+        document.body.removeChild(a);
+        URL.revokeObjectURL(objectUrl);
+        showSuccess('Download iniciado!');
+    } catch (e) {
+        showError('Erro: ' + e.message);
+    } finally {
+        if (btn) {
+            btn.innerHTML = origContent;
+            btn.disabled = false;
+        }
+    }
 }
 
-async function previewPDF(id) {
+async function previewPDF(id, event) {
     const token = localStorage.getItem('token');
     const url = `${API_URL}/nfe/${id}/pdf`;
     
-    showSuccess('Abrindo prévia...');
-    
+    const btn = event?.currentTarget;
+    const origContent = btn ? btn.innerHTML : null;
+    if (btn) {
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        btn.disabled = true;
+    }
+
     try {
         const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
         if (!res.ok) { 
@@ -935,17 +954,17 @@ async function previewPDF(id) {
         const blob = await res.blob();
         const objectUrl = URL.createObjectURL(blob);
         
-        // Em vez de window.open, vamos tentar criar um link invisível e clicar nele com target _blank
-        // Isso costuma burlar bloqueadores de popup melhor
-        const a = document.createElement('a');
-        a.href = objectUrl;
-        a.target = '_blank';
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => document.body.removeChild(a), 100);
+        window.open(objectUrl, '_blank');
+        
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 30000); // Libera após 30s
         
     } catch (e) { 
         showError('Erro ao conectar: ' + e.message); 
+    } finally {
+        if (btn) {
+            btn.innerHTML = origContent;
+            btn.disabled = false;
+        }
     }
 }
 

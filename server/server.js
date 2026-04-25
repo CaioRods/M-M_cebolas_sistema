@@ -16,8 +16,22 @@ const dbPath = path.join(__dirname, 'database.sqlite');
 const db = new sqlite3.Database(dbPath);
 const SECRET = process.env.JWT_SECRET || 'mm_cebolas_secret_2024';
 
-// --- CONFIGURAÇÃO VISUAL ---
+// --- CONFIGURAÇÃO VISUAL E CACHE ---
 const COR_DESTAQUE = [0, 80, 0];
+let LOGO_CACHE = null;
+
+function getLogoBase64() {
+    if (LOGO_CACHE) return LOGO_CACHE;
+    try {
+        const logoPath = path.join(__dirname, '../frontend/Imgs/Logo_M&M_Cebolas.png');
+        if (fs.existsSync(logoPath)) {
+            const logoData = fs.readFileSync(logoPath).toString('base64');
+            LOGO_CACHE = `data:image/png;base64,${logoData}`;
+            return LOGO_CACHE;
+        }
+    } catch (e) { console.error("Erro ao carregar logo:", e); }
+    return null;
+}
 
 db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS usuarios (id INTEGER PRIMARY KEY AUTOINCREMENT, label TEXT, username TEXT UNIQUE, password TEXT, role TEXT)`);
@@ -700,15 +714,10 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
             // --- DANFE LAYOUT ---
             doc.setFont("helvetica", "normal");
 
-            // 0. LOGO (Novo)
-            try {
-                const logoPath = path.join(__dirname, '../frontend/Imgs/Logo_M&M_Cebolas.png');
-                if (fs.existsSync(logoPath)) {
-                    const logoData = fs.readFileSync(logoPath).toString('base64');
-                    doc.addImage(`data:image/png;base64,${logoData}`, 'PNG', 12, 24, 25, 25);
-                }
-            } catch (logoErr) {
-                console.warn("Erro ao carregar logo para o PDF:", logoErr.message);
+            // 0. LOGO (Otimizado com Cache)
+            const logoBase64 = getLogoBase64();
+            if (logoBase64) {
+                doc.addImage(logoBase64, 'PNG', 12, 24, 25, 25);
             }
             
             // 1. RECEBEMOS DE... (Topo)
@@ -727,109 +736,111 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
             doc.text(`SÉRIE ${row.serie_nfe || '1'}`, 182.5, 21, { align: 'center' });
 
             // 2. IDENTIFICAÇÃO DO EMITENTE
-            doc.rect(10, 22, 90, 28);
-            const xText = 40; // Ajustado para não sobrepor o logo (que vai até x=37)
+            doc.rect(10, 22, 85, 28);
+            const xText = 38; 
             doc.setFont("helvetica", "bold");
-            doc.setFontSize(9);
+            doc.setFontSize(8.5);
             doc.text(configs['emit_nome'] || "M&M HF COMERCIO DE CEBOLAS LTDA", xText, 28);
             doc.setFontSize(7);
             doc.setFont("helvetica", "normal");
-            doc.text(configs['emit_lgr'] || "RUA MANOEL CRUZ, 36", xText, 33);
-            doc.text(`${configs['emit_bairro'] || 'RESIDENCIAL MINERVA I'} - ${configs['emit_cep'] || '19026-168'}`, xText, 37);
-            doc.text(`${configs['emit_xmun'] || 'PRESIDENTE PRUDENTE'} - ${configs['emit_uf'] || 'SP'}`, xText, 41);
-            doc.text("Fone: " + (configs['emit_tel'] || "(18) 9999-9999"), xText, 45);
+            doc.text(configs['emit_lgr'] || "RUA MANOEL CRUZ, 36", xText, 32);
+            doc.text(`${configs['emit_bairro'] || 'RESIDENCIAL MINERVA I'} - ${configs['emit_cep'] || '19026-168'}`, xText, 35);
+            doc.text(`${configs['emit_xmun'] || 'PRESIDENTE PRUDENTE'} - ${configs['emit_uf'] || 'SP'}`, xText, 38);
+            doc.text("Fone: " + (configs['emit_tel'] || "(18) 9999-9999"), xText, 41);
 
             // 3. DANFE BOX
-            doc.rect(100, 22, 25, 28);
+            doc.rect(95, 22, 22, 28);
             doc.setFont("helvetica", "bold");
             doc.setFontSize(9);
-            doc.text("DANFE", 112.5, 28, { align: 'center' });
-            doc.setFontSize(6);
+            doc.text("DANFE", 106, 28, { align: 'center' });
+            doc.setFontSize(5);
             doc.setFont("helvetica", "normal");
-            doc.text("Documento Auxiliar da", 112.5, 32, { align: 'center' });
-            doc.text("Nota Fiscal Eletrônica", 112.5, 35, { align: 'center' });
-            doc.text("0 - Entrada", 102, 40);
-            doc.text("1 - Saída", 102, 43);
-            doc.rect(116, 38, 5, 5);
-            doc.setFontSize(10);
-            doc.text("1", 118.5, 42, { align: 'center' });
-            doc.setFontSize(7);
-            doc.setFont("helvetica", "bold");
-            doc.text(`Nº ${row.numero_nfe || row.venda_id}`, 112.5, 46, { align: 'center' });
-            doc.text(`SÉRIE ${row.serie_nfe || '1'}`, 112.5, 49, { align: 'center' });
+            doc.text("Documento Auxiliar da", 106, 31, { align: 'center' });
+            doc.text("Nota Fiscal Eletrônica", 106, 33, { align: 'center' });
+            doc.text("0 - Entrada", 97, 37);
+            doc.text("1 - Saída", 97, 40);
+            doc.rect(109, 36, 4, 4);
+            doc.setFontSize(8);
+            doc.text("1", 111, 39.2, { align: 'center' });
+            doc.setFontSize(7); doc.setFont("helvetica", "bold");
+            doc.text(`Nº ${row.numero_nfe || row.venda_id}`, 106, 44, { align: 'center' });
+            doc.text(`SÉRIE ${row.serie_nfe || '1'}`, 106, 47, { align: 'center' });
 
             // 4. CHAVE DE ACESSO / BARCODE
-            doc.rect(125, 22, 75, 28);
+            doc.rect(117, 22, 83, 28);
             if (row.chave_acesso) {
                 try {
                     const barcodeBuffer = await generateBarcode(row.chave_acesso);
                     const barcodeBase64 = `data:image/png;base64,${barcodeBuffer.toString('base64')}`;
-                    doc.addImage(barcodeBase64, 'PNG', 127, 24, 71, 10);
-                    doc.setFontSize(5);
-                    doc.setFont("helvetica", "normal");
-                    doc.text("CHAVE DE ACESSO", 127, 36);
-                    doc.setFontSize(7);
-                    doc.setFont("helvetica", "bold");
+                    doc.addImage(barcodeBase64, 'PNG', 119, 24, 79, 8);
+                    doc.setFontSize(5); doc.setFont("helvetica", "normal");
+                    doc.text("CHAVE DE ACESSO", 119, 34);
+                    doc.setFontSize(6.5); doc.setFont("helvetica", "bold");
                     const c = row.chave_acesso;
                     const chaveFormatada = `${c.slice(0,4)} ${c.slice(4,8)} ${c.slice(8,12)} ${c.slice(12,16)} ${c.slice(16,20)} ${c.slice(20,24)} ${c.slice(24,28)} ${c.slice(28,32)} ${c.slice(32,36)} ${c.slice(36,40)} ${c.slice(40,44)}`;
-                    doc.text(chaveFormatada, 127, 39.5);
+                    doc.text(chaveFormatada, 119, 37);
                 } catch (e) { console.error("Erro barcode:", e); }
             }
-            doc.setFontSize(6);
-            doc.setFont("helvetica", "normal");
-            doc.text("Consulta de autenticidade no portal nacional da NF-e", 127, 45);
-            doc.text("www.nfe.fazenda.gov.br/portal ou no site da Sefaz Autorizadora", 127, 48);
+            doc.setFontSize(5.5); doc.setFont("helvetica", "normal");
+            doc.text("Consulta de autenticidade no portal nacional da NF-e", 119, 43);
+            doc.text("www.nfe.fazenda.gov.br/portal ou no site da Sefaz Autorizadora", 119, 46);
 
-            // 5. NATUREZA DA OPERAÇÃO
-            doc.rect(10, 50, 190, 8);
-            doc.text("NATUREZA DA OPERAÇÃO", 12, 53);
-            doc.setFontSize(8);
-            doc.text("Venda de mercadoria adquirida de terceiros", 12, 57);
-            doc.setFontSize(6);
-            doc.text("PROTOCOLO DE AUTORIZAÇÃO DE USO", 125, 53);
-            doc.setFontSize(8);
-            doc.text(row.protocolo_autorizacao || "ASSINADA LOCALMENTE", 125, 57);
+            // 5. NATUREZA DA OPERAÇÃO / PROTOCOLO
+            doc.rect(10, 50, 107, 8);
+            doc.setFontSize(5.5); doc.setFont("helvetica", "normal");
+            doc.text("NATUREZA DA OPERAÇÃO", 11.5, 53);
+            doc.setFontSize(7.5); doc.setFont("helvetica", "bold");
+            doc.text(row.descricao || "VENDA DE MERCADORIA", 11.5, 56.5);
+            
+            doc.rect(117, 50, 83, 8);
+            doc.setFontSize(5.5); doc.setFont("helvetica", "normal");
+            doc.text("PROTOCOLO DE AUTORIZAÇÃO DE USO", 118.5, 53);
+            doc.setFontSize(7.5); doc.setFont("helvetica", "bold");
+            doc.text(row.protocolo_autorizacao || "ASSINADA LOCALMENTE", 118.5, 56.5);
 
             // 6. IE / CNPJ
-            doc.rect(10, 58, 63, 8);
-            doc.setFontSize(6); doc.text("INSCRIÇÃO ESTADUAL", 12, 61);
-            doc.setFontSize(8); doc.text(configs['emit_ie'] || "562.696.411.110", 12, 65);
+            doc.rect(10, 58, 70, 8);
+            doc.setFontSize(5.5); doc.setFont("helvetica", "normal");
+            doc.text("INSCRIÇÃO ESTADUAL", 11.5, 61);
+            doc.setFontSize(7.5); doc.setFont("helvetica", "bold");
+            doc.text(configs['emit_ie'] || "562.696.411.110", 11.5, 65);
             
-            doc.rect(73, 58, 63, 8);
-            doc.setFontSize(6); doc.text("INSC. ESTADUAL DO SUBST. TRIBUTÁRIO", 75, 61);
+            doc.rect(80, 58, 60, 8);
+            doc.setFontSize(5.5); doc.text("INSC. ESTADUAL DO SUBST. TRIBUTÁRIO", 81.5, 61);
             
-            doc.rect(136, 58, 64, 8);
-            doc.setFontSize(6); doc.text("CNPJ", 138, 61);
-            doc.setFontSize(8); doc.text(configs['emit_cnpj'] || "56.421.395/0001-50", 138, 65);
+            doc.rect(140, 58, 60, 8);
+            doc.setFontSize(5.5); doc.text("CNPJ", 141.5, 61);
+            doc.setFontSize(7.5); doc.text(configs['emit_cnpj'] || "56.421.395/0001-50", 141.5, 65);
 
             // 7. DESTINATÁRIO
-            doc.setFillColor(240, 240, 240);
+            doc.setFillColor(245, 245, 245);
             doc.rect(10, 68, 190, 5, 'F');
             doc.rect(10, 68, 190, 5);
             doc.setFontSize(7); doc.setFont("helvetica", "bold");
             doc.text("DESTINATÁRIO / REMETENTE", 12, 71.5);
             
             doc.rect(10, 73, 140, 8);
-            doc.setFontSize(6); doc.setFont("helvetica", "normal"); doc.text("NOME / RAZÃO SOCIAL", 12, 76);
-            doc.setFontSize(8); doc.text(row.descricao || "CONSUMIDOR FINAL", 12, 80);
+            doc.setFontSize(5.5); doc.setFont("helvetica", "normal"); doc.text("NOME / RAZÃO SOCIAL", 11.5, 76);
+            doc.setFontSize(8.5); doc.setFont("helvetica", "bold"); doc.text(row.contato_nome || "CONSUMIDOR FINAL", 11.5, 80);
 
-            doc.rect(150, 73, 40, 8);
-            doc.setFontSize(6); doc.text("CNPJ / CPF", 152, 76);
-            
-            doc.rect(190, 73, 10, 8); // empty
+            doc.rect(150, 73, 50, 8);
+            doc.setFontSize(5.5); doc.setFont("helvetica", "normal"); doc.text("CNPJ / CPF", 151.5, 76);
+            doc.setFontSize(8.5); doc.text(row.contato_doc || "", 151.5, 80);
 
-            doc.rect(10, 81, 120, 8);
-            doc.setFontSize(6); doc.text("ENDEREÇO", 12, 84);
+            doc.rect(10, 81, 100, 8);
+            doc.setFontSize(5.5); doc.text("ENDEREÇO", 11.5, 84);
+            doc.setFontSize(7.5); doc.text(row.contato_end || "", 11.5, 88);
             
-            doc.rect(130, 81, 30, 8);
-            doc.setFontSize(6); doc.text("BAIRRO / DISTRITO", 132, 84);
+            doc.rect(110, 81, 40, 8);
+            doc.setFontSize(5.5); doc.text("BAIRRO / DISTRITO", 111.5, 84);
             
-            doc.rect(160, 81, 20, 8);
-            doc.setFontSize(6); doc.text("CEP", 162, 84);
+            doc.rect(150, 81, 25, 8);
+            doc.setFontSize(5.5); doc.text("CEP", 151.5, 84);
             
-            doc.rect(180, 81, 20, 8);
-            doc.setFontSize(6); doc.text("DATA DA EMISSÃO", 182, 84);
-            doc.setFontSize(7); doc.text(new Date(row.data_emissao).toLocaleDateString('pt-BR'), 182, 88);
+            doc.rect(175, 81, 25, 8);
+            doc.setFontSize(5.5); doc.text("DATA DA EMISSÃO", 176.5, 84);
+            doc.setFontSize(7.5); doc.setFont("helvetica", "bold");
+            doc.text(new Date(row.data_emissao).toLocaleDateString('pt-BR'), 176.5, 88);
 
             // 8. CÁLCULO DO IMPOSTO
             const Y_IMP = 95;
