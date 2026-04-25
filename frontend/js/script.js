@@ -21,14 +21,16 @@ const API_URL = (function () {
     const isElectron = window.location.protocol === 'file:' || (typeof process !== 'undefined' && process.versions && process.versions.electron);
     const host = window.location.hostname;
     
-    // Se estiver no Electron e não tivermos domínio, podemos usar o IP fixo ou perguntar.
-    // Por enquanto, vamos ser dinâmicos:
-    if (isElectron) return 'http://72.60.8.186/api'; 
+    // Se estiver no Electron (app desktop), aponta para o IP da VPS na porta 3000
+    if (isElectron) return 'http://72.60.8.186:3000/api'; 
     
-    // Se for localhost, usa a porta 3000
+    // Se for localhost (desenvolvimento local)
     if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:3000/api';
     
-    // Web normal: usa o próprio origin (seja IP ou Domínio)
+    // Se for acesso via IP direto no navegador, precisa da porta 3000
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) return `http://${host}:3000/api`;
+    
+    // Se for domínio (ex: portalmmcebolas.com), assume que há um proxy (Nginx) na porta padrão
     return window.location.origin + '/api';
 })();
 
