@@ -29,6 +29,18 @@ const log = (color, prefix, msg) => console.log(`${color}${c.bold}[${prefix}]${c
 // ── 1. Iniciar o servidor ──────────────────────────────────────────
 log(c.cyan, 'DEV', 'Iniciando servidor local...');
 
+// Tenta liberar a porta caso ainda esteja ocupada de uma execução anterior
+function liberarPorta(port) {
+    return new Promise((resolve) => {
+        const check = http.get(`http://localhost:${port}/api/health`, (res) => {
+            // Se há algo na porta, tenta apenas prosseguir (pode ser uma instância válida)
+            resolve();
+        });
+        check.on('error', () => resolve()); // nada na porta, tudo certo
+        check.setTimeout(500, () => { check.destroy(); resolve(); });
+    });
+}
+
 const serverProcess = spawn('node', ['server.js'], {
     cwd: SERVER_DIR,
     env: { ...process.env, NODE_ENV: 'development', PORT: String(SERVER_PORT) },
