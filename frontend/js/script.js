@@ -253,6 +253,14 @@ function showSection(id) {
         mainContent.innerHTML = getSkeletonHTML(id);
     }
 
+    // Notifica o processo principal da mudança de menu para atualizar a TouchBar
+    if (typeof require !== 'undefined') {
+        try {
+            const { ipcRenderer } = require('electron');
+            ipcRenderer.send('section-changed', id);
+        } catch (e) {}
+    }
+
     const startTime = Date.now();
     fetch(`sections/${id}.html`)
         .then(res => {
@@ -3234,8 +3242,108 @@ async function saveProfileDetails(event) {
 if (typeof require !== 'undefined') {
     try {
         const { ipcRenderer } = require('electron');
+        
+        // Recebe chamada de navegação da Touch Bar
         ipcRenderer.on('navegar-para', (event, sectionId) => {
             showSection(sectionId);
+        });
+
+        // Recebe chamada de ação específica da Touch Bar do respectivo menu
+        ipcRenderer.on('touchbar-action', (event, data) => {
+            console.log('TouchBar action received:', data);
+            const { section, action, value } = data;
+            
+            if (section === 'dashboard') {
+                if (action === 'period') {
+                    const filterBtn = document.querySelector(`.filter-btn[onclick*="'${value}'"]`);
+                    if (filterBtn) filterBtn.click();
+                } else if (action === 'refresh') {
+                    loadDashboard();
+                }
+            }
+            
+            if (section === 'entrada') {
+                if (action === 'submit') {
+                    const form = document.querySelector('#entrada-form');
+                    if (form) form.dispatchEvent(new Event('submit'));
+                } else if (action === 'clear') {
+                    const form = document.querySelector('#entrada-form');
+                    if (form) form.reset();
+                }
+            }
+            
+            if (section === 'saida') {
+                if (action === 'submit') {
+                    const form = document.querySelector('#saida-form');
+                    if (form) form.dispatchEvent(new Event('submit'));
+                } else if (action === 'clear') {
+                    const form = document.querySelector('#saida-form');
+                    if (form) form.reset();
+                }
+            }
+            
+            if (section === 'estoque') {
+                if (action === 'focus-search') {
+                    const search = document.querySelector('#estoque-search');
+                    if (search) search.focus();
+                }
+            }
+            
+            if (section === 'cadastro') {
+                if (action === 'tab') {
+                    const tabBtn = document.querySelector(`.tab-btn[onclick*="'${value}'"]`);
+                    if (tabBtn) tabBtn.click();
+                } else if (action === 'new') {
+                    const activeTab = document.querySelector('.cad-tab[style*="block"]');
+                    if (activeTab) {
+                        const addBtn = activeTab.querySelector('.btn-primary');
+                        if (addBtn) addBtn.click();
+                    } else {
+                        const firstAdd = document.querySelector('.cad-tab button.btn-primary');
+                        if (firstAdd) firstAdd.click();
+                    }
+                }
+            }
+            
+            if (section === 'nfe') {
+                if (action === 'emit') {
+                    const emitBtn = document.querySelector('button[onclick*="openNFeModal"]');
+                    if (emitBtn) emitBtn.click();
+                } else if (action === 'focus-search') {
+                    const search = document.querySelector('#nfe-search');
+                    if (search) search.focus();
+                }
+            }
+            
+            if (section === 'financeiro') {
+                if (action === 'new-expense') {
+                    const addBtn = document.querySelector('button[onclick*="openDespesaModal"]');
+                    if (addBtn) addBtn.click();
+                } else if (action === 'scroll-dre') {
+                    const dreSection = document.getElementById('dre-table-container');
+                    if (dreSection) dreSection.scrollIntoView({ behavior: 'smooth' });
+                }
+            }
+            
+            if (section === 'config') {
+                if (action === 'save') {
+                    const form = document.querySelector('#config-form');
+                    if (form) form.dispatchEvent(new Event('submit'));
+                } else if (action === 'backup') {
+                    const backupBtn = document.querySelector('button[onclick*="createBackup"]');
+                    if (backupBtn) backupBtn.click();
+                }
+            }
+            
+            if (section === 'admin') {
+                if (action === 'new-user') {
+                    const addBtn = document.querySelector('button[onclick*="openUserModal"]');
+                    if (addBtn) addBtn.click();
+                } else if (action === 'focus-logs') {
+                    const logsTable = document.querySelector('.logs-table-container');
+                    if (logsTable) logsTable.scrollIntoView({ behavior: 'smooth' });
+                }
+            }
         });
     } catch (e) {
         console.log('Ignorando escutador IPC TouchBar (rodando fora do Electron)');

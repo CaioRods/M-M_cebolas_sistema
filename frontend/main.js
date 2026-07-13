@@ -7,6 +7,7 @@ const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
 
 const isDev = process.env.NODE_ENV === 'development';
+let mainTouchBar = null;
 
 // Configuração básica do autoUpdater
 autoUpdater.autoDownload = !isDev;
@@ -79,7 +80,7 @@ function createWindow() {
         click: () => { win.webContents.send('navegar-para', 'admin'); }
     });
 
-    const touchBar = new TouchBar({
+    mainTouchBar = new TouchBar({
         items: [
             btnDashboard,
             new TouchBarSpacer({ size: 'small' }),
@@ -96,7 +97,12 @@ function createWindow() {
         ]
     });
 
-    win.setTouchBar(touchBar);
+    win.setTouchBar(mainTouchBar);
+
+    ipcMain.on('section-changed', (event, id) => {
+        const sectionTouchBar = getTouchBarForSection(id, win);
+        win.setTouchBar(sectionTouchBar);
+    });
 
     win.loadFile(path.join(__dirname, 'pages', 'login.html'));
 
@@ -126,6 +132,7 @@ function createWindow() {
         ipcMain.removeAllListeners('minimize-app');
         ipcMain.removeAllListeners('maximize-app');
         ipcMain.removeAllListeners('close-app');
+        ipcMain.removeAllListeners('section-changed');
     });
 
     // --- LÓGICA DE AUTO-UPDATE ---
@@ -192,3 +199,197 @@ app.on('window-all-closed', () => {
         app.quit();
     }
 });
+
+function getTouchBarForSection(sectionId, win) {
+    const btnBack = new TouchBarButton({
+        label: '⬅️ Menu',
+        backgroundColor: '#374151',
+        click: () => {
+            if (mainTouchBar) win.setTouchBar(mainTouchBar);
+        }
+    });
+
+    if (sectionId === 'dashboard') {
+        return new TouchBar({
+            items: [
+                btnBack,
+                new TouchBarSpacer({ size: 'small' }),
+                new TouchBarButton({
+                    label: '📅 Hoje',
+                    click: () => { win.webContents.send('touchbar-action', { section: 'dashboard', action: 'period', value: 'hoje' }); }
+                }),
+                new TouchBarButton({
+                    label: '📅 Semana',
+                    click: () => { win.webContents.send('touchbar-action', { section: 'dashboard', action: 'period', value: 'semana' }); }
+                }),
+                new TouchBarButton({
+                    label: '📅 Mês',
+                    click: () => { win.webContents.send('touchbar-action', { section: 'dashboard', action: 'period', value: 'mes' }); }
+                }),
+                new TouchBarButton({
+                    label: '📅 Ano',
+                    click: () => { win.webContents.send('touchbar-action', { section: 'dashboard', action: 'period', value: 'ano' }); }
+                }),
+                new TouchBarSpacer({ size: 'small' }),
+                new TouchBarButton({
+                    label: '🔄 Atualizar',
+                    backgroundColor: '#10b981',
+                    click: () => { win.webContents.send('touchbar-action', { section: 'dashboard', action: 'refresh' }); }
+                })
+            ]
+        });
+    }
+
+    if (sectionId === 'entrada') {
+        return new TouchBar({
+            items: [
+                btnBack,
+                new TouchBarSpacer({ size: 'small' }),
+                new TouchBarButton({
+                    label: '➕ Confirmar Compra',
+                    backgroundColor: '#1A5632',
+                    click: () => { win.webContents.send('touchbar-action', { section: 'entrada', action: 'submit' }); }
+                }),
+                new TouchBarButton({
+                    label: '🧹 Limpar',
+                    backgroundColor: '#4b5563',
+                    click: () => { win.webContents.send('touchbar-action', { section: 'entrada', action: 'clear' }); }
+                })
+            ]
+        });
+    }
+
+    if (sectionId === 'saida') {
+        return new TouchBar({
+            items: [
+                btnBack,
+                new TouchBarSpacer({ size: 'small' }),
+                new TouchBarButton({
+                    label: '➕ Confirmar Venda',
+                    backgroundColor: '#1565c0',
+                    click: () => { win.webContents.send('touchbar-action', { section: 'saida', action: 'submit' }); }
+                }),
+                new TouchBarButton({
+                    label: '🧹 Limpar',
+                    backgroundColor: '#4b5563',
+                    click: () => { win.webContents.send('touchbar-action', { section: 'saida', action: 'clear' }); }
+                })
+            ]
+        });
+    }
+
+    if (sectionId === 'estoque') {
+        return new TouchBar({
+            items: [
+                btnBack,
+                new TouchBarSpacer({ size: 'small' }),
+                new TouchBarButton({
+                    label: '🔍 Focar Busca',
+                    click: () => { win.webContents.send('touchbar-action', { section: 'estoque', action: 'focus-search' }); }
+                })
+            ]
+        });
+    }
+
+    if (sectionId === 'cadastro') {
+        return new TouchBar({
+            items: [
+                btnBack,
+                new TouchBarSpacer({ size: 'small' }),
+                new TouchBarButton({
+                    label: '👤 Clientes',
+                    click: () => { win.webContents.send('touchbar-action', { section: 'cadastro', action: 'tab', value: 'clientes' }); }
+                }),
+                new TouchBarButton({
+                    label: '🏢 Fornecedores',
+                    click: () => { win.webContents.send('touchbar-action', { section: 'cadastro', action: 'tab', value: 'fornecedores' }); }
+                }),
+                new TouchBarButton({
+                    label: '🧅 Cebolas',
+                    click: () => { win.webContents.send('touchbar-action', { section: 'cadastro', action: 'tab', value: 'produtos' }); }
+                }),
+                new TouchBarSpacer({ size: 'small' }),
+                new TouchBarButton({
+                    label: '➕ Novo Registro',
+                    backgroundColor: '#10b981',
+                    click: () => { win.webContents.send('touchbar-action', { section: 'cadastro', action: 'new' }); }
+                })
+            ]
+        });
+    }
+
+    if (sectionId === 'nfe') {
+        return new TouchBar({
+            items: [
+                btnBack,
+                new TouchBarSpacer({ size: 'small' }),
+                new TouchBarButton({
+                    label: '➕ Emitir NF-e',
+                    backgroundColor: '#059669',
+                    click: () => { win.webContents.send('touchbar-action', { section: 'nfe', action: 'emit' }); }
+                }),
+                new TouchBarButton({
+                    label: '🔍 Filtrar Notas',
+                    click: () => { win.webContents.send('touchbar-action', { section: 'nfe', action: 'focus-search' }); }
+                })
+            ]
+        });
+    }
+
+    if (sectionId === 'financeiro') {
+        return new TouchBar({
+            items: [
+                btnBack,
+                new TouchBarSpacer({ size: 'small' }),
+                new TouchBarButton({
+                    label: '➕ Lançar Despesa',
+                    backgroundColor: '#dc2626',
+                    click: () => { win.webContents.send('touchbar-action', { section: 'financeiro', action: 'new-expense' }); }
+                }),
+                new TouchBarButton({
+                    label: '📥 DRE',
+                    click: () => { win.webContents.send('touchbar-action', { section: 'financeiro', action: 'scroll-dre' }); }
+                })
+            ]
+        });
+    }
+
+    if (sectionId === 'config') {
+        return new TouchBar({
+            items: [
+                btnBack,
+                new TouchBarSpacer({ size: 'small' }),
+                new TouchBarButton({
+                    label: '💾 Salvar Configurações',
+                    backgroundColor: '#1A5632',
+                    click: () => { win.webContents.send('touchbar-action', { section: 'config', action: 'save' }); }
+                }),
+                new TouchBarButton({
+                    label: '📁 Criar Backup',
+                    backgroundColor: '#4b5563',
+                    click: () => { win.webContents.send('touchbar-action', { section: 'config', action: 'backup' }); }
+                })
+            ]
+        });
+    }
+
+    if (sectionId === 'admin') {
+        return new TouchBar({
+            items: [
+                btnBack,
+                new TouchBarSpacer({ size: 'small' }),
+                new TouchBarButton({
+                    label: '👤 Novo Usuário',
+                    backgroundColor: '#10b981',
+                    click: () => { win.webContents.send('touchbar-action', { section: 'admin', action: 'new-user' }); }
+                }),
+                new TouchBarButton({
+                    label: '📜 Focar Logs',
+                    click: () => { win.webContents.send('touchbar-action', { section: 'admin', action: 'focus-logs' }); }
+                })
+            ]
+        });
+    }
+
+    return mainTouchBar;
+}
