@@ -976,7 +976,6 @@ tr:hover td { background-color: rgba(248, 250, 252, 0.9); }
 }
 
 /* --- VERSÃO MOBILE ADAPTADA (DESIGN EXCLUSIVO E MODERNO) --- */
-
 /* Ocultar elementos mobile no PC por padrão */
 .mobile-tabbar, .mobile-more-backdrop, .mobile-more-sheet {
     display: none;
@@ -1000,13 +999,14 @@ tr:hover td { background-color: rgba(248, 250, 252, 0.9); }
         padding-bottom: 96px !important; /* Espaço confortável para a tabbar inferior */
     }
 
-    /* Barra de Título Customizada Premium no Mobile */
+    /* Barra de Título Customizada Premium no Mobile com Borda Gradiente Colorida (M&M Verde, Amarelo, Laranja) */
     #titlebar {
-        height: 50px !important;
+        height: 52px !important;
         background: rgba(15, 23, 42, 0.94) !important; /* Slate escuro moderno */
-        backdrop-filter: blur(20px) !important;
-        -webkit-backdrop-filter: blur(20px) !important;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+        backdrop-filter: blur(25px) !important;
+        -webkit-backdrop-filter: blur(25px) !important;
+        border-bottom: 2px solid transparent !important;
+        border-image: linear-gradient(90deg, #10b981 0%, #fbbf24 50%, #f97316 100%) 1 !important;
         padding: 0 16px !important;
         display: flex !important;
         align-items: center !important;
@@ -1028,7 +1028,7 @@ tr:hover td { background-color: rgba(248, 250, 252, 0.9); }
         color: #ffffff !important;
     }
 
-    /* Barra de Navegação Inferior Premium (Mobile TabBar) */
+    /* Barra de Navegação Inferior Premium (Mobile TabBar) Colorida */
     .mobile-tabbar {
         display: flex;
         position: fixed;
@@ -1055,7 +1055,6 @@ tr:hover td { background-color: rgba(248, 250, 252, 0.9); }
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        color: rgba(255, 255, 255, 0.45);
         gap: 6px;
         font-size: 0.65rem;
         font-weight: 700;
@@ -1065,31 +1064,49 @@ tr:hover td { background-color: rgba(248, 250, 252, 0.9); }
         height: 100%;
     }
     
+    /* Cores personalizadas inativas para os itens da TabBar (Vibrantes porém transparentes) */
+    .mobile-tabbar .tabbar-item:nth-child(1) { color: rgba(16, 185, 129, 0.5); } /* Verde Dashboard */
+    .mobile-tabbar .tabbar-item:nth-child(2) { color: rgba(52, 211, 153, 0.5); } /* Verde-claro Compra */
+    .mobile-tabbar .tabbar-item:nth-child(3) { color: rgba(251, 191, 36, 0.5); } /* Amarelo Venda */
+    .mobile-tabbar .tabbar-item:nth-child(4) { color: rgba(249, 115, 22, 0.5); } /* Laranja Estoque */
+    .mobile-tabbar .tabbar-item:nth-child(5) { color: rgba(167, 139, 250, 0.5); } /* Roxo Mais */
+
     .tabbar-item i {
         font-size: 1.25rem;
         transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
     
-    .tabbar-item.active {
-        color: #10b981 !important; /* Verde Esmeralda Ativo */
-    }
+    /* Cores ativas com brilho exclusivo quando selecionados */
+    .mobile-tabbar .tabbar-item:nth-child(1).active { color: #10b981 !important; }
+    .mobile-tabbar .tabbar-item:nth-child(2).active { color: #34d399 !important; }
+    .mobile-tabbar .tabbar-item:nth-child(3).active { color: #fbbf24 !important; }
+    .mobile-tabbar .tabbar-item:nth-child(4).active { color: #f97316 !important; }
+    .mobile-tabbar .tabbar-item:nth-child(5).active { color: #a78bfa !important; }
     
     .tabbar-item.active i {
         transform: translateY(-4px) scale(1.1);
-        text-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
     }
     
-    /* Indicador luminoso acima do item ativo */
+    .mobile-tabbar .tabbar-item:nth-child(1).active i { text-shadow: 0 0 12px rgba(16, 185, 129, 0.4); }
+    .mobile-tabbar .tabbar-item:nth-child(2).active i { text-shadow: 0 0 12px rgba(52, 211, 153, 0.4); }
+    .mobile-tabbar .tabbar-item:nth-child(3).active i { text-shadow: 0 0 12px rgba(251, 191, 36, 0.4); }
+    .mobile-tabbar .tabbar-item:nth-child(4).active i { text-shadow: 0 0 12px rgba(249, 115, 22, 0.4); }
+    .mobile-tabbar .tabbar-item:nth-child(5).active i { text-shadow: 0 0 12px rgba(167, 139, 250, 0.4); }
+
+    /* Indicador luminoso exclusivo acima do item ativo */
     .tabbar-item.active::after {
         content: '';
         position: absolute;
         top: 2px;
         width: 14px;
         height: 3px;
-        background: #10b981;
         border-radius: 2px;
-        box-shadow: 0 0 8px #10b981;
     }
+    .mobile-tabbar .tabbar-item:nth-child(1).active::after { background: #10b981; box-shadow: 0 0 8px #10b981; }
+    .mobile-tabbar .tabbar-item:nth-child(2).active::after { background: #34d399; box-shadow: 0 0 8px #34d399; }
+    .mobile-tabbar .tabbar-item:nth-child(3).active::after { background: #fbbf24; box-shadow: 0 0 8px #fbbf24; }
+    .mobile-tabbar .tabbar-item:nth-child(4).active::after { background: #f97316; box-shadow: 0 0 8px #f97316; }
+    .mobile-tabbar .tabbar-item:nth-child(5).active::after { background: #a78bfa; box-shadow: 0 0 8px #a78bfa; }
 
     /* Fundo escurecido ao abrir o menu deslizante "Mais" */
     .mobile-more-backdrop {
@@ -1167,7 +1184,7 @@ tr:hover td { background-color: rgba(248, 250, 252, 0.9); }
         gap: 16px;
         margin-bottom: 24px;
     }
-
+    
     @media (max-width: 350px) {
         .sheet-grid {
             grid-template-columns: repeat(2, 1fr) !important;
@@ -1206,15 +1223,16 @@ tr:hover td { background-color: rgba(248, 250, 252, 0.9); }
         justify-content: center;
         font-size: 1.35rem;
         color: #ffffff;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 4px 14px var(--item-shadow-color, rgba(0, 0, 0, 0.3)) !important;
+        transition: transform 0.2s ease, box-shadow 0.2s ease !important;
     }
     
-    .color-cadastro { background: linear-gradient(135deg, #10b981, #059669); }
-    .color-nfe { background: linear-gradient(135deg, #3b82f6, #2563eb); }
-    .color-financeiro { background: linear-gradient(135deg, #f59e0b, #d97706); }
-    .color-config { background: linear-gradient(135deg, #6b7280, #4b5563); }
-    .color-admin { background: linear-gradient(135deg, #ef4444, #dc2626); }
-    .color-perfil { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+    .color-cadastro { background: linear-gradient(135deg, #10b981, #059669); --item-shadow-color: rgba(16, 185, 129, 0.4); }
+    .color-nfe { background: linear-gradient(135deg, #3b82f6, #2563eb); --item-shadow-color: rgba(59, 130, 246, 0.4); }
+    .color-financeiro { background: linear-gradient(135deg, #fbbf24, #f59e0b); --item-shadow-color: rgba(251, 191, 36, 0.4); }
+    .color-config { background: linear-gradient(135deg, #f97316, #ea580c); --item-shadow-color: rgba(249, 115, 22, 0.4); }
+    .color-admin { background: linear-gradient(135deg, #ef4444, #dc2626); --item-shadow-color: rgba(239, 68, 68, 0.4); }
+    .color-perfil { background: linear-gradient(135deg, #8b5cf6, #7c3aed); --item-shadow-color: rgba(139, 92, 246, 0.4); }
     
     .sheet-logout-container {
         padding-top: 16px;
@@ -1257,11 +1275,36 @@ tr:hover td { background-color: rgba(248, 250, 252, 0.9); }
         display: none !important; /* Oculta a barra de rolagem horizontal */
     }
     
+    /* Efeito de neon luminoso colorido nos KPIs (Estilo Moderno e Colorido) */
     .kpi-card-pro {
+        position: relative !important;
         min-width: 270px !important;
         flex-shrink: 0 !important;
         scroll-snap-align: start !important;
         margin-bottom: 0 !important;
+        background: linear-gradient(135deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.95) 100%) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 0 20px rgba(255, 255, 255, 0.02) !important;
+    }
+    
+    .kpi-card-pro::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 12%;
+        right: 12%;
+        height: 3px;
+        background: var(--kpi-color) !important;
+        border-radius: 3px 3px 0 0;
+        box-shadow: 0 0 12px var(--kpi-color), 0 0 20px var(--kpi-color) !important;
+    }
+
+    /* Linha colorida de destaque em cada painel (Mobile) */
+    .panel {
+        border-top: 3px solid transparent !important;
+        border-image: linear-gradient(90deg, #10b981 0%, #fbbf24 50%, #f97316 100%) 1 !important;
+        border-radius: 16px !important;
+        overflow: hidden !important;
     }
 
     /* Otimização de formulários e inputs (Impede zoom forçado no iOS) */
@@ -1269,6 +1312,11 @@ tr:hover td { background-color: rgba(248, 250, 252, 0.9); }
         min-height: 44px !important;
         font-size: 16px !important; /* Fonte a 16px impede o zoom automático do Safari no iOS */
         border-radius: 12px !important;
+    }
+    
+    input:focus, select:focus, textarea:focus {
+        border-color: #10b981 !important;
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15), 0 0 10px rgba(251, 191, 36, 0.1) !important;
     }
     
     .form-group-row {
@@ -1286,6 +1334,15 @@ tr:hover td { background-color: rgba(248, 250, 252, 0.9); }
         border: 1px solid rgba(255, 255, 255, 0.05) !important;
     }
     
+    .table-container::-webkit-scrollbar {
+        height: 4px !important;
+    }
+    
+    .table-container::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.15) !important;
+        border-radius: 10px !important;
+    }
+    
     .table-pro {
         min-width: 650px !important;
     }
@@ -1293,5 +1350,34 @@ tr:hover td { background-color: rgba(248, 250, 252, 0.9); }
     .table-pro th, .table-pro td {
         padding: 12px 10px !important;
         font-size: 0.78rem !important;
+    }
+
+    /* Badges e Status de Operações mais coloridos e vibrantes */
+    .badge.compra, .badge.entrada {
+        background: rgba(16, 185, 129, 0.12) !important;
+        color: #34d399 !important;
+        border: 1px solid rgba(16, 185, 129, 0.25) !important;
+    }
+    
+    .badge.venda, .badge.saida {
+        background: rgba(251, 191, 36, 0.12) !important;
+        color: #fbbf24 !important;
+        border: 1px solid rgba(251, 191, 36, 0.25) !important;
+    }
+    
+    .badge.despesa, .badge.perda {
+        background: rgba(249, 115, 22, 0.12) !important;
+        color: #f97316 !important;
+        border: 1px solid rgba(249, 115, 22, 0.25) !important;
+    }
+
+    /* Gráficos responsivos limitados para não expandir demais verticalmente */
+    .chart-body {
+        max-height: 250px !important;
+    }
+    
+    .legend-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 8px !important;
     }
 }
