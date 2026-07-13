@@ -80,6 +80,7 @@ function checkEnvironment() {
     const windowControls = document.querySelector('.window-controls');
     if (titlebar) titlebar.style.display = 'flex';
     if (isElectron) {
+        document.body.classList.add('electron-vibrant');
         if (windowControls) windowControls.style.display = 'flex';
         try {
             const { ipcRenderer } = require('electron');

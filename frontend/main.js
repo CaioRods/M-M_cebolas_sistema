@@ -22,13 +22,25 @@ function createWindow() {
         height: 800,
         frame: false,
         autoHideMenuBar: true,
-        backgroundColor: '#000000',
+        transparent: true,
+        vibrancy: false,
+        backgroundColor: '#00000000',
         title: 'M&M Cebolas',
         icon: path.join(__dirname, 'Imgs', 'Logo_M&M_Cebolas.png'),
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
             autoplayPolicy: 'no-user-gesture-required'
+        }
+    });
+
+    win.webContents.once('did-finish-load', () => {
+        try {
+            const liquidGlass = require('electron-liquid-glass');
+            liquidGlass.addView(win.getNativeWindowHandle());
+            console.log('[Liquid Glass] Native glass effect view applied successfully.');
+        } catch (e) {
+            console.error('[Liquid Glass] Failed to apply native glass view:', e);
         }
     });
 
