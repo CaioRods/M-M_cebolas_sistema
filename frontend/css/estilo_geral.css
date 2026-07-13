@@ -1167,6 +1167,13 @@ tr:hover td { background-color: rgba(248, 250, 252, 0.9); }
         gap: 16px;
         margin-bottom: 24px;
     }
+
+    @media (max-width: 350px) {
+        .sheet-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 12px !important;
+        }
+    }
     
     .sheet-item {
         background: none;

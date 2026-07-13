@@ -208,6 +208,56 @@
             75% { transform: translateX(10px); }
         }
         .shake { animation: shake 0.4s ease-in-out; }
+
+        /* --- LAYOUT MOBILE ADAPTADO (LOGIN) --- */
+        @media (max-width: 480px) {
+            #login-viewport {
+                padding: 16px !important;
+            }
+            .login-card {
+                padding: 36px 20px !important;
+                border-radius: 24px !important;
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4) !important;
+                max-width: 92% !important;
+            }
+            .login-card img {
+                width: 90px !important;
+                height: 90px !important;
+                margin-bottom: 16px !important;
+            }
+            .login-card h1 {
+                font-size: 1.6rem !important;
+            }
+            .login-card p {
+                margin-bottom: 24px !important;
+                font-size: 0.85rem !important;
+            }
+            .login-form {
+                gap: 14px !important;
+            }
+            .login-form input {
+                font-size: 16px !important; /* Impede zoom automático do iOS */
+                padding: 14px 16px !important;
+                min-height: 48px !important;
+                border-radius: 12px !important;
+            }
+            .login-form button {
+                min-height: 48px !important;
+                font-size: 0.9rem !important;
+                border-radius: 12px !important;
+            }
+            #titlebar {
+                height: 50px !important;
+                padding: 0 16px !important;
+            }
+            #titlebar .window-controls {
+                display: none !important;
+            }
+            #titlebar .window-title {
+                text-align: left !important;
+                font-size: 0.8rem !important;
+            }
+        }
     </style>
 </head>
 <body>
