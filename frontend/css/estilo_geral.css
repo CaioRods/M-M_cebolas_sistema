@@ -974,3 +974,317 @@ tr:hover td { background-color: rgba(248, 250, 252, 0.9); }
     from { opacity: 0; transform: scale(0.95); }
     to { opacity: 1; transform: scale(1); }
 }
+
+/* --- VERSÃO MOBILE ADAPTADA (DESIGN EXCLUSIVO E MODERNO) --- */
+
+/* Ocultar elementos mobile no PC por padrão */
+.mobile-tabbar, .mobile-more-backdrop, .mobile-more-sheet {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    /* Ocultar a sidebar clássica do PC e o botão hamburger redundante */
+    .sidebar {
+        display: none !important;
+    }
+    
+    .mobile-menu-toggle {
+        display: none !important;
+    }
+    
+    /* Reajustar container de conteúdo principal */
+    .main-content {
+        margin-left: 0 !important;
+        padding: 14px !important;
+        padding-top: calc(var(--titlebar-height) + 54px) !important;
+        padding-bottom: 96px !important; /* Espaço confortável para a tabbar inferior */
+    }
+
+    /* Barra de Título Customizada Premium no Mobile */
+    #titlebar {
+        height: 50px !important;
+        background: rgba(15, 23, 42, 0.94) !important; /* Slate escuro moderno */
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+        padding: 0 16px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+    }
+    
+    #titlebar .window-controls {
+        display: none !important; /* Oculta minimizar/fechar no celular */
+    }
+    
+    #titlebar .window-title {
+        flex: 1 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        font-size: 0.8rem !important;
+        font-weight: 800 !important;
+        letter-spacing: 1px !important;
+        color: #ffffff !important;
+    }
+
+    /* Barra de Navegação Inferior Premium (Mobile TabBar) */
+    .mobile-tabbar {
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 68px;
+        background: rgba(15, 23, 42, 0.96); /* Slate escuro com transparência */
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        z-index: 999;
+        justify-content: space-around;
+        align-items: center;
+        padding-bottom: env(safe-area-inset-bottom, 8px);
+        box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
+    }
+    
+    .tabbar-item {
+        position: relative;
+        background: none;
+        border: none;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: rgba(255, 255, 255, 0.45);
+        gap: 6px;
+        font-size: 0.65rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        flex: 1;
+        height: 100%;
+    }
+    
+    .tabbar-item i {
+        font-size: 1.25rem;
+        transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    
+    .tabbar-item.active {
+        color: #10b981 !important; /* Verde Esmeralda Ativo */
+    }
+    
+    .tabbar-item.active i {
+        transform: translateY(-4px) scale(1.1);
+        text-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+    }
+    
+    /* Indicador luminoso acima do item ativo */
+    .tabbar-item.active::after {
+        content: '';
+        position: absolute;
+        top: 2px;
+        width: 14px;
+        height: 3px;
+        background: #10b981;
+        border-radius: 2px;
+        box-shadow: 0 0 8px #10b981;
+    }
+
+    /* Fundo escurecido ao abrir o menu deslizante "Mais" */
+    .mobile-more-backdrop {
+        display: block;
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        z-index: 1000;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.35s ease;
+    }
+    
+    .mobile-more-backdrop.active {
+        opacity: 1;
+        pointer-events: auto;
+    }
+    
+    /* Menu deslizante (Bottom Sheet) com Glassmorphism */
+    .mobile-more-sheet {
+        display: block;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(15, 23, 42, 0.94); /* Slate escuro */
+        backdrop-filter: blur(25px);
+        -webkit-backdrop-filter: blur(25px);
+        border-radius: 24px 24px 0 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        z-index: 1001;
+        transform: translateY(100%);
+        transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        padding: 20px;
+        padding-bottom: calc(24px + env(safe-area-inset-bottom, 8px));
+        max-height: 75vh;
+        overflow-y: auto;
+        box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.6);
+    }
+    
+    .mobile-more-sheet.active {
+        transform: translateY(0);
+    }
+    
+    .sheet-header {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-bottom: 24px;
+    }
+    
+    .sheet-drag-handle {
+        width: 36px;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 2px;
+        margin-bottom: 12px;
+    }
+    
+    .sheet-header h3 {
+        color: #ffffff;
+        font-size: 0.95rem;
+        font-weight: 800;
+        letter-spacing: 0.5px;
+    }
+    
+    .sheet-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+    
+    .sheet-item {
+        background: none;
+        border: none;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 0.72rem;
+        font-weight: 600;
+        cursor: pointer;
+        padding: 10px 4px;
+        border-radius: 12px;
+        transition: all 0.2s ease;
+    }
+    
+    .sheet-item:active {
+        background: rgba(255, 255, 255, 0.06);
+        transform: scale(0.95);
+    }
+    
+    .sheet-item-icon {
+        width: 52px;
+        height: 52px;
+        border-radius: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.35rem;
+        color: #ffffff;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    
+    .color-cadastro { background: linear-gradient(135deg, #10b981, #059669); }
+    .color-nfe { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+    .color-financeiro { background: linear-gradient(135deg, #f59e0b, #d97706); }
+    .color-config { background: linear-gradient(135deg, #6b7280, #4b5563); }
+    .color-admin { background: linear-gradient(135deg, #ef4444, #dc2626); }
+    .color-perfil { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+    
+    .sheet-logout-container {
+        padding-top: 16px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    
+    .btn-sheet-logout {
+        width: 100%;
+        height: 48px;
+        border-radius: 14px;
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.18);
+        color: #ef4444;
+        font-weight: 700;
+        font-size: 0.85rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        cursor: pointer;
+    }
+    
+    .btn-sheet-logout:active {
+        background: rgba(239, 68, 68, 0.2);
+    }
+
+    /* Swipe Horizontal para os KPIs no Dashboard Mobile (Estilo Nubank/Revolut) */
+    .kpi-grid-pro {
+        display: flex !important;
+        grid-template-columns: none !important;
+        overflow-x: auto !important;
+        scroll-snap-type: x mandatory !important;
+        gap: 12px !important;
+        padding-bottom: 12px !important;
+        margin-bottom: 20px !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+    
+    .kpi-grid-pro::-webkit-scrollbar {
+        display: none !important; /* Oculta a barra de rolagem horizontal */
+    }
+    
+    .kpi-card-pro {
+        min-width: 270px !important;
+        flex-shrink: 0 !important;
+        scroll-snap-align: start !important;
+        margin-bottom: 0 !important;
+    }
+
+    /* Otimização de formulários e inputs (Impede zoom forçado no iOS) */
+    input, select, textarea {
+        min-height: 44px !important;
+        font-size: 16px !important; /* Fonte a 16px impede o zoom automático do Safari no iOS */
+        border-radius: 12px !important;
+    }
+    
+    .form-group-row {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+    }
+
+    /* Tabelas com rolagem horizontal otimizada e sem quebras */
+    .table-container {
+        width: 100% !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        border-radius: 14px !important;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2) !important;
+        border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    }
+    
+    .table-pro {
+        min-width: 650px !important;
+    }
+    
+    .table-pro th, .table-pro td {
+        padding: 12px 10px !important;
+        font-size: 0.78rem !important;
+    }
+}

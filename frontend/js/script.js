@@ -254,6 +254,19 @@ function showSection(id) {
     const activeBtn = document.querySelector(`.nav-item[onclick*="'${id}'"]`);
     if (activeBtn) activeBtn.classList.add('active');
 
+    // Sincroniza o estado ativo da TabBar Mobile
+    document.querySelectorAll('.mobile-tabbar .tabbar-item').forEach(item => {
+        const onClickAttr = item.getAttribute('onclick') || '';
+        if (onClickAttr.includes(`'${id}'`)) {
+            item.classList.add('active');
+        } else {
+            // Apenas remove se não for o botão de abrir o menu Mais
+            if (!onClickAttr.includes('toggleMobileMoreMenu')) {
+                item.classList.remove('active');
+            }
+        }
+    });
+
     const mainContent = document.getElementById('main-content');
     
     const alreadyLoaded = loadedSections.has(id);

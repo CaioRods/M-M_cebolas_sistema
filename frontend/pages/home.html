@@ -527,6 +527,72 @@
     <audio id="sound-startup" src="../sounds/mac-startup.mp3" style="display:none;"></audio>
     <audio id="sound-success" src="../sounds/success-chime.mp3" style="display:none;"></audio>
 
+    <!-- TabBar Mobile (Barra de Navegação Inferior) -->
+    <div class="mobile-tabbar">
+        <button class="tabbar-item active" onclick="showSection('dashboard');">
+            <i class="fas fa-chart-line"></i>
+            <span>Dashboard</span>
+        </button>
+        <button class="tabbar-item" onclick="showSection('entrada');">
+            <i class="fas fa-shopping-cart"></i>
+            <span>Compra</span>
+        </button>
+        <button class="tabbar-item" onclick="showSection('saida');">
+            <i class="fas fa-hand-holding-usd"></i>
+            <span>Venda</span>
+        </button>
+        <button class="tabbar-item" onclick="showSection('estoque');">
+            <i class="fas fa-boxes"></i>
+            <span>Estoque</span>
+        </button>
+        <button class="tabbar-item" onclick="toggleMobileMoreMenu();">
+            <i class="fas fa-bars"></i>
+            <span>Mais</span>
+        </button>
+    </div>
+
+    <!-- Slide-up Menu Bottom Sheet (Menu Mais Opções Mobile) -->
+    <div class="mobile-more-backdrop" id="moreMenuBackdrop" onclick="toggleMobileMoreMenu()"></div>
+    <div class="mobile-more-sheet" id="moreMenuSheet">
+        <div class="sheet-header">
+            <div class="sheet-drag-handle"></div>
+            <h3>Menu M&M</h3>
+        </div>
+        <div class="sheet-body">
+            <div class="sheet-grid">
+                <button class="sheet-item" onclick="showSection('cadastro'); toggleMobileMoreMenu();">
+                    <div class="sheet-item-icon color-cadastro"><i class="fas fa-address-book"></i></div>
+                    <span>Cadastros</span>
+                </button>
+                <button class="sheet-item" onclick="showSection('nfe'); toggleMobileMoreMenu();">
+                    <div class="sheet-item-icon color-nfe"><i class="fas fa-file-invoice"></i></div>
+                    <span>Notas Fiscais</span>
+                </button>
+                <button class="sheet-item" onclick="showSection('financeiro'); toggleMobileMoreMenu();">
+                    <div class="sheet-item-icon color-financeiro"><i class="fas fa-wallet"></i></div>
+                    <span>Financeiro</span>
+                </button>
+                <button class="sheet-item" onclick="showSection('config'); toggleMobileMoreMenu();">
+                    <div class="sheet-item-icon color-config"><i class="fas fa-cog"></i></div>
+                    <span>Configurações</span>
+                </button>
+                <button class="sheet-item admin-only" onclick="showSection('admin'); toggleMobileMoreMenu();">
+                    <div class="sheet-item-icon color-admin"><i class="fas fa-shield-alt"></i></div>
+                    <span>Admin</span>
+                </button>
+                <button class="sheet-item" onclick="showSection('perfil'); toggleMobileMoreMenu();">
+                    <div class="sheet-item-icon color-perfil"><i class="fas fa-user-circle"></i></div>
+                    <span>Meu Perfil</span>
+                </button>
+            </div>
+            <div class="sheet-logout-container">
+                <button class="btn-sheet-logout" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i> Sair do Sistema
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="../js/script.js"></script>
     <script>
     // Animação de entrada
@@ -558,6 +624,16 @@
         rows.forEach(row => {
             row.style.display = row.textContent.toLowerCase().includes(val.toLowerCase()) ? '' : 'none';
         });
+    }
+
+    // Controle do menu deslizante mobile
+    function toggleMobileMoreMenu() {
+        const backdrop = document.getElementById('moreMenuBackdrop');
+        const sheet = document.getElementById('moreMenuSheet');
+        if (backdrop && sheet) {
+            backdrop.classList.toggle('active');
+            sheet.classList.toggle('active');
+        }
     }
     </script>
 </body>
