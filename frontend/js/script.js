@@ -21,6 +21,21 @@ let nfeGroupingMode = 'fornecedor';
 let isGlobalDataLoaded = false;
 const loadedSections = new Set();
 
+// Configurações da TabBar Mobile Dinâmica e Paginada
+let mobileTabPageIndex = 0;
+const mobileMenus = [
+    { id: 'dashboard', label: 'Dashboard', icon: 'fa-chart-line' },
+    { id: 'entrada', label: 'Compra', icon: 'fa-shopping-cart' },
+    { id: 'saida', label: 'Venda', icon: 'fa-hand-holding-usd' },
+    { id: 'estoque', label: 'Estoque', icon: 'fa-boxes' },
+    { id: 'cadastro', label: 'Cadastros', icon: 'fa-address-book' },
+    { id: 'nfe', label: 'Notas', icon: 'fa-file-invoice' },
+    { id: 'financeiro', label: 'Financeiro', icon: 'fa-wallet' },
+    { id: 'config', label: 'Configs', icon: 'fa-cog' },
+    { id: 'admin', label: 'Admin', icon: 'fa-shield-alt', adminOnly: true },
+    { id: 'perfil', label: 'Perfil', icon: 'fa-user-circle' }
+];
+
 const API_URL = (function () {
     const isElectron = window.location.protocol === 'file:' || (typeof process !== 'undefined' && process.versions && process.versions.electron);
     const host = window.location.hostname;
@@ -108,6 +123,10 @@ function checkEnvironment() {
     if (userRole !== 'admin') {
         document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
     }
+
+    // Inicializa a TabBar Mobile
+    const filtered = mobileMenus.filter(m => !m.adminOnly || userRole === 'admin');
+    renderMobileTabbar(filtered);
 
     // Notifica o Electron sobre o papel do usuário para ajustar a TouchBar principal
     if (typeof require !== 'undefined') {
@@ -243,6 +262,78 @@ function getSkeletonHTML(id) {
     `;
 }
 
+function renderMobileTabbar(filteredList) {
+    const tabbar = document.querySelector('.mobile-tabbar');
+    if (!tabbar) return;
+    
+    const itemsPerPage = 4;
+    const startIndex = mobileTabPageIndex * itemsPerPage;
+    const pageItems = filteredList.slice(startIndex, startIndex + itemsPerPage);
+    
+    let html = '';
+    
+    // Renderiza os 4 itens da página atual
+    pageItems.forEach((item) => {
+        const isActive = (currentSectionId === item.id) ? 'active' : '';
+        html += `
+            <button class="tabbar-item ${isActive}" onclick="showSection('${item.id}');">
+                <i class="fas ${item.icon}"></i>
+                <span>${item.label}</span>
+            </button>
+        `;
+    });
+    
+    // Completa com itens invisíveis vazios caso seja a última página e tenha menos de 4 itens (evita desalinhamento)
+    const emptyCount = itemsPerPage - pageItems.length;
+    for (let i = 0; i < emptyCount; i++) {
+        html += `<div class="tabbar-item-placeholder" style="flex:1;"></div>`;
+    }
+    
+    // Renderiza o 5º item (botão de paginação de seta)
+    const totalPages = Math.ceil(filteredList.length / itemsPerPage);
+    const isLastPage = (mobileTabPageIndex === totalPages - 1);
+    const arrowIcon = isLastPage ? 'fa-chevron-left' : 'fa-chevron-right';
+    const arrowLabel = isLastPage ? 'Voltar' : 'Mais';
+    
+    html += `
+        <button class="tabbar-item tabbar-cycle-btn" onclick="cycleMobileTabbar();">
+            <i class="fas ${arrowIcon}" style="color: #ff9500;"></i>
+            <span>${arrowLabel}</span>
+        </button>
+    `;
+    
+    tabbar.innerHTML = html;
+}
+
+function cycleMobileTabbar() {
+    const userData = JSON.parse(localStorage.getItem('mm_user') || '{}');
+    const userObj = userData.user || userData;
+    const userRole = userObj.role || 'funcionario';
+    const filtered = mobileMenus.filter(m => !m.adminOnly || userRole === 'admin');
+    const itemsPerPage = 4;
+    const totalPages = Math.ceil(filtered.length / itemsPerPage);
+    
+    mobileTabPageIndex = (mobileTabPageIndex + 1) % totalPages;
+    renderMobileTabbar(filtered);
+}
+
+function syncMobileTabbar(id) {
+    const userData = JSON.parse(localStorage.getItem('mm_user') || '{}');
+    const userObj = userData.user || userData;
+    const userRole = userObj.role || 'funcionario';
+    const filtered = mobileMenus.filter(m => !m.adminOnly || userRole === 'admin');
+    
+    const index = filtered.findIndex(m => m.id === id);
+    if (index !== -1) {
+        const itemsPerPage = 4;
+        const page = Math.floor(index / itemsPerPage);
+        if (page !== mobileTabPageIndex) {
+            mobileTabPageIndex = page;
+        }
+    }
+    renderMobileTabbar(filtered);
+}
+
 function showSection(id) {
     currentSectionId = id;
     
@@ -254,18 +345,8 @@ function showSection(id) {
     const activeBtn = document.querySelector(`.nav-item[onclick*="'${id}'"]`);
     if (activeBtn) activeBtn.classList.add('active');
 
-    // Sincroniza o estado ativo da TabBar Mobile
-    document.querySelectorAll('.mobile-tabbar .tabbar-item').forEach(item => {
-        const onClickAttr = item.getAttribute('onclick') || '';
-        if (onClickAttr.includes(`'${id}'`)) {
-            item.classList.add('active');
-        } else {
-            // Apenas remove se não for o botão de abrir o menu Mais
-            if (!onClickAttr.includes('toggleMobileMoreMenu')) {
-                item.classList.remove('active');
-            }
-        }
-    });
+    // Sincroniza o estado ativo da TabBar Mobile e a página atual
+    syncMobileTabbar(id);
 
     const mainContent = document.getElementById('main-content');
     
