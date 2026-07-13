@@ -1,7 +1,8 @@
 // Electron: app desktop consome a API da VPS (https://portalmmcebolas.com.br) quando não for localhost.
 // O frontend em script.js define API_URL dinamicamente (file:// → produção; localhost → :3000).
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, nativeImage } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
 
 const isDev = process.env.NODE_ENV === 'development';
@@ -94,6 +95,18 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+    if (process.platform === 'darwin') {
+        const iconPath = path.join(__dirname, 'Imgs', 'logo_M&M_arredondado.png');
+        if (fs.existsSync(iconPath)) {
+            try {
+                const image = nativeImage.createFromPath(iconPath);
+                app.dock.setIcon(image);
+            } catch (e) {
+                console.error("Erro ao definir ícone no dock:", e);
+            }
+        }
+    }
+
     createWindow();
 
     app.on('activate', () => {
