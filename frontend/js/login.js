@@ -1,13 +1,16 @@
-const isElectron = window.location.protocol === 'file:';
+const isElectron = window.location.protocol === 'file:' || (typeof process !== 'undefined' && process.versions && process.versions.electron);
 
-// Em modo desenvolvimento (npm run dev), o Electron passa NODE_ENV=development
-// Detectamos isso via process.env ou pela presença de uma flag global injetada pelo main.js
-const isDev = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development') ||
-              (typeof window.__DEV_MODE__ !== 'undefined' && window.__DEV_MODE__);
+const API_URL = (function () {
+    const host = window.location.hostname;
+    const isDev = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development') ||
+                  (typeof window.__DEV_MODE__ !== 'undefined' && window.__DEV_MODE__);
 
-const API_URL = isDev
-    ? 'http://localhost:3000/api'       // Modo desenvolvimento: servidor local
-    : 'https://portalmmcebolas.com/api'; // Modo produção: VPS
+    if (isDev) return 'http://localhost:3000/api';
+    if (isElectron) return 'https://portalmmcebolas.com/api';
+    if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:3000/api';
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) return `http://${host}:3000/api`;
+    return window.location.origin + '/api';
+})();
 
 
 function getHomeUrl() {

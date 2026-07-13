@@ -65,6 +65,7 @@ Sistema profissional de gestão de estoque, vendas e emissão de notas fiscais (
 │   ├── nfe-service.js    # Serviço de integração fiscal
 │   └── backups/          # Cópias de segurança automáticas
 ├── DEPLOY.md             # Guia de deploy em VPS
+├── manual.md             # Manual completo de arquitetura do sistema
 └── README.md             # Este arquivo
 ```
 
@@ -120,4 +121,4 @@ git push vps main     # Atualiza o Servidor em Produção
 Este projeto é de uso exclusivo da **M&M Cebolas**. Todos os direitos reservados.
 
 ---
-*Desenvolvido com ❤️ para a gestão de excelência da M&M Cebolas.*
+*Desenvolvido para a gestão de excelência da M&M Cebolas.*

@@ -9,6 +9,8 @@ let appData = {
     configs: {}
 };
 
+let tempParsedXML = null;
+
 let currentSectionId = 'dashboard';
 let mainChart = null;
 let distributionChart = null;
@@ -16,6 +18,8 @@ let dashboardData = null;
 let dashboardPeriod = 'mes';
 let dashboardChartType = 'bar';
 let nfeGroupingMode = 'fornecedor';
+let isGlobalDataLoaded = false;
+const loadedSections = new Set();
 
 const API_URL = (function () {
     const isElectron = window.location.protocol === 'file:' || (typeof process !== 'undefined' && process.versions && process.versions.electron);
@@ -74,8 +78,10 @@ function checkEnvironment() {
 
     // Set user info
     const userData = JSON.parse(localStorage.getItem('mm_user') || '{}');
-    const userName = userData.user?.label || userData.label || 'Usuário';
-    const userRole = userData.role || userData.user?.role || 'funcionario';
+    const userObj = userData.user || userData;
+    const userName = userObj.label || 'Usuário';
+    const userRole = userObj.role || 'funcionario';
+    const userFoto = userObj.foto || '';
     
     const userNameEl = document.getElementById('user-name');
     const userRoleEl = document.getElementById('user-role-badge');
@@ -83,6 +89,19 @@ function checkEnvironment() {
     if (userRoleEl) {
         userRoleEl.textContent = userRole.toUpperCase();
         userRoleEl.className = `badge ${userRole === 'admin' ? 'admin' : userRole === 'chefe' ? 'entrada' : 'operador'}`;
+    }
+
+    const sidebarAvatar = document.querySelector('.sidebar-user-card .user-avatar-modern');
+    if (sidebarAvatar) {
+        if (userFoto) {
+            sidebarAvatar.innerHTML = `<img src="${userFoto}" style="width: 100%; height: 100%; border-radius: 12px; object-fit: cover;">`;
+            sidebarAvatar.style.background = 'none';
+            sidebarAvatar.style.boxShadow = 'none';
+        } else {
+            sidebarAvatar.innerHTML = `<i class="fas fa-user-tie"></i>`;
+            sidebarAvatar.style.background = 'linear-gradient(135deg, var(--accent) 0%, #fcd34d 100%)';
+            sidebarAvatar.style.boxShadow = '0 4px 10px rgba(232, 156, 49, 0.4)';
+        }
     }
     
     // Hide admin items for non-admins
@@ -102,7 +121,8 @@ async function loadDataFromAPI() {
             fetchWithAuth('/produtos').then(r => r && r.ok ? r.json() : []),
             fetchWithAuth('/clientes').then(r => r && r.ok ? r.json() : []),
             fetchWithAuth('/fornecedores').then(r => r && r.ok ? r.json() : []),
-            fetchWithAuth('/configs').then(r => r && r.ok ? r.json() : {})
+            fetchWithAuth('/configs').then(r => r && r.ok ? r.json() : {}),
+            fetchWithAuth('/descartes').then(r => r && r.ok ? r.json() : [])
         ];
 
         if (isAdmin) {
@@ -111,12 +131,108 @@ async function loadDataFromAPI() {
             promises.push(Promise.resolve([]));
         }
 
-        const [trans, prods, clis, sups, configs, usrs] = await Promise.all(promises);
-        appData = { transactions: trans, products: prods, clients: clis, suppliers: sups, users: usrs, configs: configs || {} };
+        const [trans, prods, clis, sups, configs, descs, usrs] = await Promise.all(promises);
+        appData = { transactions: trans, products: prods, clients: clis, suppliers: sups, users: usrs, configs: configs || {}, descartes: descs };
+        isGlobalDataLoaded = true;
         initSection(currentSectionId);
+        checkCertExpiration();
     } catch (err) {
         console.error("Erro ao carregar dados:", err);
     }
+}
+
+function getSkeletonHTML(id) {
+    if (id === 'dashboard') {
+        let kpis = '';
+        for (let i = 0; i < 4; i++) {
+            kpis += `
+                <div class="panel" style="padding: 24px; min-height: 120px; border-radius: var(--radius); background: var(--bg-panel); border: 1px solid var(--border);">
+                    <div class="skeleton skeleton-text short" style="height: 12px; margin-bottom: 12px;"></div>
+                    <div class="skeleton skeleton-text" style="height: 28px; width: 80%;"></div>
+                </div>
+            `;
+        }
+        return `
+            <div class="skeleton-wrapper" style="padding: 24px; animation: fadeIn 0.4s ease-out;">
+                <div style="margin-bottom: 24px;">
+                    <div class="skeleton skeleton-text title" style="height: 24px; width: 300px;"></div>
+                    <div class="skeleton skeleton-text" style="height: 12px; width: 400px; margin-top: 8px;"></div>
+                </div>
+                <div class="kpi-grid-pro" style="margin-bottom: 32px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 24px;">
+                    ${kpis}
+                </div>
+                <div class="analysis-row" style="margin-bottom: 32px; display: grid; grid-template-columns: 2.5fr 1fr; gap: 24px;">
+                    <div class="panel" style="min-height: 380px; padding: 24px; border-radius: var(--radius); background: var(--bg-panel); border: 1px solid var(--border);">
+                        <div class="skeleton skeleton-text title" style="height: 18px; margin-bottom: 20px;"></div>
+                        <div class="skeleton" style="height: 280px; width: 100%; border-radius: 12px;"></div>
+                    </div>
+                    <div class="panel" style="min-height: 380px; padding: 24px; border-radius: var(--radius); background: var(--bg-panel); border: 1px solid var(--border);">
+                        <div class="skeleton skeleton-text title" style="height: 18px; margin-bottom: 20px;"></div>
+                        <div class="skeleton skeleton-circle" style="height: 200px; width: 200px; margin: 0 auto;"></div>
+                        <div class="skeleton skeleton-text" style="height: 12px; width: 80%; margin: 24px auto 0 auto;"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    if (['estoque', 'nfe', 'financeiro', 'cadastro', 'admin'].includes(id)) {
+        let tableHeaderCells = '';
+        for (let i = 0; i < 5; i++) {
+            tableHeaderCells += `<div class="skeleton" style="height: 16px; flex: 1;"></div>`;
+        }
+        let tableRows = '';
+        for (let r = 0; r < 5; r++) {
+            let rowCells = '';
+            for (let c = 0; c < 5; c++) {
+                rowCells += `<div class="skeleton" style="height: 12px; flex: 1;"></div>`;
+            }
+            tableRows += `
+                <div style="display: flex; gap: 12px; padding: 20px 0; border-bottom: 1px solid #f1f5f9;">
+                    ${rowCells}
+                </div>
+            `;
+        }
+        return `
+            <div class="skeleton-wrapper" style="padding: 24px; animation: fadeIn 0.4s ease-out;">
+                <div style="margin-bottom: 24px;">
+                    <div class="skeleton skeleton-text title" style="height: 24px; width: 250px;"></div>
+                    <div class="skeleton skeleton-text" style="height: 12px; width: 350px; margin-top: 8px;"></div>
+                </div>
+                <div class="panel" style="padding: 24px; min-height: 400px; border-radius: var(--radius); background: var(--bg-panel); border: 1px solid var(--border);">
+                    <div style="display: flex; gap: 16px; margin-bottom: 24px;">
+                        <div class="skeleton" style="height: 40px; width: 300px; border-radius: 10px;"></div>
+                        <div class="skeleton" style="height: 40px; width: 150px; border-radius: 10px;"></div>
+                    </div>
+                    <div class="skeleton-table">
+                        <div style="display: flex; gap: 12px; padding: 12px 0; border-bottom: 2px solid var(--border);">
+                            ${tableHeaderCells}
+                        </div>
+                        ${tableRows}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Default generic skeleton for forms / config / entry / exit
+    return `
+        <div class="skeleton-wrapper" style="padding: 24px; animation: fadeIn 0.4s ease-out;">
+            <div style="margin-bottom: 24px;">
+                <div class="skeleton skeleton-text title" style="height: 24px; width: 200px;"></div>
+                <div class="skeleton skeleton-text" style="height: 12px; width: 300px; margin-top: 8px;"></div>
+            </div>
+            <div class="panel" style="padding: 32px; min-height: 350px; border-radius: var(--radius); background: var(--bg-panel); border: 1px solid var(--border);">
+                <div style="max-width: 600px; display: flex; flex-direction: column; gap: 20px;">
+                    <div class="skeleton skeleton-text" style="height: 14px; width: 30%;"></div>
+                    <div class="skeleton" style="height: 45px; width: 100%; border-radius: 10px;"></div>
+                    <div class="skeleton skeleton-text" style="height: 14px; width: 25%;"></div>
+                    <div class="skeleton" style="height: 45px; width: 100%; border-radius: 10px;"></div>
+                    <div class="skeleton" style="height: 45px; width: 150px; border-radius: 10px; margin-top: 10px;"></div>
+                </div>
+            </div>
+        </div>
+    `;
 }
 
 function showSection(id) {
@@ -131,23 +247,39 @@ function showSection(id) {
     if (activeBtn) activeBtn.classList.add('active');
 
     const mainContent = document.getElementById('main-content');
-    mainContent.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;"><div class="apple-loader-modern"></div></div>';
+    
+    const alreadyLoaded = loadedSections.has(id);
+    if (!alreadyLoaded) {
+        mainContent.innerHTML = getSkeletonHTML(id);
+    }
 
+    const startTime = Date.now();
     fetch(`sections/${id}.html`)
         .then(res => {
             if (!res.ok) throw new Error('Section not found');
             return res.text();
         })
         .then(html => {
-            mainContent.innerHTML = html;
-            initSection(id);
+            const elapsed = Date.now() - startTime;
+            const minDelay = alreadyLoaded ? 0 : 650; // Delay mínimo de 650ms apenas na primeira vez que abre
+            const remaining = Math.max(0, minDelay - elapsed);
+            
+            setTimeout(() => {
+                if (currentSectionId === id) {
+                    mainContent.innerHTML = html;
+                    initSection(id);
+                    loadedSections.add(id); // Marca como carregada nesta sessão
+                }
+            }, remaining);
         })
         .catch(err => {
-            mainContent.innerHTML = `<div class="panel" style="padding:24px;text-align:center;margin:32px;">
-                <i class="fas fa-exclamation-triangle fa-3x" style="color:var(--danger);margin-bottom:16px;"></i>
-                <h3>Erro ao carregar seção</h3>
-                <p style="color:var(--text-muted);">Verifique sua conexão ou tente novamente.</p>
-            </div>`;
+            mainContent.innerHTML = `
+                <div class="panel" style="padding:24px;text-align:center;margin:32px;">
+                    <i class="fas fa-exclamation-triangle fa-3x" style="color:var(--danger);margin-bottom:16px;"></i>
+                    <h3>Erro ao carregar seção</h3>
+                    <p style="color:var(--text-muted);">Verifique sua conexão ou tente novamente.</p>
+                </div>
+            `;
         });
 }
 
@@ -193,6 +325,7 @@ function initSection(id) {
     }
     if (id === 'nfe') loadNFeSection();
     if (id === 'config') loadConfigSection(isAdmin);
+    if (id === 'perfil') loadProfilePage();
     if (id === 'admin') {
         if (!isAdmin) { showSection('dashboard'); return; }
         loadAdminSection();
@@ -207,7 +340,128 @@ function toggleSidebar() {
 // =============================================
 // DASHBOARD
 // =============================================
+function getUserAvatar(name) {
+    if (!name) return '<div class="avatar-placeholder"><i class="fas fa-user"></i></div>';
+    const cleanName = name.trim();
+    if (cleanName.length === 0) return '<div class="avatar-placeholder"><i class="fas fa-user"></i></div>';
+    
+    const words = cleanName.split(/\s+/);
+    let initials = '';
+    if (words.length > 0 && words[0]) {
+        initials += words[0][0];
+        if (words.length > 1 && words[words.length - 1]) {
+            initials += words[words.length - 1][0];
+        }
+    }
+    initials = initials.toUpperCase().slice(0, 2);
+    
+    let hash = 0;
+    for (let i = 0; i < cleanName.length; i++) {
+        hash = cleanName.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const h = Math.abs(hash % 360);
+    return `<div class="avatar-circle" style="background: hsl(${h}, 65%, 42%)">${initials}</div>`;
+}
+
 async function loadDashboard() {
+    // Definir saudação e data dinâmica
+    const greetingEl = document.getElementById('dash-greeting');
+    const dateSubtitleEl = document.getElementById('dash-date-subtitle');
+    if (greetingEl) {
+        const hrs = new Date().getHours();
+        let greeting = 'Olá';
+        if (hrs >= 5 && hrs < 12) greeting = 'Bom dia';
+        else if (hrs >= 12 && hrs < 18) greeting = 'Boa tarde';
+        else greeting = 'Boa noite';
+        
+        const userDataRaw = localStorage.getItem('mm_user');
+        let userName = 'Usuário';
+        if (userDataRaw) {
+            try {
+                const userData = JSON.parse(userDataRaw);
+                const userObj = userData && (userData.user || userData);
+                if (userObj) {
+                    userName = userObj.label || userObj.username || userObj.name || 'Usuário';
+                }
+            } catch (e) {
+                userName = userDataRaw;
+            }
+        }
+        const firstName = String(userName || 'Usuário').split(' ')[0];
+        greetingEl.innerHTML = `${greeting}, <span style="color: var(--primary);">${firstName}</span>!`;
+    }
+    if (dateSubtitleEl) {
+        const today = new Date();
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        const dateStr = today.toLocaleDateString('pt-BR', options);
+        const capitalizedDateStr = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+        dateSubtitleEl.textContent = capitalizedDateStr;
+    }
+
+    // Populate dashboard slots with shimmering skeletons during fetch (apenas no primeiro load)
+    const alreadyLoaded = loadedSections.has('dashboard_metrics');
+    if (!alreadyLoaded) {
+        const kpiContainer = document.getElementById('kpi-container');
+        if (kpiContainer) {
+            kpiContainer.innerHTML = Array(5).fill(0).map(() => `
+                <div class="panel" style="padding: 24px; min-height: 140px; border-radius: var(--radius); background: var(--bg-panel); border: 1px solid var(--border); display: flex; flex-direction: column; gap: 12px;">
+                    <div class="skeleton skeleton-text short" style="height: 12px; margin-bottom: 12px;"></div>
+                    <div class="skeleton skeleton-text" style="height: 28px; width: 80%;"></div>
+                </div>
+            `).join('');
+        }
+
+        const recentOps = document.getElementById('dash-recent-ops');
+        if (recentOps) {
+            recentOps.innerHTML = Array(5).fill(0).map(() => `
+                <tr>
+                    <td><div class="skeleton" style="height: 12px; width: 80px;"></div></td>
+                    <td><div class="skeleton" style="height: 12px; width: 60px;"></div></td>
+                    <td><div class="skeleton" style="height: 12px; width: 120px;"></div></td>
+                    <td><div class="skeleton" style="height: 12px; width: 100px;"></div></td>
+                    <td><div class="skeleton" style="height: 12px; width: 40px; margin: 0 auto;"></div></td>
+                    <td><div class="skeleton" style="height: 12px; width: 70px; margin-left: auto;"></div></td>
+                    <td><div class="skeleton" style="height: 12px; width: 30px;"></div></td>
+                </tr>
+            `).join('');
+        }
+
+        const clientRanking = document.getElementById('dash-client-ranking');
+        if (clientRanking) {
+            clientRanking.innerHTML = Array(3).fill(0).map(() => `
+                <tr>
+                    <td><div class="skeleton" style="height: 12px; width: 120px;"></div></td>
+                    <td><div class="skeleton" style="height: 12px; width: 40px; margin: 0 auto;"></div></td>
+                    <td><div class="skeleton" style="height: 12px; width: 70px; margin-left: auto;"></div></td>
+                </tr>
+            `).join('');
+        }
+
+        const supplierRanking = document.getElementById('dash-supplier-ranking');
+        if (supplierRanking) {
+            supplierRanking.innerHTML = Array(3).fill(0).map(() => `
+                <tr>
+                    <td><div class="skeleton" style="height: 12px; width: 120px;"></div></td>
+                    <td><div class="skeleton" style="height: 12px; width: 40px; margin: 0 auto;"></div></td>
+                    <td><div class="skeleton" style="height: 12px; width: 70px; margin-left: auto;"></div></td>
+                </tr>
+            `).join('');
+        }
+
+        const inventoryTable = document.getElementById('dash-inventory-table');
+        if (inventoryTable) {
+            inventoryTable.innerHTML = Array(3).fill(0).map(() => `
+                <tr>
+                    <td><div class="skeleton" style="height: 12px; width: 150px;"></div></td>
+                    <td><div class="skeleton" style="height: 12px; width: 80px; margin: 0 auto;"></div></td>
+                    <td><div class="skeleton" style="height: 12px; width: 80px; margin: 0 auto;"></div></td>
+                    <td><div class="skeleton" style="height: 12px; width: 100px;"></div></td>
+                </tr>
+            `).join('');
+        }
+    }
+
+    const startTime = Date.now();
     try {
         const res = await fetchWithAuth('/dashboard');
         if (res && res.ok) {
@@ -218,7 +472,17 @@ async function loadDashboard() {
     } catch (e) {
         dashboardData = calcularDashboardLocal();
     }
-    renderDashboardPro(dashboardData);
+    
+    const elapsed = Date.now() - startTime;
+    const minDelay = alreadyLoaded ? 0 : 700; // Delay de 700ms apenas na primeira vez
+    const remaining = Math.max(0, minDelay - elapsed);
+    
+    setTimeout(() => {
+        if (currentSectionId === 'dashboard') {
+            renderDashboardPro(dashboardData);
+            loadedSections.add('dashboard_metrics'); // Marca como carregada
+        }
+    }, remaining);
 }
 
 function calcularDashboardLocal() {
@@ -271,6 +535,18 @@ function calcularDashboardLocal() {
     return {
         estoque: { totalCaixas: Math.round(totalCaixas * 10) / 10, totalKg: Math.round(totalKg * 10) / 10, porProduto: topProdutos },
         financeiro: { receitaMes, despesasMes, lucroMes: receitaMes - despesasMes, ticketMedio: qtdVendasMes > 0 ? receitaMes / qtdVendasMes : 0, receitaTotal: 0, despesasTotal: 0, lucroTotal: 0 },
+        dre: {
+            faturamentoMes: receitaMes,
+            faturamentoTotal: receitaMes,
+            cmvMes: despesasMes,
+            cmvTotal: despesasMes,
+            perdasMes: 0,
+            perdasTotal: 0,
+            despesasOpMes: 0,
+            despesasOpTotal: 0,
+            lucroMes: receitaMes - despesasMes,
+            lucroTotal: receitaMes - despesasMes
+        },
         mensal: monthlyData,
         ultimasMovimentacoes: appData.transactions.slice(0, 10)
     };
@@ -284,17 +560,60 @@ function renderDashboardPro(data) {
     renderClientRanking(data);
     renderSupplierRanking(data);
     renderInventoryTable(data);
+    renderDRE(data.dre);
     renderRecentOps(data.ultimasMovimentacoes);
+}
+
+function renderDRE(dre) {
+    if (!dre) return;
+    
+    const setVal = (id, val, isNegative = false) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const formatted = parseFloat(val || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+        el.textContent = `${isNegative && val > 0 ? '-' : ''}R$ ${formatted}`;
+    };
+    
+    setVal('dre-rec-mes', dre.faturamentoMes);
+    setVal('dre-rec-tot', dre.faturamentoTotal);
+    
+    setVal('dre-cmv-mes', dre.cmvMes, true);
+    setVal('dre-cmv-tot', dre.cmvTotal, true);
+    
+    setVal('dre-perdas-mes', dre.perdasMes, true);
+    setVal('dre-perdas-tot', dre.perdasTotal, true);
+    
+    const margemMes = dre.faturamentoMes - dre.cmvMes - dre.perdasMes;
+    const margemTot = dre.faturamentoTotal - dre.cmvTotal - dre.perdasTotal;
+    setVal('dre-margem-mes', margemMes);
+    setVal('dre-margem-tot', margemTot);
+    
+    const margemMesEl = document.getElementById('dre-margem-mes');
+    const margemTotEl = document.getElementById('dre-margem-tot');
+    if (margemMesEl) margemMesEl.style.color = margemMes >= 0 ? '#166534' : '#b91c1c';
+    if (margemTotEl) margemTotEl.style.color = margemTot >= 0 ? '#166534' : '#b91c1c';
+
+    setVal('dre-desp-mes', dre.despesasOpMes, true);
+    setVal('dre-desp-tot', dre.despesasOpTotal, true);
+    
+    setVal('dre-lucro-mes', dre.lucroMes);
+    setVal('dre-lucro-tot', dre.lucroTotal);
+    
+    const lucroMesEl = document.getElementById('dre-lucro-mes');
+    const lucroTotEl = document.getElementById('dre-lucro-tot');
+    if (lucroMesEl) lucroMesEl.style.color = dre.lucroMes >= 0 ? '#166534' : '#b91c1c';
+    if (lucroTotEl) lucroTotEl.style.color = dre.lucroTotal >= 0 ? '#166534' : '#b91c1c';
 }
 
 function renderKPIs(data) {
     const container = document.getElementById('kpi-container');
     if (!container) return;
     
-    // Calcular Crescimento MoM (Mês sobre Mês)
     const monthlyEntries = Object.entries(data.mensal || {});
     let growthLabel = 'Estável';
-    let growthColor = 'var(--text-muted)';
+    let growthColor = '#64748b';
+    let growthBg = 'rgba(100, 116, 139, 0.08)';
+    let growthBorder = 'rgba(100, 116, 139, 0.15)';
     
     if (monthlyEntries.length >= 2) {
         const lastMonth = monthlyEntries[monthlyEntries.length - 1][1];
@@ -302,7 +621,9 @@ function renderKPIs(data) {
         if (prevMonth.receita > 0) {
             const growth = ((lastMonth.receita - prevMonth.receita) / prevMonth.receita) * 100;
             growthLabel = `${growth >= 0 ? '+' : ''}${growth.toFixed(1)}%`;
-            growthColor = growth >= 0 ? 'var(--success)' : 'var(--danger)';
+            growthColor = growth >= 0 ? '#10b981' : '#ef4444';
+            growthBg = growth >= 0 ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)';
+            growthBorder = growth >= 0 ? 'rgba(16, 185, 129, 0.18)' : 'rgba(239, 68, 68, 0.18)';
         }
     }
 
@@ -311,26 +632,76 @@ function renderKPIs(data) {
         : 0;
 
     const kpis = [
-        { label: 'Volume em Caixas', value: `${(data.estoque.totalCaixas || 0).toLocaleString('pt-BR')} Cx`, icon: 'fa-boxes', color: '#166534', bg: '#dcfce7', trend: 'Estoque Total' },
-        { label: 'Receita (Mês)', value: `R$ ${(data.financeiro.receitaMes || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: 'fa-hand-holding-usd', color: '#065f46', bg: '#d1fae5', trend: growthLabel, trendColor: growthColor },
-        { label: 'Lucro Estimado', value: `R$ ${(data.financeiro.lucroMes || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: 'fa-coins', color: '#92400e', bg: '#fef3c7', trend: 'Líquido' },
-        { label: 'Margem de Lucro', value: `${margemLucro.toFixed(1)}%`, icon: 'fa-chart-pie', color: '#7c3aed', bg: '#f5f3ff', trend: 'Rentabilidade', trendColor: '#7c3aed' },
-        { label: 'Ticket Médio', value: `R$ ${(data.financeiro.ticketMedio || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: 'fa-receipt', color: '#1e40af', bg: '#dbeafe', trend: 'Por Venda' }
+        { 
+            label: 'Volume em Caixas', 
+            value: `${(data.estoque.totalCaixas || 0).toLocaleString('pt-BR')} Cx`, 
+            icon: 'fa-boxes', 
+            color: '#166534', 
+            bg: 'rgba(22, 101, 52, 0.1)', 
+            trend: 'Estoque Total', 
+            trendColor: '#166534',
+            trendBg: 'rgba(22, 101, 52, 0.08)',
+            trendBorder: 'rgba(22, 101, 52, 0.15)'
+        },
+        { 
+            label: 'Receita (Mês)', 
+            value: `R$ ${(data.financeiro.receitaMes || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 
+            icon: 'fa-hand-holding-usd', 
+            color: '#059669', 
+            bg: 'rgba(5, 150, 105, 0.1)', 
+            trend: growthLabel, 
+            trendColor: growthColor,
+            trendBg: growthBg,
+            trendBorder: growthBorder
+        },
+        { 
+            label: 'Lucro Estimado', 
+            value: `R$ ${(data.financeiro.lucroMes || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 
+            icon: 'fa-coins', 
+            color: '#d97706', 
+            bg: 'rgba(217, 119, 6, 0.1)', 
+            trend: 'Lucro Real', 
+            trendColor: '#d97706',
+            trendBg: 'rgba(217, 119, 6, 0.08)',
+            trendBorder: 'rgba(217, 119, 6, 0.15)'
+        },
+        { 
+            label: 'Margem de Lucro', 
+            value: `${margemLucro.toFixed(1)}%`, 
+            icon: 'fa-chart-pie', 
+            color: '#7c3aed', 
+            bg: 'rgba(124, 58, 237, 0.1)', 
+            trend: 'Rentabilidade', 
+            trendColor: '#7c3aed',
+            trendBg: 'rgba(124, 58, 237, 0.08)',
+            trendBorder: 'rgba(124, 58, 237, 0.15)'
+        },
+        { 
+            label: 'Ticket Médio', 
+            value: `R$ ${(data.financeiro.ticketMedio || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 
+            icon: 'fa-receipt', 
+            color: '#2563eb', 
+            bg: 'rgba(37, 99, 235, 0.1)', 
+            trend: 'Por Venda', 
+            trendColor: '#2563eb',
+            trendBg: 'rgba(37, 99, 235, 0.08)',
+            trendBorder: 'rgba(37, 99, 235, 0.15)'
+        }
     ];
     
     container.innerHTML = kpis.map(kpi => `
-        <div class="panel" style="padding: 24px; position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 12px; border-top: 4px solid ${kpi.color};">
-            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-                <div style="width: 54px; height: 54px; background: ${kpi.bg}; color: ${kpi.color}; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink:0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+        <div class="kpi-card-pro" style="--kpi-color: ${kpi.color}; --kpi-bg: ${kpi.bg};">
+            <div class="kpi-card-header">
+                <div class="kpi-icon-wrapper">
                     <i class="fas ${kpi.icon}"></i>
                 </div>
-                ${kpi.trend ? `<span style="font-size: 0.7rem; font-weight: 800; color: ${kpi.trendColor || 'var(--text-muted)'}; background: ${kpi.trendColor ? kpi.trendColor + '10' : '#f1f5f9'}; padding: 4px 10px; border-radius: 100px; border: 1px solid ${kpi.trendColor ? kpi.trendColor + '20' : 'var(--border)'};">${kpi.trend}</span>` : ''}
+                ${kpi.trend ? `<span class="kpi-trend" style="--trend-color: ${kpi.trendColor}; --trend-bg: ${kpi.trendBg}; --trend-border: ${kpi.trendBorder}">${kpi.trend}</span>` : ''}
             </div>
-            <div style="margin-top: 8px;">
-                <p style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">${kpi.label}</p>
-                <h3 style="font-size: 1.6rem; font-weight: 900; color: var(--text-main); letter-spacing: -0.5px;">${kpi.value}</h3>
+            <div class="kpi-card-content">
+                <p class="kpi-label">${kpi.label}</p>
+                <h3 class="kpi-value">${kpi.value}</h3>
             </div>
-            <div style="position: absolute; right: -15px; bottom: -15px; font-size: 5rem; opacity: 0.03; color: ${kpi.color}; pointer-events: none;">
+            <div class="kpi-bg-icon">
                 <i class="fas ${kpi.icon}"></i>
             </div>
         </div>
@@ -350,12 +721,12 @@ function renderMainChart(data) {
     const values = Object.values(data.mensal || {});
     
     const canvasCtx = ctx.getContext('2d');
-    const gradientPrimary = canvasCtx.createLinearGradient(0, 0, 0, 400);
-    gradientPrimary.addColorStop(0, 'rgba(26, 86, 50, 0.4)');
+    const gradientPrimary = canvasCtx.createLinearGradient(0, 0, 0, 360);
+    gradientPrimary.addColorStop(0, 'rgba(26, 86, 50, 0.35)');
     gradientPrimary.addColorStop(1, 'rgba(26, 86, 50, 0.0)');
     
-    const gradientAccent = canvasCtx.createLinearGradient(0, 0, 0, 400);
-    gradientAccent.addColorStop(0, 'rgba(232, 156, 49, 0.4)');
+    const gradientAccent = canvasCtx.createLinearGradient(0, 0, 0, 360);
+    gradientAccent.addColorStop(0, 'rgba(232, 156, 49, 0.35)');
     gradientAccent.addColorStop(1, 'rgba(232, 156, 49, 0.0)');
 
     let datasets = [];
@@ -366,13 +737,14 @@ function renderMainChart(data) {
                 data: values.map(v => v.receita), 
                 backgroundColor: dashboardChartType === 'line' ? gradientPrimary : '#1A5632', 
                 borderColor: '#1A5632', 
-                borderWidth: 3, 
+                borderWidth: dashboardChartType === 'line' ? 3 : 0, 
+                borderRadius: dashboardChartType === 'line' ? 0 : 6,
                 tension: 0.4, 
-                fill: true,
+                fill: dashboardChartType === 'line',
                 pointBackgroundColor: '#fff',
                 pointBorderColor: '#1A5632',
                 pointBorderWidth: 2,
-                pointRadius: 4,
+                pointRadius: dashboardChartType === 'line' ? 4 : 0,
                 pointHoverRadius: 6
             },
             { 
@@ -380,13 +752,14 @@ function renderMainChart(data) {
                 data: values.map(v => v.despesa), 
                 backgroundColor: dashboardChartType === 'line' ? gradientAccent : '#E89C31', 
                 borderColor: '#E89C31', 
-                borderWidth: 3, 
+                borderWidth: dashboardChartType === 'line' ? 3 : 0, 
+                borderRadius: dashboardChartType === 'line' ? 0 : 6,
                 tension: 0.4, 
-                fill: true,
+                fill: dashboardChartType === 'line',
                 pointBackgroundColor: '#fff',
                 pointBorderColor: '#E89C31',
                 pointBorderWidth: 2,
-                pointRadius: 4,
+                pointRadius: dashboardChartType === 'line' ? 4 : 0,
                 pointHoverRadius: 6
             }
         ];
@@ -419,12 +792,12 @@ function renderMainChart(data) {
             maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
             plugins: {
-                legend: { position: 'top', align: 'end', labels: { usePointStyle: true, boxWidth: 8, font: { weight: '700', size: 11 } } },
-                tooltip: { backgroundColor: 'rgba(255, 255, 255, 0.95)', titleColor: '#0f172a', bodyColor: '#475569', borderColor: '#e2e8f0', borderWidth: 1, padding: 12, bodySpacing: 8, titleFont: { size: 13, weight: '800' }, bodyFont: { size: 12 }, usePointStyle: true, callbacks: { label: function(context) { let label = context.dataset.label || ''; if (label) label += ': '; if (context.parsed.y !== null) { if (metric === 'financeiro') label += new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(context.parsed.y); else label += context.parsed.y.toLocaleString('pt-BR') + (metric === 'volume_cx' ? ' Cx' : ' Kg'); } return label; } } }
+                legend: { position: 'top', align: 'end', labels: { usePointStyle: true, boxWidth: 8, font: { weight: '700', size: 11, family: 'Inter' } } },
+                tooltip: { backgroundColor: 'rgba(255, 255, 255, 0.98)', titleColor: '#0f172a', bodyColor: '#475569', borderColor: '#e2e8f0', borderWidth: 1, padding: 12, bodySpacing: 8, titleFont: { size: 13, weight: '800', family: 'Inter' }, bodyFont: { size: 12, family: 'Inter' }, usePointStyle: true, callbacks: { label: function(context) { let label = context.dataset.label || ''; if (label) label += ': '; if (context.parsed.y !== null) { if (metric === 'financeiro') label += new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(context.parsed.y); else label += context.parsed.y.toLocaleString('pt-BR') + (metric === 'volume_cx' ? ' Cx' : ' Kg'); } return label; } } }
             },
             scales: {
-                y: { grid: { borderDash: [5, 5], color: '#e2e8f0' }, ticks: { font: { weight: '600', size: 10 }, callback: function(value) { if (metric === 'financeiro') return 'R$ ' + value.toLocaleString('pt-BR'); return value; } } },
-                x: { grid: { display: false }, ticks: { font: { weight: '600', size: 10 } } }
+                y: { grid: { borderDash: [5, 5], color: '#e2e8f0' }, ticks: { font: { weight: '600', size: 10, family: 'Inter' }, callback: function(value) { if (metric === 'financeiro') return 'R$ ' + value.toLocaleString('pt-BR'); return value; } } },
+                x: { grid: { display: false }, ticks: { font: { weight: '600', size: 10, family: 'Inter' } } }
             }
         } 
     });
@@ -436,11 +809,44 @@ function renderDistributionChart(data) {
     if (distributionChart) distributionChart.destroy();
     const prods = (data.estoque || {}).porProduto || [];
     if (prods.length === 0) return;
+    
+    const colors = ['#1A5632', '#E89C31', '#22c55e', '#3b82f6', '#ef4444'];
+    
     distributionChart = new Chart(ctx, {
         type: 'doughnut',
-        data: { labels: prods.map(p => p.nome), datasets: [{ data: prods.map(p => p.caixas), backgroundColor: ['#1A5632', '#E89C31', '#22c55e', '#3b82f6', '#ef4444'], borderWidth: 0 }] },
-        options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { display: false } } }
+        data: { 
+            labels: prods.map(p => p.nome), 
+            datasets: [{ 
+                data: prods.map(p => p.caixas), 
+                backgroundColor: colors.slice(0, prods.length), 
+                borderWidth: 2,
+                borderColor: '#ffffff'
+            }] 
+        },
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            cutout: '72%', 
+            plugins: { 
+                legend: { display: false } 
+            } 
+        }
     });
+
+    const legendContainer = document.getElementById('product-legend');
+    if (legendContainer) {
+        const totalCaixas = prods.reduce((sum, p) => sum + p.caixas, 0);
+        legendContainer.innerHTML = prods.map((p, idx) => {
+            const pct = totalCaixas > 0 ? ((p.caixas / totalCaixas) * 100).toFixed(1) : 0;
+            return `
+                <div class="legend-item-pro">
+                    <span class="legend-dot" style="background-color: ${colors[idx % colors.length]}"></span>
+                    <span class="legend-name" title="${p.nome}">${p.nome}</span>
+                    <span class="legend-pct">${pct}%</span>
+                </div>
+            `;
+        }).join('');
+    }
 }
 
 function renderClientRanking(data) {
@@ -453,7 +859,17 @@ function renderClientRanking(data) {
         ranking[t.descricao].valor += t.valor;
     });
     const sorted = Object.values(ranking).sort((a, b) => b.valor - a.valor).slice(0, 5);
-    tbody.innerHTML = sorted.length > 0 ? sorted.map(s => `<tr><td><strong>${s.nome || '-'}</strong></td><td style="text-align:center;">${s.caixas}</td><td style="text-align:right; font-weight:700; color:var(--primary);">R$ ${s.valor.toLocaleString('pt-BR')}</td></tr>`).join('') 
+    tbody.innerHTML = sorted.length > 0 ? sorted.map(s => `
+        <tr>
+            <td>
+                <div class="entity-info">
+                    ${getUserAvatar(s.nome)}
+                    <strong>${s.nome || '-'}</strong>
+                </div>
+            </td>
+            <td style="text-align:center; font-weight:700;">${s.caixas.toLocaleString('pt-BR')}</td>
+            <td style="text-align:right; font-weight:800; color:var(--primary);">R$ ${s.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+        </tr>`).join('') 
     : '<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--text-muted)">Nenhum dado</td></tr>';
 }
 
@@ -467,7 +883,17 @@ function renderSupplierRanking(data) {
         ranking[t.descricao].valor += t.valor;
     });
     const sorted = Object.values(ranking).sort((a, b) => b.valor - a.valor).slice(0, 5);
-    tbody.innerHTML = sorted.length > 0 ? sorted.map(s => `<tr><td><strong>${s.nome || '-'}</strong></td><td style="text-align:center;">${s.caixas}</td><td style="text-align:right; font-weight:700; color:var(--primary);">R$ ${s.valor.toLocaleString('pt-BR')}</td></tr>`).join('') 
+    tbody.innerHTML = sorted.length > 0 ? sorted.map(s => `
+        <tr>
+            <td>
+                <div class="entity-info">
+                    ${getUserAvatar(s.nome)}
+                    <strong>${s.nome || '-'}</strong>
+                </div>
+            </td>
+            <td style="text-align:center; font-weight:700;">${s.caixas.toLocaleString('pt-BR')}</td>
+            <td style="text-align:right; font-weight:800; color:var(--primary);">R$ ${s.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+        </tr>`).join('') 
     : '<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--text-muted)">Nenhum dado</td></tr>';
 }
 
@@ -475,7 +901,22 @@ function renderInventoryTable(data) {
     const tbody = document.getElementById('dash-inventory-table');
     if (!tbody) return;
     const prods = (data.estoque || {}).porProduto || [];
-    tbody.innerHTML = prods.length > 0 ? prods.map(p => `<tr><td><strong>${p.nome}</strong></td><td style="text-align:center; font-weight:700;">${p.caixas}</td><td style="text-align:center;">${p.kg}</td><td><i class="fas fa-arrow-up" style="color:#22c55e;"></i></td></tr>`).join('')
+    tbody.innerHTML = prods.length > 0 ? prods.map(p => {
+        const prodObj = (appData.products || []).find(pr => pr.nome === p.nome);
+        const color = prodObj ? prodObj.cor : '#1A5632';
+        return `
+            <tr>
+                <td>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: ${color};"></span>
+                        <strong>${p.nome}</strong>
+                    </div>
+                </td>
+                <td style="text-align:center; font-weight:700;">${p.caixas.toLocaleString('pt-BR')}</td>
+                <td style="text-align:center;">${p.kg.toLocaleString('pt-BR')}</td>
+                <td><i class="fas fa-arrow-up" style="color:#22c55e;"></i></td>
+            </tr>`;
+    }).join('')
     : '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted)">Nenhum produto em estoque</td></tr>';
 }
 
@@ -485,12 +926,22 @@ function renderRecentOps(transactions) {
     tbody.innerHTML = (transactions || []).slice(0, 8).map(t => `
         <tr>
             <td>${new Date(t.data).toLocaleDateString('pt-BR')}</td>
-            <td><span class="badge ${t.tipo}">${t.tipo.toUpperCase()}</span></td>
+            <td>
+                <span class="badge ${t.tipo}">
+                    ${t.tipo === 'entrada' ? '<i class="fas fa-arrow-down" style="font-size:0.75rem; margin-right:4px;"></i>COMPRA' : 
+                      t.tipo === 'saida' ? '<i class="fas fa-arrow-up" style="font-size:0.75rem; margin-right:4px;"></i>VENDA' : 
+                      '<i class="fas fa-wallet" style="font-size:0.75rem; margin-right:4px;"></i>DESPESA'}
+                </span>
+            </td>
             <td><strong>${t.descricao || '-'}</strong></td>
             <td>${t.produto}</td>
-            <td style="text-align:center; font-weight:700;">${t.qtd_caixas || t.quantidade} Cx</td>
-            <td style="text-align:right; font-weight:700;">R$ ${t.valor.toLocaleString('pt-BR')}</td>
-            <td style="text-align:right;"><button class="btn-icon" onclick="showSection('estoque')"><i class="fas fa-eye"></i></button></td>
+            <td style="text-align:center; font-weight:700;">${(t.qtd_caixas || t.quantidade).toLocaleString('pt-BR')} Cx</td>
+            <td style="text-align:right; font-weight:700;">R$ ${t.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+            <td style="text-align:center;">
+                <button class="btn-icon" onclick="showSection('estoque')" title="Ver estoque">
+                    <i class="fas fa-eye"></i>
+                </button>
+            </td>
         </tr>`).join('');
 }
 
@@ -521,6 +972,18 @@ function loadCadastros() {
 function renderClientesTable() {
     const tbody = document.getElementById('list-clientes');
     if (!tbody) return;
+    if (!isGlobalDataLoaded) {
+        tbody.innerHTML = Array(3).fill(0).map(() => `
+            <tr>
+                <td><div class="skeleton" style="height: 12px; width: 140px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 100px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 90px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 150px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 40px;"></div></td>
+            </tr>
+        `).join('');
+        return;
+    }
     tbody.innerHTML = appData.clients.length > 0 ? appData.clients.map(c => `
         <tr>
             <td><strong>${c.nome}</strong></td>
@@ -538,6 +1001,18 @@ function renderClientesTable() {
 function renderFornecedoresTable() {
     const tbody = document.getElementById('list-fornecedores');
     if (!tbody) return;
+    if (!isGlobalDataLoaded) {
+        tbody.innerHTML = Array(3).fill(0).map(() => `
+            <tr>
+                <td><div class="skeleton" style="height: 12px; width: 140px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 100px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 90px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 150px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 40px;"></div></td>
+            </tr>
+        `).join('');
+        return;
+    }
     tbody.innerHTML = appData.suppliers.length > 0 ? appData.suppliers.map(f => `
         <tr>
             <td><strong>${f.nome}</strong></td>
@@ -555,6 +1030,18 @@ function renderFornecedoresTable() {
 function renderProdutosTable() {
     const tbody = document.getElementById('list-produtos');
     if (!tbody) return;
+    if (!isGlobalDataLoaded) {
+        tbody.innerHTML = Array(3).fill(0).map(() => `
+            <tr>
+                <td><div class="skeleton" style="height: 12px; width: 160px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 80px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 70px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 60px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 40px;"></div></td>
+            </tr>
+        `).join('');
+        return;
+    }
     tbody.innerHTML = appData.products.length > 0 ? appData.products.map(p => `
         <tr style="border-left: 4px solid ${p.cor || '#1A5632'}">
             <td><i class="fas ${p.icone || 'fa-box'}" style="color:${p.cor};margin-right:8px;"></i> <strong>${p.nome}</strong></td>
@@ -677,11 +1164,11 @@ async function saveCadastro(event) {
 // =============================================
 // PRODUTOS
 // =============================================
-function openProdutoModal(data = null) {
+function openProdutoModal(data = null, readOnly = false) {
     const modal = document.getElementById('modal-produto');
     if (!modal) return;
     modal.classList.add('active');
-    document.getElementById('produto-modal-title').innerText = data ? 'Editar Produto' : 'Novo Produto';
+    document.getElementById('produto-modal-title').innerText = readOnly ? 'Visualizar Produto' : (data ? 'Editar Produto' : 'Novo Produto');
     document.getElementById('prod-id').value = data ? data.id : '';
     document.getElementById('prod-nome').value = data ? data.nome : '';
     document.getElementById('prod-ncm').value = data ? (data.ncm || '07031011') : '07031011';
@@ -696,6 +1183,26 @@ function openProdutoModal(data = null) {
     document.querySelectorAll('.color-option').forEach(opt => {
         opt.classList.toggle('active', opt.getAttribute('onclick')?.includes(data?.cor || '#1A5632'));
     });
+
+    const form = modal.querySelector('form');
+    if (form) {
+        const inputs = form.querySelectorAll('input, select');
+        inputs.forEach(inp => {
+            if (readOnly) inp.setAttribute('disabled', 'true');
+            else inp.removeAttribute('disabled');
+        });
+        
+        const iconOptions = form.querySelectorAll('.icon-option, .color-option');
+        iconOptions.forEach(opt => {
+            if (readOnly) opt.style.pointerEvents = 'none';
+            else opt.style.pointerEvents = 'auto';
+        });
+
+        const saveBtn = document.getElementById('btn-salvar-produto');
+        if (saveBtn) {
+            saveBtn.style.display = readOnly ? 'none' : 'block';
+        }
+    }
 }
 
 function closeProdutoModal() { document.getElementById('modal-produto')?.classList.remove('active'); }
@@ -766,7 +1273,27 @@ async function loadNFeTable() {
     const container = document.getElementById('nfe-dynamic-container');
     if (!container) return;
     
-    container.innerHTML = '<div style="text-align:center;padding:40px;"><div class="apple-loader-modern" style="margin:0 auto;"></div></div>';
+    let tableRows = '';
+    for (let i = 0; i < 5; i++) {
+        tableRows += `
+            <tr>
+                <td><div class="skeleton" style="height: 14px; width: 70px;"></div></td>
+                <td><div class="skeleton" style="height: 14px; width: 150px;"></div></td>
+                <td><div class="skeleton" style="height: 14px; width: 120px;"></div></td>
+                <td><div class="skeleton" style="height: 14px; width: 80px;"></div></td>
+                <td><div class="skeleton" style="height: 14px; width: 60px;"></div></td>
+                <td><div class="skeleton" style="height: 25px; width: 80px; border-radius: 20px;"></div></td>
+                <td><div class="skeleton" style="height: 30px; width: 100px; border-radius: 8px;"></div></td>
+            </tr>
+        `;
+    }
+    container.innerHTML = `
+        <table class="table-pro">
+            <tbody>
+                ${tableRows}
+            </tbody>
+        </table>
+    `;
     
     const res = await fetchWithAuth('/nfe');
     if (!res) return;
@@ -856,6 +1383,7 @@ async function loadNFeTable() {
                             <span class="badge ${n.status === 'autorizada' ? 'entrada' : n.status === 'cancelada' ? 'saida' : 'despesa'}">${(n.status || 'pendente').toUpperCase()}</span>
                         </div>
                         <div class="actions" style="display:flex;gap:4px;justify-content:flex-end">
+                            <button class="btn-icon" style="color: #10b981;" title="Enviar por WhatsApp" onclick="shareNFeWhatsApp(${n.id}, \`${n.produto || ''}\`, ${n.valor || 0}, '${n.chave_acesso || ''}', \`${(n.descricao || '').replace(/`/g, '\\`').replace(/'/g, "\\'")}\`)"><i class="fab fa-whatsapp"></i></button>
                             <button class="btn-icon" title="Ver PDF" onclick="previewPDF(${n.id}, event)"><i class="fas fa-eye"></i></button>
                             <button class="btn-icon" title="Baixar PDF" onclick="downloadPDF(${n.id}, event)"><i class="fas fa-file-pdf"></i></button>
                             <button class="btn-icon" title="Baixar XML" onclick="downloadXML(${n.id})"><i class="fas fa-file-code"></i></button>
@@ -880,7 +1408,7 @@ function toggleNFeGroup(id) {
 
 function setNFeGrouping(mode) {
     nfeGroupingMode = mode;
-    document.querySelectorAll('#nfe-section .filter-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.filter-group-pro .filter-btn').forEach(b => b.classList.remove('active'));
     document.getElementById(`btn-group-${mode === 'fornecedor' ? 'forn' : mode}`)?.classList.add('active');
     loadNFeTable();
 }
@@ -958,21 +1486,23 @@ async function previewPDF(id, event) {
             return; 
         }
         const blob = await res.blob();
+        const objectUrl = URL.createObjectURL(blob);
         
-        // Converte blob para Base64 para garantir abertura em todos os browsers/Electron
-        const reader = new FileReader();
-        reader.readAsDataURL(blob);
-        reader.onloadend = () => {
-            const base64data = reader.result;
+        const modal = document.getElementById('danfe-pdf-modal');
+        const iframe = document.getElementById('danfe-pdf-iframe');
+        if (modal && iframe) {
+            iframe.src = objectUrl;
+            modal.classList.add('active');
+        } else {
+            // Fallback se o modal não existir por algum motivo
             const win = window.open();
             if (win) {
-                win.document.write(`<iframe src="${base64data}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+                win.document.write(`<iframe src="${objectUrl}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
                 win.document.title = "Visualização DANFE";
             } else {
-                showError('Bloqueador de popups detectado. Por favor, autorize popups.');
+                showError('Erro ao abrir PDF. Verifique os popups.');
             }
-        };
-        
+        }
     } catch (e) { 
         showError('Erro ao conectar: ' + e.message); 
     } finally {
@@ -993,6 +1523,36 @@ async function deleteNFe(id) {
         const err = res ? await res.json() : {};
         showError(err.error || 'Erro ao excluir');
     }
+}
+
+function shareNFeWhatsApp(id, produto, valor, chave, clientName) {
+    let clientPhone = '';
+    if (clientName) {
+        const client = (appData.clients || []).find(c => c.nome.toLowerCase() === clientName.toLowerCase());
+        if (client) clientPhone = client.telefone || '';
+    }
+
+    clientPhone = clientPhone.replace(/\D/g, '');
+    if (clientPhone.startsWith('0')) clientPhone = clientPhone.substring(1);
+    if (clientPhone.length > 0 && !clientPhone.startsWith('55')) {
+        clientPhone = '55' + clientPhone;
+    }
+
+    const targetPhone = prompt('Digite o número de WhatsApp do cliente (com DDD, somente números):', clientPhone || '55');
+    if (targetPhone === null) return;
+
+    const cleanPhone = targetPhone.replace(/\D/g, '');
+    if (!cleanPhone || cleanPhone.length < 10) {
+        showError('Número inválido');
+        return;
+    }
+
+    const valorFormatado = parseFloat(valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+    const msg = `Olá! Segue a Nota Fiscal emitida pela M&M Cebolas.\n\n*Produto:* ${produto}\n*Valor:* R$ ${valorFormatado}\n*Chave de Acesso:* ${chave}\n\nO PDF da nota pode ser consultado no painel do cliente. Obrigado pela preferência!`;
+    const encodedMsg = encodeURIComponent(msg);
+    
+    const url = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMsg}`;
+    window.open(url, '_blank');
 }
 
 // =============================================
@@ -1080,6 +1640,117 @@ async function loadConfigSection(isAdmin) {
     if (!isAdmin) {
         document.querySelectorAll('.admin-config-section').forEach(el => el.style.display = 'none');
     }
+
+    // Populate certificate info
+    const certCNEl = document.getElementById('cert-cn-val');
+    const certExpEl = document.getElementById('cert-exp-val');
+    const certDaysEl = document.getElementById('cert-days-val');
+    const certNotifyToggle = document.getElementById('cert-notify-toggle');
+
+    if (appData.configs?.cert_loaded === 'true') {
+        const expDate = new Date(appData.configs.cert_valid_to);
+        const now = new Date();
+        const diffTime = expDate - now;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (certCNEl) certCNEl.textContent = appData.configs.cert_cn || 'N/A';
+        if (certExpEl) certExpEl.textContent = expDate.toLocaleString('pt-BR');
+        if (certDaysEl) {
+            if (diffDays <= 0) {
+                certDaysEl.textContent = 'Expirado!';
+                certDaysEl.style.color = '#dc2626';
+            } else {
+                certDaysEl.textContent = `${diffDays} dias restantes`;
+                certDaysEl.style.color = diffDays < 30 ? '#ea580c' : 'var(--primary)';
+            }
+        }
+    } else {
+        if (certCNEl) certCNEl.textContent = 'Não carregado';
+        if (certCNEl) certCNEl.style.color = '#dc2626';
+        if (certExpEl) certExpEl.textContent = 'N/A';
+        if (certDaysEl) certDaysEl.textContent = appData.configs?.cert_error || 'Erro ao carregar';
+        if (certDaysEl) certDaysEl.style.color = '#dc2626';
+    }
+
+    if (certNotifyToggle) {
+        certNotifyToggle.checked = appData.configs?.nfe_cert_notify !== 'false';
+    }
+}
+
+function closeDanfeModal() {
+    const modal = document.getElementById('danfe-pdf-modal');
+    if (modal) {
+        modal.classList.remove('active');
+        const iframe = document.getElementById('danfe-pdf-iframe');
+        if (iframe) {
+            if (iframe.src.startsWith('blob:')) {
+                URL.revokeObjectURL(iframe.src);
+            }
+            iframe.src = '';
+        }
+    }
+}
+
+function closeCertExpirationModal() {
+    const modal = document.getElementById('cert-expiration-modal');
+    if (modal) modal.classList.remove('active');
+}
+
+async function toggleCertNotify(checked) {
+    const val = checked ? 'true' : 'false';
+    const res = await fetchWithAuth('/configs', { method: 'POST', body: JSON.stringify({ chave: 'nfe_cert_notify', valor: val }) });
+    if (res && res.ok) {
+        appData.configs.nfe_cert_notify = val;
+        showSuccess(checked ? 'Notificações ativadas!' : 'Notificações desativadas!');
+    }
+}
+
+function checkCertExpiration() {
+    if (!appData.configs || appData.configs.cert_loaded !== 'true') return;
+    
+    // Check if notify preference is enabled
+    const notifyPref = appData.configs.nfe_cert_notify !== 'false';
+    if (!notifyPref) return;
+
+    // Check if already notified today
+    const today = new Date().toISOString().split('T')[0];
+    const lastNotify = localStorage.getItem('mm_last_cert_notify');
+    if (lastNotify === today) return; // already notified today
+
+    const expDate = new Date(appData.configs.cert_valid_to);
+    const now = new Date();
+    const diffTime = expDate - now;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    // Exibir se estiver expirado ou a menos de 45 dias
+    if (diffDays <= 45) {
+        const modal = document.getElementById('cert-expiration-modal');
+        const iconEl = document.getElementById('cert-modal-icon');
+        const titleEl = document.getElementById('cert-modal-title');
+        const textEl = document.getElementById('cert-modal-text');
+        
+        if (modal && titleEl && textEl) {
+            if (diffDays <= 0) {
+                if (iconEl) {
+                    iconEl.className = 'fas fa-times-circle';
+                    iconEl.parentElement.style.background = '#fee2e2';
+                    iconEl.parentElement.style.color = '#dc2626';
+                }
+                titleEl.textContent = 'Certificado Digital Expirado!';
+                textEl.innerHTML = 'Atenção: Seu certificado digital expirou e você <strong>não conseguirá emitir novas Notas Fiscais</strong> até realizar a renovação!';
+            } else {
+                if (iconEl) {
+                    iconEl.className = 'fas fa-exclamation-triangle';
+                    iconEl.parentElement.style.background = '#fef3c7';
+                    iconEl.parentElement.style.color = '#d97706';
+                }
+                titleEl.textContent = 'Certificado Digital Expirando!';
+                textEl.innerHTML = `O certificado digital vence em <strong>${diffDays} dias</strong> (no dia ${expDate.toLocaleDateString('pt-BR')}).<br><br>Por favor, providencie a renovação do seu certificado A1 para evitar interrupções nas emissões.`;
+            }
+            modal.classList.add('active');
+            localStorage.setItem('mm_last_cert_notify', today);
+        }
+    }
 }
 
 async function savePesoPorCaixa() {
@@ -1113,6 +1784,74 @@ async function saveCertPassword() {
     if (res && res.ok) {
         showSuccess('Senha do certificado salva!');
         document.getElementById('cert-password').value = '';
+    }
+}
+
+// --- SISTEMA DE BACKUPS ---
+async function loadBackupsList() {
+    const container = document.getElementById('backup-list-container');
+    if (!container) return;
+
+    try {
+        const res = await fetchWithAuth('/backups');
+        if (!res || !res.ok) {
+            container.innerHTML = '<div style="color:var(--text-muted); text-align:center; padding:10px;">Erro ao carregar backups</div>';
+            return;
+        }
+
+        const backups = await res.json();
+        if (backups.length === 0) {
+            container.innerHTML = '<div style="color:var(--text-muted); text-align:center; padding:10px;">Nenhum backup encontrado</div>';
+            return;
+        }
+
+        container.innerHTML = backups.map(b => {
+            const dateStr = new Date(b.created_at).toLocaleString('pt-BR');
+            const sizeMB = (b.size / (1024 * 1024)).toFixed(2);
+            return `
+                <div style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);">
+                    <div style="display: flex; flex-direction: column; gap: 2px; text-align: left;">
+                        <span style="font-weight: 700; color: var(--text-main); word-break: break-all;">${b.name}</span>
+                        <span style="font-size: 0.7rem; color: var(--text-muted);">${dateStr} • ${sizeMB} MB</span>
+                    </div>
+                    <button class="btn-icon text-danger" title="Excluir Backup" onclick="deletarBackup('${b.name}')" style="margin-left: 8px;">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `;
+        }).join('');
+    } catch (e) {
+        container.innerHTML = '<div style="color:var(--text-muted); text-align:center; padding:10px;">Falha de rede</div>';
+    }
+}
+
+async function criarBackupAgora() {
+    showSuccess('Gerando cópia de segurança do banco...');
+    try {
+        const res = await fetchWithAuth('/backups/criar', { method: 'POST' });
+        if (res && res.ok) {
+            showSuccess('Backup gerado com sucesso!');
+            loadBackupsList();
+        } else {
+            showError('Erro ao criar backup');
+        }
+    } catch (e) {
+        showError('Erro: ' + e.message);
+    }
+}
+
+async function deletarBackup(name) {
+    if (!confirm(`Deseja realmente excluir permanentemente o backup "${name}"?`)) return;
+    try {
+        const res = await fetchWithAuth(`/backups/${name}`, { method: 'DELETE' });
+        if (res && res.ok) {
+            showSuccess('Backup excluído com sucesso!');
+            loadBackupsList();
+        } else {
+            showError('Erro ao excluir backup');
+        }
+    } catch (e) {
+        showError('Erro: ' + e.message);
     }
 }
 
@@ -1254,13 +1993,48 @@ async function loadLogs() {
     if (!res || !res.ok) return;
     const logs = await res.json();
     
-    tbody.innerHTML = logs.slice(0, 100).map(l => `
+    tbody.innerHTML = logs.slice(0, 150).map(l => `
         <tr>
             <td style="font-size:0.75rem;">${new Date(l.data).toLocaleString('pt-BR')}</td>
             <td><strong>${l.username}</strong></td>
             <td><span style="background:#f1f5f9;padding:2px 8px;border-radius:4px;font-size:0.75rem;">${l.acao}</span></td>
             <td style="font-size:0.8rem;">${l.detalhes || '-'}</td>
         </tr>`).join('') || '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted)">Nenhum log</td></tr>';
+
+    const filterSelect = document.getElementById('log-user-filter');
+    if (filterSelect) {
+        const currentVal = filterSelect.value;
+        const users = Array.from(new Set(logs.map(l => l.username))).filter(Boolean).sort();
+        filterSelect.innerHTML = '<option value="">Todos os Usuários</option>' + 
+            users.map(u => `<option value="${u}" ${u === currentVal ? 'selected' : ''}>${u}</option>`).join('');
+    }
+}
+
+function filterLogsTable() {
+    const searchVal = document.getElementById('log-search')?.value?.toUpperCase() || '';
+    const userVal = document.getElementById('log-user-filter')?.value?.toUpperCase() || '';
+    const tbody = document.getElementById('list-logs');
+    if (!tbody) return;
+    const rows = tbody.getElementsByTagName('tr');
+
+    for (let i = 0; i < rows.length; i++) {
+        const tds = rows[i].getElementsByTagName('td');
+        if (tds.length < 4) continue;
+        
+        const dateText = tds[0].textContent.toUpperCase();
+        const userText = tds[1].textContent.toUpperCase();
+        const actionText = tds[2].textContent.toUpperCase();
+        const detailsText = tds[3].textContent.toUpperCase();
+        
+        const searchMatch = !searchVal || 
+            actionText.includes(searchVal) || 
+            detailsText.includes(searchVal) || 
+            dateText.includes(searchVal);
+            
+        const userMatch = !userVal || userText.includes(userVal);
+        
+        rows[i].style.display = (searchMatch && userMatch) ? '' : 'none';
+    }
 }
 
 async function resetSystem() {
@@ -1324,6 +2098,166 @@ function calcPesoFromCaixas(prefix) {
     const caixas = parseFloat(caixasInput.value || 0);
     const pesoPorCaixa = getPesoPorCaixa(prefix);
     if (caixas > 0) pesoInput.value = (caixas * pesoPorCaixa).toFixed(1);
+}
+
+async function handleXMLImport(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        const xmlText = e.target.result;
+        showSuccess('Processando XML...');
+        
+        try {
+            const res = await fetchWithAuth('/movimentacoes/importar-xml', {
+                method: 'POST',
+                body: JSON.stringify({ xml: xmlText })
+            });
+
+            if (!res || !res.ok) {
+                const err = res ? await res.json() : { error: 'Erro de conexão' };
+                showError(err.error || 'Erro ao processar arquivo XML');
+                return;
+            }
+
+            const data = await res.json();
+            tempParsedXML = data;
+
+            // Preenche modal de confirmação
+            document.getElementById('xml-forn-nome').textContent = data.fornecedor.nome;
+            document.getElementById('xml-forn-doc').textContent = data.fornecedor.documento;
+            document.getElementById('xml-forn-end').textContent = data.fornecedor.endereco;
+            document.getElementById('xml-nota-chave').textContent = data.chave || 'N/A';
+            document.getElementById('xml-nota-data').textContent = new Date(data.data_emissao).toLocaleDateString('pt-BR');
+            document.getElementById('xml-nota-total').textContent = `R$ ${data.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+
+            // Preenche tabela de itens
+            const tbody = document.getElementById('xml-itens-tbody');
+            if (tbody) {
+                tbody.innerHTML = data.itens.map((item, idx) => {
+                    let bestMatch = '';
+                    const match = (appData.products || []).find(p => 
+                        item.produto.toLowerCase().includes(p.nome.toLowerCase()) || 
+                        p.nome.toLowerCase().includes(item.produto.toLowerCase())
+                    );
+                    if (match) bestMatch = match.nome;
+
+                    return `
+                        <tr>
+                            <td>
+                                <strong>${item.produto}</strong>
+                                <br><small style="color:var(--text-muted);font-size:0.7rem;">NCM: ${item.ncm || 'N/A'}</small>
+                            </td>
+                            <td>
+                                <select class="xml-item-product-map select-compact" data-index="${idx}" style="width: 100%; padding: 4px; border-radius: 6px; border: 1px solid var(--border);">
+                                    <option value="">-- Não Lançar Item --</option>
+                                    ${(appData.products || []).map(p => `
+                                        <option value="${p.nome}" ${p.nome === bestMatch ? 'selected' : ''}>${p.nome}</option>
+                                    `).join('')}
+                                </select>
+                            </td>
+                            <td style="text-align: right; font-weight:700;">${item.quantidade} ${item.unidade}</td>
+                            <td style="text-align: right;">R$ ${item.valor_unitario.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                            <td style="text-align: right; font-weight:700;">R$ ${item.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            document.getElementById('modal-confirmacao-xml')?.classList.add('active');
+        } catch (err) {
+            showError('Erro de processamento: ' + err.message);
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+}
+
+function closeConfirmacaoXMLModal() {
+    document.getElementById('modal-confirmacao-xml')?.classList.remove('active');
+    tempParsedXML = null;
+}
+
+async function confirmarImportacaoXML() {
+    if (!tempParsedXML) return;
+
+    const selects = document.querySelectorAll('.xml-item-product-map');
+    const mappedItens = [];
+
+    selects.forEach(sel => {
+        const idx = parseInt(sel.getAttribute('data-index'));
+        const mappedProduct = sel.value;
+        if (mappedProduct) {
+            mappedItens.push({
+                item: tempParsedXML.itens[idx],
+                localProduct: mappedProduct
+            });
+        }
+    });
+
+    if (mappedItens.length === 0) {
+        showError('Selecione pelo menos um produto para associar e lançar no estoque.');
+        return;
+    }
+
+    showSuccess('Salvando compra e atualizando estoque...');
+
+    // 1. Cadastra/Atualiza Fornecedor
+    let fornId = null;
+    const existingForn = (appData.suppliers || []).find(s => s.documento === tempParsedXML.fornecedor.documento);
+    
+    if (existingForn) {
+        fornId = existingForn.id;
+    } else {
+        const resF = await fetchWithAuth('/fornecedores', {
+            method: 'POST',
+            body: JSON.stringify(tempParsedXML.fornecedor)
+        });
+        if (resF && resF.ok) {
+            const dataF = await resF.json();
+            fornId = dataF.id;
+        }
+    }
+
+    // 2. Lança Movimentações de Compra (Entrada)
+    let hasError = false;
+    for (const mapping of mappedItens) {
+        const { item, localProduct } = mapping;
+        const isKg = item.unidade.toUpperCase() === 'KG';
+        const prod = (appData.products || []).find(p => p.nome === localProduct);
+        const pesoCx = prod ? (prod.peso_por_caixa_padrao || 20) : 20;
+
+        const body = {
+            tipo: 'entrada',
+            produto: localProduct,
+            quantidade: isKg ? item.quantidade : item.quantidade,
+            valor: item.valor_total,
+            descricao: tempParsedXML.fornecedor.nome,
+            data: tempParsedXML.data_emissao ? tempParsedXML.data_emissao.split('T')[0] : new Date().toISOString().split('T')[0],
+            unidade: isKg ? 'KG' : 'CX',
+            qtd_caixas: isKg ? Math.round(item.quantidade / pesoCx) : Math.round(item.quantidade),
+            peso_kg: isKg ? item.quantidade : (item.quantidade * pesoCx)
+        };
+
+        const resM = await fetchWithAuth('/movimentacoes', {
+            method: 'POST',
+            body: JSON.stringify(body)
+        });
+
+        if (!resM || !resM.ok) {
+            hasError = true;
+        }
+    }
+
+    if (hasError) {
+        showError('Erro ao lançar alguns itens no estoque');
+    } else {
+        showSuccess('Compra importada com sucesso!');
+        closeConfirmacaoXMLModal();
+        await loadDataFromAPI();
+        showSection('estoque');
+    }
 }
 
 async function saveEntrada(event) { await saveMovimentacao('entrada', event); }
@@ -1411,6 +2345,21 @@ function getPesoPorCaixa(prefix) {
 function renderStockTable() {
     const tbody = document.getElementById('full-table-body');
     if (!tbody) return;
+    if (!isGlobalDataLoaded) {
+        tbody.innerHTML = Array(5).fill(0).map(() => `
+            <tr>
+                <td><div class="skeleton" style="height: 12px; width: 80px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 60px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 100px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 120px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 50px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 50px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 70px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 30px;"></div></td>
+            </tr>
+        `).join('');
+        return;
+    }
     tbody.innerHTML = appData.transactions.map(t => `
         <tr>
             <td>${new Date(t.data).toLocaleDateString('pt-BR')}</td>
@@ -1429,14 +2378,27 @@ function renderStockTable() {
 function renderEstoqueResumo() {
     const container = document.getElementById('estoque-resumo');
     if (!container) return;
+    if (!isGlobalDataLoaded) {
+        container.innerHTML = Array(3).fill(0).map(() => `
+            <div class="panel" style="padding: 20px; border-radius: var(--radius); background: var(--bg-panel); border: 1px solid var(--border);">
+                <div class="skeleton skeleton-text title" style="height: 16px; width: 140px; margin-bottom:12px;"></div>
+                <div class="skeleton skeleton-text" style="height: 12px; width: 80%; margin-bottom:8px;"></div>
+                <div class="skeleton skeleton-text" style="height: 12px; width: 60%; margin-bottom:8px;"></div>
+            </div>
+        `).join('');
+        return;
+    }
 
     if (appData.products.length === 0) {
         container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-muted)">Nenhum produto para exibir o estoque.</div>';
         return;
     }
 
-    const totalCxAll = appData.transactions.reduce((acc, t) => acc + (t.tipo === 'entrada' ? (t.qtd_caixas || 0) : -(t.qtd_caixas || 0)), 0);
-    const totalKgAll = appData.transactions.reduce((acc, t) => acc + (t.tipo === 'entrada' ? (t.peso_kg || 0) : -(t.peso_kg || 0)), 0);
+    const totalDescarteCx = (appData.descartes || []).reduce((acc, d) => acc + (d.quantidade_caixas || 0), 0);
+    const totalDescarteKg = (appData.descartes || []).reduce((acc, d) => acc + (d.peso_kg || 0), 0);
+
+    const totalCxAll = appData.transactions.reduce((acc, t) => acc + (t.tipo === 'entrada' ? (t.qtd_caixas || 0) : -(t.qtd_caixas || 0)), 0) - totalDescarteCx;
+    const totalKgAll = appData.transactions.reduce((acc, t) => acc + (t.tipo === 'entrada' ? (t.peso_kg || 0) : -(t.peso_kg || 0)), 0) - totalDescarteKg;
     
     const cxEl = document.getElementById('total-global-cx');
     const kgEl = document.getElementById('total-global-kg');
@@ -1449,8 +2411,13 @@ function renderEstoqueResumo() {
 
     container.innerHTML = appData.products.map(p => {
         const trans = appData.transactions.filter(t => t.produto === p.nome);
-        const stockCx = trans.reduce((acc, t) => acc + (t.tipo === 'entrada' ? (t.qtd_caixas || 0) : -(t.qtd_caixas || 0)), 0);
-        const stockKg = trans.reduce((acc, t) => acc + (t.tipo === 'entrada' ? (t.peso_kg || 0) : -(t.peso_kg || 0)), 0);
+        const productDescartes = (appData.descartes || []).filter(d => d.produto === p.nome);
+        
+        const descarteCx = productDescartes.reduce((acc, d) => acc + (d.quantidade_caixas || 0), 0);
+        const descarteKg = productDescartes.reduce((acc, d) => acc + (d.peso_kg || 0), 0);
+
+        const stockCx = trans.reduce((acc, t) => acc + (t.tipo === 'entrada' ? (t.qtd_caixas || 0) : -(t.qtd_caixas || 0)), 0) - descarteCx;
+        const stockKg = trans.reduce((acc, t) => acc + (t.tipo === 'entrada' ? (t.peso_kg || 0) : -(t.peso_kg || 0)), 0) - descarteKg;
         
         const totalIn = trans.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + (t.qtd_caixas || 0), 0);
         const totalOut = trans.filter(t => t.tipo === 'saida').reduce((acc, t) => acc + (t.qtd_caixas || 0), 0);
@@ -1523,6 +2490,123 @@ async function deleteMovimentacao(id) {
     }
 }
 
+// --- DESCARTES / PERDAS ---
+function switchEstoqueTab(tabId, el) {
+    document.querySelectorAll('.tab-btn-estoque').forEach(btn => btn.classList.remove('active'));
+    el.classList.add('active');
+    
+    document.querySelectorAll('.estoque-tab-content').forEach(content => content.style.display = 'none');
+    const activeTab = document.getElementById(`tab-${tabId}`);
+    if (activeTab) activeTab.style.display = 'block';
+    
+    if (tabId === 'descartes') {
+        renderDescartesTable();
+    } else {
+        renderStockTable();
+    }
+}
+
+function renderDescartesTable() {
+    const tbody = document.getElementById('descartes-table-body');
+    if (!tbody) return;
+    if (!isGlobalDataLoaded) {
+        tbody.innerHTML = Array(3).fill(0).map(() => `
+            <tr>
+                <td><div class="skeleton" style="height: 12px; width: 80px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 100px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 120px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 60px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 60px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 30px;"></div></td>
+            </tr>
+        `).join('');
+        return;
+    }
+    tbody.innerHTML = (appData.descartes || []).map(d => `
+        <tr>
+            <td>${new Date(d.data).toLocaleDateString('pt-BR')}</td>
+            <td><strong style="color:var(--primary-dark)">${d.produto}</strong></td>
+            <td><span style="font-size:0.85rem;color:var(--text-muted);">${d.motivo}</span></td>
+            <td style="font-weight:700;color:#ea580c;">${d.quantidade_caixas || 0} Cx</td>
+            <td style="font-weight:700;color:#ea580c;">${d.peso_kg || 0} Kg</td>
+            <td style="text-align: right;">
+                <button class="btn-icon text-danger" onclick="deleteDescarte(${d.id})"><i class="fas fa-trash"></i></button>
+            </td>
+        </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted)">Nenhuma perda registrada</td></tr>';
+}
+
+function openDescarteModal() {
+    const select = document.getElementById('descarte-produto');
+    if (select) {
+        select.innerHTML = (appData.products || []).map(p => `<option value="${p.nome}">${p.nome}</option>`).join('');
+    }
+    const dateInput = document.getElementById('descarte-data');
+    if (dateInput) {
+        dateInput.value = new Date().toISOString().split('T')[0];
+    }
+    document.getElementById('descarte-caixas').value = '';
+    document.getElementById('descarte-peso').value = '';
+    document.getElementById('modal-descarte')?.classList.add('active');
+}
+
+function closeDescarteModal() {
+    document.getElementById('modal-descarte')?.classList.remove('active');
+}
+
+function calculateDescarteKg() {
+    const prodName = document.getElementById('descarte-produto')?.value;
+    const caixas = parseFloat(document.getElementById('descarte-caixas')?.value || 0);
+    const prod = (appData.products || []).find(p => p.nome === prodName);
+    const pesoCx = prod ? (prod.peso_por_caixa_padrao || 20) : 20;
+    
+    const pesoInput = document.getElementById('descarte-peso');
+    if (pesoInput) {
+        pesoInput.value = (caixas * pesoCx).toFixed(1);
+    }
+}
+
+async function saveDescarte(event) {
+    event.preventDefault();
+    const produto = document.getElementById('descarte-produto')?.value;
+    const caixas = parseInt(document.getElementById('descarte-caixas')?.value || 0);
+    const peso = parseFloat(document.getElementById('descarte-peso')?.value || 0);
+    const motivo = document.getElementById('descarte-motivo')?.value;
+    const data = document.getElementById('descarte-data')?.value;
+    
+    if (!produto || !caixas) {
+        showError('Preencha os campos obrigatórios');
+        return;
+    }
+    
+    const res = await fetchWithAuth('/descartes', {
+        method: 'POST',
+        body: JSON.stringify({ produto, quantidade_caixas: caixas, peso_kg: peso, motivo, data })
+    });
+    
+    if (res && res.ok) {
+        showSuccess('Perda registrada com sucesso!');
+        closeDescarteModal();
+        await loadDataFromAPI();
+        renderEstoqueResumo();
+        renderDescartesTable();
+    } else {
+        showError('Erro ao registrar perda');
+    }
+}
+
+async function deleteDescarte(id) {
+    if (!confirm('Deseja realmente excluir este registro de perda?')) return;
+    const res = await fetchWithAuth(`/descartes/${id}`, { method: 'DELETE' });
+    if (res && res.ok) {
+        showSuccess('Registro de perda excluído!');
+        await loadDataFromAPI();
+        renderEstoqueResumo();
+        renderDescartesTable();
+    } else {
+        showError('Erro ao excluir registro');
+    }
+}
+
 // =============================================
 // FINANCEIRO
 // =============================================
@@ -1546,6 +2630,17 @@ function updateFinanceKPIs() {
 function renderFinanceTable() {
     const tbody = document.getElementById('finance-table-body');
     if (!tbody) return;
+    if (!isGlobalDataLoaded) {
+        tbody.innerHTML = Array(5).fill(0).map(() => `
+            <tr>
+                <td><div class="skeleton" style="height: 12px; width: 80px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 60px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 180px;"></div></td>
+                <td><div class="skeleton" style="height: 12px; width: 100px; margin-left: auto;"></div></td>
+            </tr>
+        `).join('');
+        return;
+    }
     tbody.innerHTML = appData.transactions.map(t => `
         <tr>
             <td>${new Date(t.data).toLocaleDateString('pt-BR')}</td>
@@ -1586,29 +2681,64 @@ async function saveDespesa(event) {
 function renderProductShowcase(section) {
     const container = document.getElementById('product-showcase');
     if (!container) return;
+    if (!isGlobalDataLoaded) {
+        container.innerHTML = Array(4).fill(0).map(() => `
+            <div class="product-card" style="cursor: not-allowed; opacity: 0.7;">
+                <div class="skeleton skeleton-circle" style="width: 42px; height: 42px; margin: 0 auto 12px auto;"></div>
+                <div class="skeleton skeleton-text" style="height: 14px; width: 80%; margin: 0 auto;"></div>
+                <div style="display:flex; justify-content:space-between; width:100%; margin-top:12px;">
+                    <div class="skeleton skeleton-text short" style="height: 10px; width: 40px; margin-bottom:0;"></div>
+                    <div class="skeleton skeleton-text short" style="height: 10px; width: 40px; margin-bottom:0;"></div>
+                </div>
+            </div>
+        `).join('');
+        return;
+    }
     if (appData.products.length === 0) {
         container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);grid-column:1/-1"><i class="fas fa-box-open fa-2x" style="margin-bottom:10px;opacity:0.3;"></i><p>Nenhum produto cadastrado.<br><a href="#" onclick="showSection(\'cadastro\')" style="color:var(--primary)">Cadastrar produtos</a></p></div>';
         return;
     }
 
     container.innerHTML = appData.products.map(p => {
-        const stock = appData.transactions
-            .filter(t => t.produto === p.nome)
-            .reduce((acc, t) => acc + (t.tipo === 'entrada' ? (t.qtd_caixas || 0) : t.tipo === 'saida' ? -(t.qtd_caixas || 0) : 0), 0);
+        const transactions = appData.transactions.filter(t => t.produto === p.nome);
+        const entries = transactions.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + (t.qtd_caixas || 0), 0);
+        const exits = transactions.filter(t => t.tipo === 'saida').reduce((acc, t) => acc + (t.qtd_caixas || 0), 0);
+        const losses = (appData.descartes || []).filter(d => d.produto === p.nome).reduce((acc, d) => acc + (d.quantidade_caixas || 0), 0);
+        const stock = Math.round((entries - exits - losses) * 10) / 10;
         
         const isOutOfStock = section === 'saida' && stock <= 0;
         
         return `
         <div class="product-card ${isOutOfStock ? 'out-of-stock' : ''}" 
              onclick="${isOutOfStock ? '' : `selectProductPro('${p.nome}', '${section}', event)`}"
-             style="${isOutOfStock ? 'opacity:0.5; cursor:not-allowed; filter:grayscale(1);' : 'cursor:pointer;'}">
-            <div class="product-icon-circle" style="background:${p.cor || '#1A5632'}20; color:${p.cor || '#1A5632'}">
-                ${p.icone === 'icon-cebola' ? `<div class="custom-icon icon-cebola"></div>` : `<i class="fas ${p.icone || 'fa-box'}"></i>`}
+             oncontextmenu="showProductContextMenu(event, '${p.nome}')"
+             style="${isOutOfStock ? 'opacity:0.55; cursor:not-allowed; filter:grayscale(1);' : 'cursor:pointer;'}">
+            
+            <div class="product-icon-circle" style="background:${p.cor || '#1A5632'}15; color:${p.cor || '#1A5632'}; box-shadow: 0 8px 16px ${p.cor || '#1A5632'}15;">
+                ${p.icone === 'icon-cebola' ? `<div class="custom-icon icon-cebola" style="background-color: ${p.cor || '#1A5632'};"></div>` : `<i class="fas ${p.icone || 'fa-box'}"></i>`}
             </div>
-            <div class="product-name" style="font-weight:700;">${p.nome}</div>
-            <div style="display:flex; justify-content:space-between; width:100%; font-size:0.7rem; margin-top:4px;">
-                <span style="color:var(--text-muted)">${p.peso_por_caixa || 20} Kg/Cx</span>
-                <span style="font-weight:800; color:${stock > 5 ? 'var(--primary)' : '#dc2626'}">${stock} Cx</span>
+            
+            <div class="product-name">${p.nome}</div>
+            <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 12px; font-weight: 500;">
+                ${p.peso_por_caixa || 20} Kg/Cx
+            </div>
+            
+            <div style="margin-top: auto; width: 100%; display: flex; justify-content: center;">
+                <span class="product-stock-pill" style="
+                    background: ${stock > 5 ? '#ecfdf5' : '#fef2f2'};
+                    color: ${stock > 5 ? '#047857' : '#b91c1c'};
+                    padding: 4px 12px;
+                    border-radius: 100px;
+                    font-size: 0.72rem;
+                    font-weight: 800;
+                    border: 1px solid ${stock > 5 ? '#a7f3d0' : '#fecaca'};
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 4px;
+                ">
+                    <i class="fas ${stock > 5 ? 'fa-check' : 'fa-exclamation-triangle'}" style="font-size: 0.65rem;"></i>
+                    ${stock} Cx
+                </span>
             </div>
         </div>`;
     }).join('');
@@ -1836,4 +2966,266 @@ function copyToClipboard(text) {
         console.error('Erro ao copiar:', err);
         showError('Erro ao copiar chave.');
     });
+}
+
+// =============================================
+// VITRINE CONTEXT MENU & PROFILE SECTION HELPERS
+// =============================================
+function showProductContextMenu(event, productName) {
+    event.preventDefault();
+    
+    let menu = document.getElementById('product-context-menu');
+    if (menu) menu.remove();
+    
+    menu = document.createElement('div');
+    menu.id = 'product-context-menu';
+    menu.className = 'product-context-menu';
+    menu.style.left = `${event.clientX}px`;
+    menu.style.top = `${event.clientY}px`;
+    
+    menu.innerHTML = `
+        <button onclick="triggerProductShowcaseAction('${productName}', 'visualizar')" style="display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 16px; border: none; background: transparent; text-align: left; cursor: pointer; font-size: 0.85rem; font-weight: 600; color: var(--text-main); transition: background 0.2s;">
+            <i class="fas fa-eye" style="color: var(--primary); width: 16px;"></i> Visualizar Produto
+        </button>
+        <button onclick="triggerProductShowcaseAction('${productName}', 'editar')" style="display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 16px; border: none; background: transparent; text-align: left; cursor: pointer; font-size: 0.85rem; font-weight: 600; color: var(--text-main); transition: background 0.2s;">
+            <i class="fas fa-edit" style="color: #2563eb; width: 16px;"></i> Editar Produto
+        </button>
+    `;
+    
+    document.body.appendChild(menu);
+    
+    const btns = menu.querySelectorAll('button');
+    btns.forEach(btn => {
+        btn.addEventListener('mouseenter', () => btn.style.background = '#f1f5f9');
+        btn.addEventListener('mouseleave', () => btn.style.background = 'transparent');
+    });
+
+    const closeMenu = () => {
+        menu.remove();
+        document.removeEventListener('click', closeMenu);
+        document.removeEventListener('contextmenu', closeMenu);
+    };
+    
+    setTimeout(() => {
+        document.addEventListener('click', closeMenu);
+        document.addEventListener('contextmenu', closeMenu);
+    }, 10);
+}
+
+function triggerProductShowcaseAction(productName, action) {
+    showSection('cadastro');
+    
+    setTimeout(() => {
+        const prodTabBtn = document.querySelector(".tab-btn[onclick*=\"'produtos'\"]");
+        if (prodTabBtn) {
+            prodTabBtn.click();
+        }
+        
+        const prod = (appData.products || []).find(p => p.nome === productName);
+        if (prod) {
+            openProdutoModal(prod, action === 'visualizar');
+        }
+    }, 450);
+}
+
+let tempProfilePhotoBase64 = '';
+let profilePollInterval = null;
+
+async function loadProfilePage() {
+    if (profilePollInterval) clearInterval(profilePollInterval);
+
+    let userData = JSON.parse(localStorage.getItem('mm_user') || '{}');
+    let user = userData.user || userData;
+    let label = user.label || 'Usuário';
+    let username = user.username || 'usuario';
+    let role = user.role || userData.role || 'funcionario';
+    let nascimento = user.data_nascimento || '';
+    let apelido = user.apelido || '';
+    let foto = user.foto || '';
+
+    const renderFields = () => {
+        const inputName = document.getElementById('profile-input-name');
+        const inputApelido = document.getElementById('profile-input-apelido');
+        const inputNascimento = document.getElementById('profile-input-nascimento');
+        const infoUsername = document.getElementById('profile-info-username');
+        const infoRole = document.getElementById('profile-info-role');
+
+        if (inputName) inputName.value = label;
+        if (inputApelido) inputApelido.value = apelido;
+        if (inputNascimento) inputNascimento.value = nascimento;
+        if (infoUsername) infoUsername.textContent = `@${username}`;
+        if (infoRole) {
+            infoRole.textContent = role.toUpperCase();
+            infoRole.className = `badge ${role === 'admin' ? 'admin' : role === 'chefe' ? 'entrada' : 'operador'}`;
+        }
+
+        const imgPreview = document.getElementById('profile-avatar-img');
+        const placeholder = document.getElementById('profile-avatar-placeholder');
+        if (foto) {
+            tempProfilePhotoBase64 = foto;
+            if (imgPreview) {
+                imgPreview.src = foto;
+                imgPreview.style.display = 'block';
+            }
+            if (placeholder) placeholder.style.display = 'none';
+        } else {
+            tempProfilePhotoBase64 = '';
+            if (imgPreview) imgPreview.style.display = 'none';
+            if (placeholder) placeholder.style.display = 'block';
+        }
+    };
+
+    renderFields();
+
+    try {
+        const resMe = await fetchWithAuth('/usuarios/me');
+        if (resMe && resMe.ok) {
+            const freshUser = await resMe.json();
+            localStorage.setItem('mm_user', JSON.stringify({ user: freshUser, role: freshUser.role }));
+            
+            label = freshUser.label || label;
+            username = freshUser.username || username;
+            role = freshUser.role || role;
+            nascimento = freshUser.data_nascimento || '';
+            apelido = freshUser.apelido || '';
+            foto = freshUser.foto || '';
+            
+            renderFields();
+        }
+    } catch(err) {
+        console.error("Error fetching latest profile details:", err);
+    }
+
+    const otherProfilesPanel = document.getElementById('panel-other-profiles');
+    const layoutGrid = document.getElementById('profile-layout-grid');
+    
+    if (role === 'chefe' || role === 'admin') {
+        if (otherProfilesPanel) otherProfilesPanel.style.display = 'block';
+        if (layoutGrid) layoutGrid.style.gridTemplateColumns = '1.2fr 2fr';
+        
+        await loadOtherProfilesRealTime();
+        
+        profilePollInterval = setInterval(async () => {
+            if (currentSectionId === 'perfil') {
+                await loadOtherProfilesRealTime();
+            } else {
+                clearInterval(profilePollInterval);
+            }
+        }, 6000);
+    } else {
+        if (otherProfilesPanel) otherProfilesPanel.style.display = 'none';
+        if (layoutGrid) layoutGrid.style.gridTemplateColumns = '1fr';
+    }
+}
+
+async function loadOtherProfilesRealTime() {
+    const tbody = document.getElementById('profile-list-users');
+    if (!tbody) return;
+
+    try {
+        const res = await fetchWithAuth('/usuarios');
+        if (res && res.ok) {
+            const users = await res.json();
+            tbody.innerHTML = users.map(u => {
+                const birthDate = u.data_nascimento ? new Date(u.data_nascimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-';
+                const avatarHTML = u.foto 
+                    ? `<img src="${u.foto}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border);">`
+                    : `<div style="width: 32px; height: 32px; border-radius: 50%; background: #e2e8f0; display:flex; align-items:center; justify-content:center; color: var(--text-muted);"><i class="fas fa-user" style="font-size:0.8rem;"></i></div>`;
+
+                return `
+                    <tr>
+                        <td style="padding: 8px 12px; vertical-align: middle;">${avatarHTML}</td>
+                        <td style="vertical-align: middle;"><strong>${u.label}</strong></td>
+                        <td style="vertical-align: middle;"><code>${u.apelido || '-'}</code></td>
+                        <td style="vertical-align: middle;">${birthDate}</td>
+                        <td style="text-align: right; vertical-align: middle;">
+                            <span class="badge ${u.role === 'admin' ? 'admin' : u.role === 'chefe' ? 'entrada' : 'operador'}">
+                                ${u.role.toUpperCase()}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+    } catch (e) {
+        console.error('Erro polling users:', e);
+    }
+}
+
+function handleProfilePhotoChange(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const base64 = e.target.result;
+        tempProfilePhotoBase64 = base64;
+        
+        const imgPreview = document.getElementById('profile-avatar-img');
+        const placeholder = document.getElementById('profile-avatar-placeholder');
+        
+        if (imgPreview) {
+            imgPreview.src = base64;
+            imgPreview.style.display = 'block';
+        }
+        if (placeholder) placeholder.style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+}
+
+async function saveProfileDetails(event) {
+    event.preventDefault();
+    
+    const label = document.getElementById('profile-input-name').value;
+    const apelido = document.getElementById('profile-input-apelido').value;
+    const data_nascimento = document.getElementById('profile-input-nascimento').value;
+    
+    showSuccess('Salvando alterações...');
+
+    try {
+        const res = await fetchWithAuth('/usuarios/me', {
+            method: 'PUT',
+            body: JSON.stringify({
+                label,
+                apelido,
+                data_nascimento,
+                foto: tempProfilePhotoBase64
+            })
+        });
+
+        if (res && res.ok) {
+            const data = await res.json();
+            if (data.success && data.user) {
+                localStorage.setItem('mm_user', JSON.stringify({ user: data.user, role: data.user.role }));
+                
+                const userNameEl = document.getElementById('user-name');
+                if (userNameEl) userNameEl.textContent = data.user.label || label;
+                
+                const sidebarAvatar = document.querySelector('.sidebar-user-card .user-avatar-modern');
+                if (sidebarAvatar) {
+                    if (tempProfilePhotoBase64) {
+                        sidebarAvatar.innerHTML = `<img src="${tempProfilePhotoBase64}" style="width: 100%; height: 100%; border-radius: 12px; object-fit: cover;">`;
+                        sidebarAvatar.style.background = 'none';
+                        sidebarAvatar.style.boxShadow = 'none';
+                    } else {
+                        sidebarAvatar.innerHTML = `<i class="fas fa-user-tie"></i>`;
+                        sidebarAvatar.style.background = 'linear-gradient(135deg, var(--accent) 0%, #fcd34d 100%)';
+                        sidebarAvatar.style.boxShadow = '0 4px 10px rgba(232, 156, 49, 0.4)';
+                    }
+                }
+                
+                showSuccess('Perfil atualizado com sucesso!');
+                
+                if (data.user.role === 'chefe' || data.user.role === 'admin') {
+                    await loadOtherProfilesRealTime();
+                }
+            } else {
+                showError('Erro ao atualizar perfil.');
+            }
+        } else {
+            showError('Erro de permissão ou conexão.');
+        }
+    } catch (e) {
+        showError('Erro de rede: ' + e.message);
+    }
 }

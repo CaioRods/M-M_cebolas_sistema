@@ -16,39 +16,6 @@
         .nav-item.show { opacity: 1; transform: translateY(0); }
         .main-content { filter: blur(10px); transition: filter 1.2s ease; }
         body.loaded .main-content { filter: blur(0); }
-        
-        /* User info in sidebar */
-        .sidebar-user-card {
-            margin: 0 16px 20px 16px;
-            padding: 16px;
-            border-radius: 16px;
-            background: rgba(255,255,255,0.06);
-            border: 1px solid rgba(255,255,255,0.1);
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            transition: all 0.3s ease;
-        }
-        .sidebar-user-card:hover {
-            background: rgba(255,255,255,0.1);
-            transform: translateY(-2px);
-        }
-        .user-avatar-modern {
-            width: 42px;
-            height: 42px;
-            border-radius: 12px;
-            background: linear-gradient(135deg, var(--accent) 0%, #fcd34d 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-            color: var(--primary-dark);
-            flex-shrink: 0;
-            box-shadow: 0 4px 10px rgba(232, 156, 49, 0.4);
-        }
-        .user-info-modern { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-        .user-info-modern strong { display: block; font-size: 0.95rem; color: white; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1; }
     </style>
 </head>
 <body>
@@ -72,7 +39,7 @@
         </div>
         
         <!-- User info -->
-        <div class="sidebar-user-card">
+        <div class="sidebar-user-card" onclick="showSection('perfil')" style="cursor: pointer;">
             <div class="user-avatar-modern"><i class="fas fa-user-tie"></i></div>
             <div class="user-info-modern">
                 <strong id="user-name">Usuário</strong>
@@ -130,9 +97,7 @@
     </div>
 
     <main class="main-content" id="main-content">
-        <div class="main-content-placeholder" id="main-placeholder">
-            <img src="../Imgs/logo_M&M.jpg" alt="M&M Cebolas" class="placeholder-logo">
-        </div>
+        <!-- O skeleton loader do dashboard é injetado dinamicamente aqui imediatamente no boot -->
     </main>
 
     <!-- ========== MODAIS GLOBAIS ========== -->
@@ -193,6 +158,38 @@
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Modal de Visualização de PDF (DANFE) -->
+    <div id="danfe-pdf-modal" class="modal-overlay">
+        <div class="edit-modal" style="max-width: 1000px; width: 95%; height: 85vh; padding: 0;">
+            <div class="modal-header" style="background: var(--primary); color: white; padding: 20px 24px; border-radius: 20px 20px 0 0; display:flex; justify-content:space-between; align-items:center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-file-pdf fa-lg" style="color: white;"></i>
+                    <h3 style="font-weight: 700; margin: 0; font-size:1.1rem;">Visualização do DANFE</h3>
+                </div>
+                <button onclick="closeDanfeModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: white; line-height: 1;">&times;</button>
+            </div>
+            <div style="flex: 1; padding: 0; background: #525659; position: relative; height: calc(100% - 65px);">
+                <iframe id="danfe-pdf-iframe" style="width: 100%; height: 100%; border: none;" src=""></iframe>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Notificação de Vencimento do Certificado -->
+    <div id="cert-expiration-modal" class="modal-overlay">
+        <div class="edit-modal" style="max-width: 480px; text-align: center; padding: 32px 24px;">
+            <div style="width: 64px; height: 64px; background: #fef3c7; color: #d97706; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px auto; font-size: 2rem;">
+                <i id="cert-modal-icon" class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h3 id="cert-modal-title" style="font-weight: 800; margin-bottom: 12px; color: var(--text-main);">Atenção com o Certificado!</h3>
+            <p id="cert-modal-text" style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.5; margin-bottom: 24px;">
+                Seu certificado digital A1 está próximo do vencimento.
+            </p>
+            <button class="btn-primary" onclick="closeCertExpirationModal()" style="width: 100%; padding: 12px; font-weight: 700; border-radius: 10px;">
+                Entendido
+            </button>
         </div>
     </div>
 
@@ -264,9 +261,139 @@
                 
                 <div style="display:flex;gap:12px;margin-top:8px;" class="span-2">
                     <button type="button" class="btn-danger" onclick="closeProdutoModal()" style="flex:1;">Cancelar</button>
-                    <button type="submit" class="btn-primary" style="flex:2;"><i class="fas fa-save"></i> Salvar Produto</button>
+                    <button type="submit" class="btn-primary" id="btn-salvar-produto" style="flex:2;"><i class="fas fa-save"></i> Salvar Produto</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Modal de Registro de Descarte / Perda -->
+    <div id="modal-descarte" class="modal-overlay">
+        <div class="edit-modal" style="max-width: 500px;">
+            <div class="modal-header" style="background: #ea580c; color: white; padding: 20px 24px; border-radius: 20px 20px 0 0; display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0;font-size:1.1rem;"><i class="fas fa-trash-alt"></i> Registrar Perda / Descarte</h3>
+                <button onclick="closeDescarteModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:white;line-height:1;">&times;</button>
+            </div>
+            <form onsubmit="saveDescarte(event)" class="form-grid" style="padding:24px;">
+                <div class="form-group span-2">
+                    <label>Produto / Variedade *</label>
+                    <select id="descarte-produto" required style="width:100%;">
+                        <!-- Injetado via JS -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Quantidade (Caixas) *</label>
+                    <input type="number" id="descarte-caixas" required min="0" placeholder="0" oninput="calculateDescarteKg()">
+                </div>
+                <div class="form-group">
+                    <label>Peso (Kg)</label>
+                    <input type="number" step="0.1" id="descarte-peso" placeholder="0.0">
+                </div>
+                <div class="form-group span-2">
+                    <label>Motivo da Perda *</label>
+                    <select id="descarte-motivo" required style="width:100%;">
+                        <option value="Cebola Podre / Estragada">Cebola Podre / Estragada</option>
+                        <option value="Desidratação / Quebra Natural">Desidratação / Quebra Natural (Peso)</option>
+                        <option value="Danos no Transporte / Manuseio">Danos no Transporte / Manuseio</option>
+                        <option value="Classificação / Seleção de Tamanho">Classificação / Seleção de Tamanho</option>
+                        <option value="Outros">Outros</option>
+                    </select>
+                </div>
+                <div class="form-group span-2">
+                    <label>Data da Ocorrência *</label>
+                    <input type="date" id="descarte-data" required>
+                </div>
+                <div style="display:flex;gap:12px;margin-top:16px;" class="span-2">
+                    <button type="button" class="btn-danger" onclick="closeDescarteModal()" style="flex:1;">Cancelar</button>
+                    <button type="submit" class="btn-primary" style="flex:2; background:#ea580c; border-color:#ea580c;">
+                        <i class="fas fa-save"></i> Registrar Perda
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmação de Importação XML -->
+    <div id="modal-confirmacao-xml" class="modal-overlay">
+        <div class="edit-modal" style="max-width: 650px;">
+            <div class="modal-header" style="background: #1e3a8a; color: white; padding: 20px 24px; border-radius: 20px 20px 0 0; display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0;font-size:1.1rem;"><i class="fas fa-file-invoice"></i> Confirmar Importação de NFe</h3>
+                <button onclick="closeConfirmacaoXMLModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:white;line-height:1;">&times;</button>
+            </div>
+            <div style="padding: 24px; display: flex; flex-direction: column; gap: 20px; max-height: 70vh; overflow-y: auto;">
+                
+                <!-- Dados do Fornecedor -->
+                <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 12px; padding: 16px;">
+                    <h5 style="font-weight: 700; color: #1e3a8a; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-truck"></i> Dados do Emitente (Fornecedor)
+                    </h5>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.85rem;">
+                        <div>
+                            <span style="color: var(--text-muted); display: block;">Razão Social:</span>
+                            <strong id="xml-forn-nome">-</strong>
+                        </div>
+                        <div>
+                            <span style="color: var(--text-muted); display: block;">CNPJ / CPF:</span>
+                            <strong id="xml-forn-doc">-</strong>
+                        </div>
+                        <div class="span-2" style="grid-column: 1 / -1;">
+                            <span style="color: var(--text-muted); display: block;">Endereço:</span>
+                            <strong id="xml-forn-end">-</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dados da Nota -->
+                <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 12px; padding: 16px;">
+                    <h5 style="font-weight: 700; color: #1e3a8a; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-file-alt"></i> Detalhes da Nota Fiscal
+                    </h5>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.85rem;">
+                        <div>
+                            <span style="color: var(--text-muted); display: block;">Chave de Acesso:</span>
+                            <strong id="xml-nota-chave">-</strong>
+                        </div>
+                        <div>
+                            <span style="color: var(--text-muted); display: block;">Data de Emissão:</span>
+                            <strong id="xml-nota-data">-</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Itens da Nota -->
+                <div>
+                    <h5 style="font-weight: 700; margin-bottom: 10px;"><i class="fas fa-boxes"></i> Produtos Identificados</h5>
+                    <div class="table-container" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden;">
+                        <table class="table-compact" style="margin: 0; width: 100%;">
+                            <thead>
+                                <tr style="background: #f1f5f9;">
+                                    <th>Descrição no XML</th>
+                                    <th>Associar ao Produto</th>
+                                    <th style="text-align: right;">Qtd</th>
+                                    <th style="text-align: right;">Unitário</th>
+                                    <th style="text-align: right;">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="xml-itens-tbody">
+                                <!-- Injetado via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Valor Total -->
+                <div style="display: flex; justify-content: space-between; align-items: center; background: #e0f2fe; padding: 16px; border-radius: 12px; border: 1px solid #bae6fd;">
+                    <strong style="color: #0369a1;">Valor Total da Compra:</strong>
+                    <strong id="xml-nota-total" style="font-size: 1.3rem; color: #0369a1;">R$ 0,00</strong>
+                </div>
+
+                <div style="display:flex;gap:12px;margin-top:8px;">
+                    <button type="button" class="btn-danger" onclick="closeConfirmacaoXMLModal()" style="flex:1; padding: 14px; border-radius: 10px;">Cancelar</button>
+                    <button type="button" class="btn-primary" onclick="confirmarImportacaoXML()" style="flex:2; background:#1e3a8a; border-color:#1e3a8a; padding: 14px; font-weight: 700; border-radius: 10px;">
+                        <i class="fas fa-check-circle"></i> Confirmar e Lançar Compra
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -408,7 +535,7 @@
         });
         setTimeout(() => {
             if (typeof showSection === 'function') showSection('dashboard');
-        }, 1200);
+        }, 150);
     });
 
     // Helper para preencher campos NF-e ao selecionar cliente

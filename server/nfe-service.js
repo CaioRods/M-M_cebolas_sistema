@@ -187,11 +187,20 @@ class NFeService {
         }
 
         try {
+            const https = require('https');
+            const pfxBuffer = fs.readFileSync(this.pfxPath);
+            const agent = new https.Agent({
+                pfx: pfxBuffer,
+                passphrase: this.password,
+                rejectUnauthorized: false
+            });
+
             const client = await new Promise((resolve, reject) => {
                 soap.createClient(wsdlUrl, {
+                    forceSoap12Headers: true,
+                    httpsAgent: agent,
                     wsdl_options: {
-                        pfx: fs.readFileSync(this.pfxPath),
-                        passphrase: this.password,
+                        httpsAgent: agent,
                         rejectUnauthorized: false
                     }
                 }, (err, client) => {
@@ -223,14 +232,10 @@ class NFeService {
                         // Log do retorno bruto para depuração na VPS se necessário
                         console.log("Retorno SEFAZ:", rawResponse);
                         
-                        // Verificação básica de sucesso no retorno (cStat 103 ou 104 ou 100)
-                        const hasSuccess = rawResponse && (
-                            rawResponse.includes('<cStat>100</cStat>') || 
-                            rawResponse.includes('<cStat>103</cStat>') || 
-                            rawResponse.includes('<cStat>104</cStat>')
-                        );
+                        // A nota só está autorizada se o cStat de retorno no protocolo for 100 (Autorizado o uso)
+                        const isAuthorized = rawResponse && rawResponse.includes('<cStat>100</cStat>');
 
-                        if (hasSuccess) {
+                        if (isAuthorized) {
                             // Tenta extrair o protocolo real se disponível
                             const protMatch = rawResponse.match(/<nProt>(\d+)<\/nProt>/);
                             const protocolo = protMatch ? protMatch[1] : '135' + Math.floor(Math.random() * 1000000000);
@@ -242,14 +247,17 @@ class NFeService {
                                 message: 'NF-e Autorizada com Sucesso na SEFAZ'
                             });
                         } else {
-                            // Extrai o motivo do erro se disponível
-                            const xMotivoMatch = rawResponse.match(/<xMotivo>([^<]+)<\/xMotivo>/);
-                            const cStatMatch = rawResponse.match(/<cStat>([^<]+)<\/cStat>/);
-                            const motivo = xMotivoMatch ? xMotivoMatch[1] : 'Lote enviado, mas sem confirmação imediata.';
+                            // Extrai o motivo do erro de dentro do infProt (rejeição da nota) ou do lote
+                            const infProtMatch = rawResponse.match(/<infProt>([\s\S]*?)<\/infProt>/);
+                            const searchSource = infProtMatch ? infProtMatch[1] : rawResponse;
+                            
+                            const xMotivoMatch = searchSource.match(/<xMotivo>([^<]+)<\/xMotivo>/);
+                            const cStatMatch = searchSource.match(/<cStat>([^<]+)<\/cStat>/);
+                            const motivo = xMotivoMatch ? xMotivoMatch[1] : 'Lote rejeitado ou erro na estrutura SOAP.';
                             const cStat = cStatMatch ? cStatMatch[1] : '???';
 
                             resolve({
-                                success: true,
+                                success: false,
                                 status: 'erro_sefaz',
                                 message: `SEFAZ Rejeitou (cStat ${cStat}): ${motivo}`
                             });

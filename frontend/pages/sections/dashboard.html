@@ -1,44 +1,44 @@
-<header class="top-bar">
+<header class="top-bar animate-fade-up">
     <div>
-        <h2 class="page-title">Painel de Controle Profissional</h2>
-        <p style="color: var(--text-muted); font-size: 0.9rem;">Gestão estratégica e análise de dados em tempo real.</p>
+        <h2 class="page-title" id="dash-greeting" style="display: flex; align-items: center; gap: 8px;">Painel de Controle</h2>
+        <p style="color: var(--text-muted); font-size: 0.9rem; font-weight: 500;" id="dash-date-subtitle">Carregando informações...</p>
     </div>
     <div style="display: flex; gap: 12px; align-items: center;">
-        <div class="dashboard-filters" style="display: flex; gap: 8px; background: white; padding: 4px; border-radius: 100px; border: 1px solid var(--border);">
+        <div class="dashboard-filters">
             <button onclick="setDashboardPeriod('hoje')" class="filter-btn active" id="btn-period-hoje">Hoje</button>
             <button onclick="setDashboardPeriod('semana')" class="filter-btn" id="btn-period-semana">Semana</button>
             <button onclick="setDashboardPeriod('mes')" class="filter-btn" id="btn-period-mes">Mês</button>
             <button onclick="setDashboardPeriod('ano')" class="filter-btn" id="btn-period-ano">Ano</button>
-            <button onclick="openCustomFilterModal()" class="filter-btn" style="padding: 6px 10px;"><i class="fas fa-filter"></i></button>
+            <button onclick="openCustomFilterModal()" class="filter-btn" style="padding: 6px 12px;" title="Filtro Personalizado"><i class="fas fa-filter"></i></button>
         </div>
-        <button class="btn-icon" onclick="refreshDashboard()" title="Atualizar dados" style="padding: 8px 14px; border-radius: 100px; border: 1px solid var(--border); background: white; font-size: 0.82rem; font-weight: 700; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+        <button class="btn-sync-pro" onclick="refreshDashboard()" title="Atualizar dados">
             <i class="fas fa-sync-alt"></i>
         </button>
     </div>
 </header>
 
 <!-- DASHBOARD CONFIGURÁVEL: GRID DE KPIS -->
-<div id="kpi-container" class="kpi-grid-pro">
+<div id="kpi-container" class="kpi-grid-pro animate-fade-up delay-1">
     <!-- Os cards serão injetados e podem ser reordenados ou ocultados via config -->
 </div>
 
 <!-- SEÇÃO DE ANÁLISE GRÁFICA AVANÇADA -->
-<div class="analysis-row">
+<div class="analysis-row animate-fade-up delay-2">
     <div class="panel main-chart">
         <div class="panel-header">
             <div style="display: flex; flex-direction: column;">
-                <h4 style="font-weight: 700;">Análise de Performance</h4>
-                <span style="font-size: 0.7rem; color: var(--text-muted);">Comparativo de fluxo e volume</span>
+                <h4 style="font-weight: 700; color: var(--primary-dark);">Análise de Performance</h4>
+                <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; margin-top: 2px;">Comparativo de fluxo e volume</span>
             </div>
             <div class="chart-controls">
                 <select id="chart-metric-select" onchange="updateMainChart()" class="minimal-select">
-                    <option value="financeiro">Financeiro (R$)</option>
-                    <option value="volume_cx">Volume (Caixas)</option>
-                    <option value="volume_kg">Volume (Kg)</option>
+                    <option value="financeiro">📊 Financeiro (R$)</option>
+                    <option value="volume_cx">📦 Volume (Caixas)</option>
+                    <option value="volume_kg">⚖️ Volume (Kg)</option>
                 </select>
                 <div class="toggle-group">
-                    <button onclick="setChartType('bar')" class="toggle-btn active" id="btn-chart-bar"><i class="fas fa-chart-bar"></i></button>
-                    <button onclick="setChartType('line')" class="toggle-btn" id="btn-chart-line"><i class="fas fa-chart-line"></i></button>
+                    <button onclick="setChartType('bar')" class="toggle-btn active" id="btn-chart-bar" title="Gráfico de Barras"><i class="fas fa-chart-bar"></i></button>
+                    <button onclick="setChartType('line')" class="toggle-btn" id="btn-chart-line" title="Gráfico de Linha"><i class="fas fa-chart-line"></i></button>
                 </div>
             </div>
         </div>
@@ -49,7 +49,7 @@
 
     <div class="panel side-panel">
         <div class="panel-header">
-            <h4 style="font-weight: 700;">Mix de Produtos</h4>
+            <h4 style="font-weight: 700; color: var(--primary-dark);">Mix de Produtos</h4>
         </div>
         <div class="chart-body compact">
             <canvas id="distributionChart"></canvas>
@@ -61,11 +61,11 @@
 </div>
 
 <!-- TABELAS DE GESTÃO ORGANIZADAS -->
-<div class="data-row">
+<div class="data-row animate-fade-up delay-3">
     <!-- RANKING DE CLIENTES (Vendas) -->
     <div class="panel">
         <div class="panel-header">
-            <h4 style="font-weight: 700;"><i class="fas fa-users" style="color: var(--primary);"></i> Principais Clientes (Vendas)</h4>
+            <h4 style="font-weight: 700; display: flex; align-items: center; gap: 8px;"><i class="fas fa-users" style="color: var(--primary);"></i> Principais Clientes (Vendas)</h4>
         </div>
         <div class="table-container">
             <table class="table-pro">
@@ -86,7 +86,7 @@
     <!-- RANKING DE FORNECEDORES -->
     <div class="panel">
         <div class="panel-header">
-            <h4 style="font-weight: 700;"><i class="fas fa-medal" style="color: #f59e0b;"></i> Principais Fornecedores</h4>
+            <h4 style="font-weight: 700; display: flex; align-items: center; gap: 8px;"><i class="fas fa-truck-loading" style="color: var(--accent);"></i> Principais Fornecedores</h4>
         </div>
         <div class="table-container">
             <table class="table-pro">
@@ -106,10 +106,10 @@
 </div>
 
 <!-- ESTOQUE DETALHADO -->
-<div class="panel" style="margin-bottom: 24px;">
+<div class="panel animate-fade-up delay-4" style="margin-bottom: 24px;">
     <div class="panel-header">
-        <h4 style="font-weight: 700;"><i class="fas fa-warehouse" style="color: var(--primary);"></i> Inventário em Tempo Real</h4>
-        <button class="btn-text" onclick="showSection('estoque')">Ver Detalhes</button>
+        <h4 style="font-weight: 700; display: flex; align-items: center; gap: 8px;"><i class="fas fa-warehouse" style="color: var(--primary);"></i> Inventário em Tempo Real</h4>
+        <button class="btn-text" onclick="showSection('estoque')">Ver Detalhes <i class="fas fa-arrow-right" style="font-size: 0.75rem; margin-left: 4px;"></i></button>
     </div>
     <div class="table-container">
         <table class="table-pro">
@@ -128,14 +128,70 @@
     </div>
 </div>
 
+<!-- DRE - DEMONSTRATIVO DO RESULTADO DO EXERCÍCIO -->
+<div class="panel animate-fade-up delay-5" style="margin-bottom: 24px;">
+    <div class="panel-header" style="background: rgba(255,255,255,0.4); border-bottom: 1px solid var(--border);">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-coins" style="color: #2563eb; font-size: 1.2rem;"></i>
+            <h4 style="font-weight: 700; margin: 0; color: var(--primary-dark);">DRE - Demonstrativo do Resultado do Exercício</h4>
+        </div>
+        <span style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); background: #f1f5f9; padding: 4px 10px; border-radius: 100px; border: 1px solid var(--border);" id="dre-period-label">Consolidado Mensal</span>
+    </div>
+    <div style="padding: 20px;">
+        <div class="table-container" style="border: 1px solid var(--border); border-radius: 14px; overflow: hidden; background: white; width: 100%; box-shadow: 0 4px 15px rgba(0,0,0,0.02);">
+            <table class="table-pro" style="margin: 0; width: 100%;">
+                <thead>
+                    <tr style="background: #f8fafc;">
+                        <th style="font-weight: 800; font-size: 0.75rem; text-transform: uppercase;">Estrutura do DRE</th>
+                        <th style="text-align: right; font-weight: 800; font-size: 0.75rem; text-transform: uppercase; width: 220px;">Este Mês</th>
+                        <th style="text-align: right; font-weight: 800; font-size: 0.75rem; text-transform: uppercase; width: 220px;">Total Histórico</th>
+                    </tr>
+                </thead>
+                <tbody id="dre-table-body" style="font-size: 0.9rem;">
+                    <tr class="dre-row-header">
+                        <td><strong>(=) RECEITA BRUTA DE VENDAS (Faturamento)</strong></td>
+                        <td style="text-align: right; font-weight: 700; color: #166534;" id="dre-rec-mes">R$ 0,00</td>
+                        <td style="text-align: right; font-weight: 700; color: #166534;" id="dre-rec-tot">R$ 0,00</td>
+                    </tr>
+                    <tr class="dre-row-indent">
+                        <td>(-) Custo de Aquisição de Mercadoria (CMV)</td>
+                        <td style="text-align: right; color: #b91c1c;" id="dre-cmv-mes">R$ 0,00</td>
+                        <td style="text-align: right; color: #b91c1c;" id="dre-cmv-tot">R$ 0,00</td>
+                    </tr>
+                    <tr class="dre-row-indent">
+                        <td>(-) Perdas por Descartes / Quebra de Estoque</td>
+                        <td style="text-align: right; color: #b91c1c;" id="dre-perdas-mes">R$ 0,00</td>
+                        <td style="text-align: right; color: #b91c1c;" id="dre-perdas-tot">R$ 0,00</td>
+                    </tr>
+                    <tr class="dre-row-total">
+                        <td><strong>(=) MARGEM DE CONTRIBUIÇÃO BRUTA</strong></td>
+                        <td style="text-align: right; font-weight: 700; color: var(--text-main);" id="dre-margem-mes">R$ 0,00</td>
+                        <td style="text-align: right; font-weight: 700; color: var(--text-main);" id="dre-margem-tot">R$ 0,00</td>
+                    </tr>
+                    <tr class="dre-row-indent">
+                        <td>(-) Despesas Operacionais / Gerais</td>
+                        <td style="text-align: right; color: #b91c1c;" id="dre-desp-mes">R$ 0,00</td>
+                        <td style="text-align: right; color: #b91c1c;" id="dre-desp-tot">R$ 0,00</td>
+                    </tr>
+                    <tr class="dre-row-result">
+                        <td><strong><i class="fas fa-wallet" style="margin-right: 6px;"></i> RESULTADO LÍQUIDO DO EXERCÍCIO (Lucro Real)</strong></td>
+                        <td style="text-align: right; font-weight: 900; font-size: 1.05rem;" id="dre-lucro-mes">R$ 0,00</td>
+                        <td style="text-align: right; font-weight: 900; font-size: 1.05rem;" id="dre-lucro-tot">R$ 0,00</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 <!-- ÚLTIMAS TRANSAÇÕES COM FILTRO GLOBAL -->
-<div class="panel">
+<div class="panel animate-fade-up delay-5">
     <div class="panel-header">
-        <h4 style="font-weight: 700;"><i class="fas fa-exchange-alt"></i> Fluxo de Operações Recentes</h4>
+        <h4 style="font-weight: 700; color: var(--primary-dark); display: flex; align-items: center; gap: 8px;"><i class="fas fa-exchange-alt"></i> Fluxo de Operações Recentes</h4>
         <div style="display: flex; gap: 10px;">
             <div class="search-box-pro">
                 <i class="fas fa-search"></i>
-                <input type="text" id="global-dash-search" placeholder="Buscar em tudo (fornecedor, produto, nota)..." onkeyup="globalDashSearch(this.value)">
+                <input type="text" id="global-dash-search" placeholder="Buscar por fornecedor, produto, nota..." onkeyup="globalDashSearch(this.value)">
             </div>
         </div>
     </div>
@@ -149,7 +205,7 @@
                     <th>Produto</th>
                     <th style="text-align: center;">Qtd</th>
                     <th style="text-align: right;">Valor</th>
-                    <th>Ações</th>
+                    <th style="text-align: center;">Ações</th>
                 </tr>
             </thead>
             <tbody id="dash-recent-ops">
@@ -160,7 +216,32 @@
 </div>
 
 <style>
-/* Estilos Pro para o Dashboard */
+/* ==========================================================================
+   ESTILOS PREMIUM PARA O DASHBOARD (PRO)
+   ========================================================================== */
+
+/* Animações Sequenciais de Entrada */
+@keyframes dashboard-fade-up {
+    from {
+        opacity: 0;
+        transform: translateY(16px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+.animate-fade-up {
+    opacity: 0;
+    animation: dashboard-fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.delay-1 { animation-delay: 0.05s; }
+.delay-2 { animation-delay: 0.1s; }
+.delay-3 { animation-delay: 0.15s; }
+.delay-4 { animation-delay: 0.2s; }
+.delay-5 { animation-delay: 0.25s; }
+
+/* Grid de Layout */
 .kpi-grid-pro {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -182,29 +263,181 @@
     margin-bottom: 32px;
 }
 
+/* Novo visual do Dashboard Filter bar */
+.dashboard-filters {
+    display: flex;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.8) !important;
+    padding: 4px;
+    border-radius: 100px;
+    border: 1px solid var(--border);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: var(--shadow-sm);
+}
+
 .filter-btn {
     padding: 8px 18px;
     border: none;
     background: transparent;
     color: var(--text-muted);
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     font-weight: 700;
     border-radius: 100px;
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .filter-btn.active {
-    background: var(--primary);
-    color: white;
-    box-shadow: 0 4px 12px rgba(26, 86, 50, 0.25);
+    background: var(--primary) !important;
+    color: white !important;
+    box-shadow: 0 4px 12px rgba(26, 86, 50, 0.2) !important;
 }
 
 .filter-btn:hover:not(.active) {
-    background: #f1f5f9;
+    background: rgba(26, 86, 50, 0.06);
     color: var(--primary);
 }
 
+/* Botão Sync Pro */
+.btn-sync-pro {
+    background: white;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow-sm);
+}
+
+.btn-sync-pro:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    transform: rotate(180deg);
+    background: rgba(26, 86, 50, 0.05);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+
+/* Cards de KPI Reestilizados */
+.kpi-card-pro {
+    background: var(--bg-panel);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    border-top: 4px solid var(--kpi-color);
+}
+
+.kpi-card-pro:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.03);
+    border-color: rgba(255, 255, 255, 0.8);
+}
+
+.kpi-card-pro::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius);
+    box-shadow: 0 0 35px var(--kpi-bg);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.kpi-card-pro:hover::after {
+    opacity: 0.18;
+}
+
+.kpi-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    z-index: 1;
+}
+
+.kpi-icon-wrapper {
+    width: 52px;
+    height: 52px;
+    background: var(--kpi-bg);
+    color: var(--kpi-color);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+    transition: all 0.3s ease;
+}
+
+.kpi-card-pro:hover .kpi-icon-wrapper {
+    transform: scale(1.1) rotate(5deg);
+}
+
+.kpi-trend {
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: var(--trend-color);
+    background: var(--trend-bg, rgba(241, 245, 249, 0.8));
+    padding: 4px 10px;
+    border-radius: 100px;
+    border: 1px solid var(--trend-border, var(--border));
+}
+
+.kpi-card-content {
+    margin-top: 4px;
+    z-index: 1;
+}
+
+.kpi-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 6px;
+}
+
+.kpi-value {
+    font-size: 1.65rem;
+    font-weight: 900;
+    color: var(--text-main);
+    letter-spacing: -0.5px;
+}
+
+.kpi-bg-icon {
+    position: absolute;
+    right: -15px;
+    bottom: -15px;
+    font-size: 5.5rem;
+    opacity: 0.025;
+    color: var(--kpi-color);
+    pointer-events: none;
+    transition: all 0.4s ease;
+    z-index: 0;
+}
+
+.kpi-card-pro:hover .kpi-bg-icon {
+    transform: scale(1.15) rotate(-10deg);
+    opacity: 0.045;
+}
+
+/* Gráficos e Controles */
 .minimal-select {
     border: 1px solid var(--border);
     padding: 8px 14px;
@@ -215,6 +448,7 @@
     background: white;
     cursor: pointer;
     transition: var(--transition);
+    outline: none;
 }
 
 .minimal-select:hover {
@@ -244,21 +478,126 @@
     box-shadow: 0 2px 6px rgba(0,0,0,0.08);
 }
 
-.chart-body { height: 360px; padding: 24px; }
+.chart-body { height: 360px; padding: 20px; }
 .chart-body.compact { height: 260px; }
 
+/* Custom Legend para Pizza/Rosquinha */
+.custom-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 0 24px 24px 24px;
+}
+
+.legend-item-pro {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.85rem;
+    color: var(--text-main);
+    font-weight: 600;
+}
+
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.legend-name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.legend-pct {
+    font-weight: 700;
+    color: var(--text-muted);
+    background: #f1f5f9;
+    padding: 2px 8px;
+    border-radius: 100px;
+    font-size: 0.75rem;
+}
+
+/* Tabelas Pro e Avatares */
 .table-pro { width: 100%; border-collapse: collapse; }
 .table-pro th { padding: 16px 24px; font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); border-bottom: 2px solid var(--border); text-align: left; letter-spacing: 1px; font-weight: 800; }
-.table-pro td { padding: 16px 24px; font-size: 0.9rem; border-bottom: 1px solid #f1f5f9; }
+.table-pro td { padding: 16px 24px; font-size: 0.9rem; border-bottom: 1px solid #f1f5f9; color: var(--text-main); }
 .table-pro tr:hover td { background: #f8fafc; }
+
+.entity-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.avatar-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    color: white;
+    font-weight: 800;
+    font-size: 0.78rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    flex-shrink: 0;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+
+.avatar-placeholder {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #cbd5e1;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+}
 
 .search-box-pro { position: relative; width: 100%; max-width: 450px; }
 .search-box-pro i { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.9rem; }
 .search-box-pro input { width: 100%; padding: 12px 18px 12px 46px; border-radius: 12px; border: 1px solid var(--border); outline: none; transition: all 0.3s; background: white; font-size: 0.9rem; }
 .search-box-pro input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(26, 86, 50, 0.1); }
 
-.btn-text { background: none; border: none; color: var(--primary); font-weight: 800; font-size: 0.85rem; cursor: pointer; padding: 8px 12px; border-radius: 8px; transition: background 0.2s; }
+.btn-text { background: none; border: none; color: var(--primary); font-weight: 800; font-size: 0.85rem; cursor: pointer; padding: 8px 12px; border-radius: 8px; transition: background 0.2s; display: inline-flex; align-items: center; }
 .btn-text:hover { background: rgba(26, 86, 50, 0.05); }
+
+/* Estilização Profissional para DRE */
+.dre-row-header {
+    font-weight: 700;
+    background-color: rgba(248, 250, 252, 0.6);
+    border-left: 4px solid var(--primary);
+}
+
+.dre-row-indent td:first-child {
+    padding-left: 36px !important;
+    color: var(--text-muted);
+}
+
+.dre-row-total {
+    font-weight: 700;
+    background-color: rgba(253, 242, 248, 0.5);
+    border-left: 4px solid #db2777; /* Rosa escuro */
+}
+
+.dre-row-result {
+    font-weight: 800;
+    background: linear-gradient(90deg, rgba(236, 253, 245, 0.7) 0%, rgba(209, 250, 229, 0.3) 100%) !important;
+    border-left: 4px solid var(--success);
+    border-top: 2px solid rgba(167, 243, 208, 0.5);
+}
+
+.dre-row-result td {
+    padding: 18px 24px !important;
+    font-size: 0.95rem !important;
+}
 
 @media (max-width: 1280px) {
     .analysis-row { grid-template-columns: 1fr; }

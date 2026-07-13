@@ -35,6 +35,9 @@ function getLogoBase64() {
 
 db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS usuarios (id INTEGER PRIMARY KEY AUTOINCREMENT, label TEXT, username TEXT UNIQUE, password TEXT, role TEXT)`);
+    db.run(`ALTER TABLE usuarios ADD COLUMN data_nascimento TEXT`, () => {});
+    db.run(`ALTER TABLE usuarios ADD COLUMN apelido TEXT`, () => {});
+    db.run(`ALTER TABLE usuarios ADD COLUMN foto TEXT`, () => {});
     db.run(`CREATE TABLE IF NOT EXISTS produtos (id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT, ncm TEXT, preco_venda REAL, cor TEXT, icone TEXT)`);
     db.run(`CREATE TABLE IF NOT EXISTS clientes (id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT, documento TEXT UNIQUE, telefone TEXT, ie TEXT, email TEXT, endereco TEXT)`);
     db.run(`CREATE TABLE IF NOT EXISTS fornecedores (id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT, documento TEXT UNIQUE, telefone TEXT, ie TEXT, email TEXT, endereco TEXT)`);
@@ -42,6 +45,7 @@ db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS nfe (id INTEGER PRIMARY KEY AUTOINCREMENT, venda_id INTEGER, chave_acesso TEXT, xml_content TEXT, status TEXT, data_emissao TEXT)`);
     db.run(`CREATE TABLE IF NOT EXISTS configs (chave TEXT PRIMARY KEY, valor TEXT)`);
     db.run(`CREATE TABLE IF NOT EXISTS logs (id INTEGER PRIMARY KEY AUTOINCREMENT, usuario_id INTEGER, username TEXT, acao TEXT, detalhes TEXT, data TEXT)`);
+    db.run(`CREATE TABLE IF NOT EXISTS descartes (id INTEGER PRIMARY KEY AUTOINCREMENT, produto TEXT, quantidade_caixas INTEGER, peso_kg REAL, motivo TEXT, data TEXT)`);
 
     // Migrações seguras: adiciona colunas se não existirem
     const safeMigrate = (sql, desc) => {
@@ -116,7 +120,8 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(express.static(path.join(__dirname, '../frontend')));
 
 function authenticateToken(req, res, next) {
@@ -151,7 +156,7 @@ app.post('/api/login', (req, res) => {
         const data = new Date().toISOString();
         db.run(`INSERT INTO logs (usuario_id, username, acao, detalhes, data) VALUES (?, ?, ?, ?, ?)`,
             [user.id, user.username, 'LOGIN', 'Usuário realizou login no sistema', data]);
-        res.json({ token, user: { id: user.id, label: user.label, role: user.role }, role: user.role });
+        res.json({ token, user: { id: user.id, label: user.label, role: user.role, username: user.username, data_nascimento: user.data_nascimento, apelido: user.apelido, foto: user.foto }, role: user.role });
     });
 });
 
@@ -198,7 +203,34 @@ app.post('/api/movimentacoes', authenticateToken, (req, res) => {
 
 app.delete('/api/movimentacoes/:id', authenticateToken, (req, res) => db.run('DELETE FROM movimentacoes WHERE id = ?', [req.params.id], () => res.json({ success: true })));
 
-// Rota de dashboard com estatísticas completas
+app.get('/api/descartes', authenticateToken, (req, res) => {
+    db.all('SELECT * FROM descartes ORDER BY data DESC', [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
+});
+
+app.post('/api/descartes', authenticateToken, (req, res) => {
+    const { produto, quantidade_caixas, peso_kg, motivo, data } = req.body;
+    db.run(
+        `INSERT INTO descartes (produto, quantidade_caixas, peso_kg, motivo, data) VALUES (?, ?, ?, ?, ?)`,
+        [produto, quantidade_caixas || 0, peso_kg || 0, motivo || 'Outros', data || new Date().toISOString().split('T')[0]],
+        function (err) {
+            if (err) return res.status(500).json({ error: err.message });
+            registrarLog(req, 'DESCARTE', `Descarte registrado: ${quantidade_caixas}CX (${peso_kg}KG) de ${produto} - Motivo: ${motivo}`);
+            res.json({ id: this.lastID });
+        }
+    );
+});
+
+app.delete('/api/descartes/:id', authenticateToken, (req, res) => {
+    db.run('DELETE FROM descartes WHERE id = ?', [req.params.id], function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        registrarLog(req, 'DESCARTE_DELETE', `Descarte ID ${req.params.id} excluído`);
+        res.json({ success: true });
+    });
+});
+
 app.get('/api/dashboard', authenticateToken, (req, res) => {
     db.all('SELECT * FROM movimentacoes ORDER BY data DESC', [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -206,109 +238,176 @@ app.get('/api/dashboard', authenticateToken, (req, res) => {
         db.get("SELECT valor FROM configs WHERE chave = 'peso_por_caixa_padrao'", [], (err2, configRow) => {
             const pesoPorCaixa = configRow ? parseFloat(configRow.valor) : 20;
 
-            const now = new Date();
-            const currentMonth = now.getMonth();
-            const currentYear = now.getFullYear();
+            db.all('SELECT * FROM descartes', [], (err3, descartes) => {
+                const now = new Date();
+                const currentMonth = now.getMonth();
+                const currentYear = now.getFullYear();
 
-            let totalCaixas = 0;
-            let totalKg = 0;
-            let receitaMes = 0;
-            let despesasMes = 0;
-            let receitaTotal = 0;
-            let despesasTotal = 0;
+                let totalCaixas = 0;
+                let totalKg = 0;
+                let receitaMes = 0;
+                let despesasMes = 0;
+                let receitaTotal = 0;
+                let despesasTotal = 0;
 
-            // Estoque por produto
-            const stockByCaixas = {};
-            const stockByKg = {};
+                let comprasMes = 0;
+                let comprasTotal = 0;
+                let despesasOpMes = 0;
+                let despesasOpTotal = 0;
 
-            // Dados mensais (últimos 6 meses)
-            const monthlyData = {};
-            for (let i = 5; i >= 0; i--) {
-                const d = new Date(currentYear, currentMonth - i, 1);
-                const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-                monthlyData[key] = { receita: 0, despesa: 0, caixas_entrada: 0, caixas_saida: 0, kg_entrada: 0, kg_saida: 0 };
-            }
+                // Estoque por produto
+                const stockByCaixas = {};
+                const stockByKg = {};
 
-            rows.forEach(t => {
-                const tDate = new Date(t.data);
-                const monthKey = `${tDate.getFullYear()}-${String(tDate.getMonth() + 1).padStart(2, '0')}`;
-                const isCurrentMonth = tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear;
-
-                // Calcular caixas e kg para cada movimentação
-                let caixas = t.qtd_caixas || 0;
-                let kg = t.peso_kg || 0;
-
-                if (caixas === 0 && kg === 0) {
-                    // Compatibilidade com registros antigos
-                    if (t.unidade === 'KG') {
-                        kg = t.quantidade;
-                        caixas = t.quantidade / pesoPorCaixa;
-                    } else {
-                        caixas = t.quantidade;
-                        kg = t.quantidade * pesoPorCaixa;
-                    }
+                // Dados mensais (últimos 6 meses)
+                const monthlyData = {};
+                for (let i = 5; i >= 0; i--) {
+                    const d = new Date(currentYear, currentMonth - i, 1);
+                    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                    monthlyData[key] = { receita: 0, despesa: 0, caixas_entrada: 0, caixas_saida: 0, kg_entrada: 0, kg_saida: 0 };
                 }
 
-                if (t.tipo === 'entrada') {
-                    if (!stockByCaixas[t.produto]) { stockByCaixas[t.produto] = 0; stockByKg[t.produto] = 0; }
-                    stockByCaixas[t.produto] += caixas;
-                    stockByKg[t.produto] += kg;
-                    totalCaixas += caixas;
-                    totalKg += kg;
-                    despesasTotal += t.valor;
-                    if (isCurrentMonth) despesasMes += t.valor;
-                    if (monthlyData[monthKey]) {
-                        monthlyData[monthKey].despesa += t.valor;
-                        monthlyData[monthKey].caixas_entrada += caixas;
-                        monthlyData[monthKey].kg_entrada += kg;
+                rows.forEach(t => {
+                    const tDate = new Date(t.data);
+                    const monthKey = `${tDate.getFullYear()}-${String(tDate.getMonth() + 1).padStart(2, '0')}`;
+                    const isCurrentMonth = tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear;
+
+                    let caixas = t.qtd_caixas || 0;
+                    let kg = t.peso_kg || 0;
+
+                    if (caixas === 0 && kg === 0) {
+                        if (t.unidade === 'KG') {
+                            kg = t.quantidade;
+                            caixas = t.quantidade / pesoPorCaixa;
+                        } else {
+                            caixas = t.quantidade;
+                            kg = t.quantidade * pesoPorCaixa;
+                        }
                     }
-                } else if (t.tipo === 'saida') {
-                    if (!stockByCaixas[t.produto]) { stockByCaixas[t.produto] = 0; stockByKg[t.produto] = 0; }
-                    stockByCaixas[t.produto] -= caixas;
-                    stockByKg[t.produto] -= kg;
-                    totalCaixas -= caixas;
-                    totalKg -= kg;
-                    receitaTotal += t.valor;
-                    if (isCurrentMonth) receitaMes += t.valor;
-                    if (monthlyData[monthKey]) {
-                        monthlyData[monthKey].receita += t.valor;
-                        monthlyData[monthKey].caixas_saida += caixas;
-                        monthlyData[monthKey].kg_saida += kg;
+
+                    if (t.tipo === 'entrada') {
+                        if (!stockByCaixas[t.produto]) { stockByCaixas[t.produto] = 0; stockByKg[t.produto] = 0; }
+                        stockByCaixas[t.produto] += caixas;
+                        stockByKg[t.produto] += kg;
+                        totalCaixas += caixas;
+                        totalKg += kg;
+                        despesasTotal += t.valor;
+                        comprasTotal += t.valor;
+                        if (isCurrentMonth) {
+                            despesasMes += t.valor;
+                            comprasMes += t.valor;
+                        }
+                        if (monthlyData[monthKey]) {
+                            monthlyData[monthKey].despesa += t.valor;
+                            monthlyData[monthKey].caixas_entrada += caixas;
+                            monthlyData[monthKey].kg_entrada += kg;
+                        }
+                    } else if (t.tipo === 'saida') {
+                        if (!stockByCaixas[t.produto]) { stockByCaixas[t.produto] = 0; stockByKg[t.produto] = 0; }
+                        stockByCaixas[t.produto] -= caixas;
+                        stockByKg[t.produto] -= kg;
+                        totalCaixas -= caixas;
+                        totalKg -= kg;
+                        receitaTotal += t.valor;
+                        if (isCurrentMonth) receitaMes += t.valor;
+                        if (monthlyData[monthKey]) {
+                            monthlyData[monthKey].receita += t.valor;
+                            monthlyData[monthKey].caixas_saida += caixas;
+                            monthlyData[monthKey].kg_saida += kg;
+                        }
+                    } else if (t.tipo === 'despesa') {
+                        despesasTotal += t.valor;
+                        despesasOpTotal += t.valor;
+                        if (isCurrentMonth) {
+                            despesasMes += t.valor;
+                            despesasOpMes += t.valor;
+                        }
+                        if (monthlyData[monthKey]) monthlyData[monthKey].despesa += t.valor;
                     }
-                } else if (t.tipo === 'despesa') {
-                    despesasTotal += t.valor;
-                    if (isCurrentMonth) despesasMes += t.valor;
-                    if (monthlyData[monthKey]) monthlyData[monthKey].despesa += t.valor;
-                }
-            });
+                });
 
-            // Top produtos por estoque
-            const topProdutos = Object.entries(stockByCaixas)
-                .map(([nome, caixas]) => ({ nome, caixas: Math.round(caixas * 10) / 10, kg: Math.round((stockByKg[nome] || 0) * 10) / 10 }))
-                .filter(p => p.caixas > 0)
-                .sort((a, b) => b.caixas - a.caixas)
-                .slice(0, 5);
+                // Deduzir descartes do estoque global e estoque por produto
+                const totalDescarteCx = (descartes || []).reduce((acc, d) => acc + (d.quantidade_caixas || 0), 0);
+                const totalDescarteKg = (descartes || []).reduce((acc, d) => acc + (d.peso_kg || 0), 0);
+                totalCaixas -= totalDescarteCx;
+                totalKg -= totalDescarteKg;
 
-            // Últimas movimentações
-            const ultimasMovimentacoes = rows.slice(0, 10);
+                (descartes || []).forEach(d => {
+                    if (stockByCaixas[d.produto]) {
+                        stockByCaixas[d.produto] -= d.quantidade_caixas || 0;
+                        stockByKg[d.produto] -= d.peso_kg || 0;
+                    }
+                });
 
-            res.json({
-                estoque: {
-                    totalCaixas: Math.round(totalCaixas * 10) / 10,
-                    totalKg: Math.round(totalKg * 10) / 10,
-                    porProduto: topProdutos
-                },
-                financeiro: {
-                    receitaMes,
-                    despesasMes,
-                    lucroMes: receitaMes - despesasMes,
-                    receitaTotal,
-                    despesasTotal,
-                    lucroTotal: receitaTotal - despesasTotal
-                },
-                mensal: monthlyData,
-                ultimasMovimentacoes,
-                pesoPorCaixa
+                // Top produtos por estoque
+                const topProdutos = Object.entries(stockByCaixas)
+                    .map(([nome, caixas]) => ({ nome, caixas: Math.round(caixas * 10) / 10, kg: Math.round((stockByKg[nome] || 0) * 10) / 10 }))
+                    .filter(p => p.caixas > 0)
+                    .sort((a, b) => b.caixas - a.caixas)
+                    .slice(0, 5);
+
+                // Cálculo do Preço Médio de Compra por Produto para valorar perdas
+                const productPrices = {};
+                const productCounts = {};
+                rows.filter(t => t.tipo === 'entrada').forEach(t => {
+                    let caixas = t.qtd_caixas || t.quantidade || 0;
+                    if (caixas > 0) {
+                        productPrices[t.produto] = (productPrices[t.produto] || 0) + t.valor;
+                        productCounts[t.produto] = (productCounts[t.produto] || 0) + caixas;
+                    }
+                });
+
+                const avgPrices = {};
+                Object.keys(productPrices).forEach(p => {
+                    avgPrices[p] = productPrices[p] / productCounts[p];
+                });
+
+                let totalDescarteValue = 0;
+                let descarteValueMes = 0;
+
+                (descartes || []).forEach(d => {
+                    const avgPrice = avgPrices[d.produto] || 25; // Padrão 25 reais/caixa se não houver compras
+                    const cost = (d.quantidade_caixas || 0) * avgPrice;
+                    totalDescarteValue += cost;
+                    
+                    const dDate = new Date(d.data);
+                    if (dDate.getMonth() === currentMonth && dDate.getFullYear() === currentYear) {
+                        descarteValueMes += cost;
+                    }
+                });
+
+                const ultimasMovimentacoes = rows.slice(0, 10);
+
+                res.json({
+                    estoque: {
+                        totalCaixas: Math.round(totalCaixas * 10) / 10,
+                        totalKg: Math.round(totalKg * 10) / 10,
+                        porProduto: topProdutos
+                    },
+                    financeiro: {
+                        receitaMes,
+                        despesasMes,
+                        lucroMes: receitaMes - despesasMes,
+                        receitaTotal,
+                        despesasTotal,
+                        lucroTotal: receitaTotal - despesasTotal
+                    },
+                    dre: {
+                        faturamentoMes: receitaMes,
+                        faturamentoTotal: receitaTotal,
+                        cmvMes: comprasMes,
+                        cmvTotal: comprasTotal,
+                        perdasMes: descarteValueMes,
+                        perdasTotal: totalDescarteValue,
+                        despesasOpMes,
+                        despesasOpTotal,
+                        lucroMes: receitaMes - comprasMes - descarteValueMes - despesasOpMes,
+                        lucroTotal: receitaTotal - comprasTotal - totalDescarteValue - despesasOpTotal
+                    },
+                    mensal: monthlyData,
+                    ultimasMovimentacoes,
+                    pesoPorCaixa
+                });
             });
         });
     });
@@ -331,8 +430,32 @@ app.post('/api/produtos', authenticateToken, (req, res) => {
 app.delete('/api/produtos/:id', authenticateToken, (req, res) => db.run('DELETE FROM produtos WHERE id = ?', [req.params.id], () => res.json({ success: true })));
 
 app.get('/api/usuarios', authenticateToken, (req, res) => {
-    if (req.user.role !== 'admin') return res.sendStatus(403);
-    db.all('SELECT id, label, username, role FROM usuarios', [], (err, rows) => res.json(rows || []));
+    if (req.user.role !== 'admin' && req.user.role !== 'chefe') return res.sendStatus(403);
+    db.all('SELECT id, label, username, role, data_nascimento, apelido, foto FROM usuarios', [], (err, rows) => res.json(rows || []));
+});
+
+app.get('/api/usuarios/me', authenticateToken, (req, res) => {
+    db.get('SELECT id, label, username, role, data_nascimento, apelido, foto FROM usuarios WHERE id = ?', [req.user.id], (err, user) => {
+        if (err || !user) return res.status(404).json({ error: 'Usuário não encontrado' });
+        res.json(user);
+    });
+});
+
+app.put('/api/usuarios/me', authenticateToken, (req, res) => {
+    const { label, data_nascimento, apelido, foto } = req.body;
+    db.run(
+        `UPDATE usuarios SET label = ?, data_nascimento = ?, apelido = ?, foto = ? WHERE id = ?`,
+        [label, data_nascimento, apelido, foto, req.user.id],
+        (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            registrarLog(req, 'PROFILE_UPDATE', `Atualizou dados do perfil`);
+            
+            db.get('SELECT id, label, username, role, data_nascimento, apelido, foto FROM usuarios WHERE id = ?', [req.user.id], (err2, user) => {
+                if (err2 || !user) return res.json({ success: true });
+                res.json({ success: true, user });
+            });
+        }
+    );
 });
 
 app.post('/api/usuarios', authenticateToken, async (req, res) => {
@@ -447,6 +570,79 @@ app.post('/api/fornecedores', authenticateToken, (req, res) => {
             registrarLog(req, 'FORNECEDOR_ADD', `Adicionou fornecedor: ${nome}`);
             res.json({ id: this.lastID });
         });
+    }
+});
+
+app.post('/api/movimentacoes/importar-xml', authenticateToken, (req, res) => {
+    const { xml } = req.body;
+    if (!xml) return res.status(400).json({ error: "XML não enviado" });
+
+    try {
+        const { create } = require('xmlbuilder2');
+        const doc = create(xml);
+        const obj = doc.end({ format: 'object' });
+
+        const getVal = (parent, pathStr) => {
+            const parts = pathStr.split('.');
+            let curr = parent;
+            for (const part of parts) {
+                if (!curr || typeof curr !== 'object') return undefined;
+                const foundKey = Object.keys(curr).find(k => k.split(':').pop() === part);
+                curr = curr[foundKey];
+            }
+            return curr;
+        };
+
+        const infNFe = getVal(obj, 'nfeProc.NFe.infNFe') || getVal(obj, 'NFe.infNFe') || getVal(obj, 'infNFe');
+        if (!infNFe) {
+            return res.status(400).json({ error: "Estrutura infNFe não encontrada no XML" });
+        }
+
+        let chave = getVal(obj, 'nfeProc.protNFe.infProt.chNFe') || '';
+        if (!chave && infNFe['@Id']) {
+            chave = infNFe['@Id'].replace(/\D/g, '');
+        }
+
+        const emit = getVal(infNFe, 'emit');
+        if (!emit) return res.status(400).json({ error: "Emitente (fornecedor) não encontrado" });
+
+        const forj = {
+            nome: getVal(emit, 'xNome') || '',
+            documento: getVal(emit, 'CNPJ') || getVal(emit, 'CPF') || '',
+            telefone: getVal(emit, 'enderEmit.fone') || '',
+            ie: getVal(emit, 'IE') || 'ISENTO',
+            email: getVal(emit, 'email') || '',
+            endereco: `${getVal(emit, 'enderEmit.xLgr') || ''}, ${getVal(emit, 'enderEmit.nro') || ''} - ${getVal(emit, 'enderEmit.xBairro') || ''}, ${getVal(emit, 'enderEmit.xMun') || ''} - ${getVal(emit, 'enderEmit.UF') || ''}`
+        };
+
+        let det = getVal(infNFe, 'det');
+        if (!det) return res.status(400).json({ error: "Itens da nota não encontrados" });
+        if (!Array.isArray(det)) det = [det];
+
+        const itens = det.map(d => {
+            const prod = getVal(d, 'prod');
+            return {
+                produto: getVal(prod, 'xProd') || '',
+                ncm: getVal(prod, 'NCM') || '',
+                quantidade: parseFloat(getVal(prod, 'qCom') || 0),
+                valor_unitario: parseFloat(getVal(prod, 'vUnCom') || 0),
+                valor_total: parseFloat(getVal(prod, 'vProd') || 0),
+                unidade: getVal(prod, 'uCom') || 'CX'
+            };
+        });
+
+        const valorTotal = parseFloat(getVal(infNFe, 'total.ICMSTot.vNF') || 0);
+
+        res.json({
+            chave,
+            fornecedor: forj,
+            itens,
+            valor_total: valorTotal,
+            data_emissao: getVal(infNFe, 'ide.dhEmi') || getVal(infNFe, 'ide.dEmi') || new Date().toISOString()
+        });
+    } catch (e) {
+        console.error("Erro parse XML:", e);
+        res.status(500).json({ error: "Falha ao processar o XML: " + e.message });
     }
 });
 
@@ -983,6 +1179,34 @@ app.get('/api/configs', authenticateToken, (req, res) => {
     db.all('SELECT * FROM configs', [], (err, rows) => {
         const c = {};
         rows?.forEach(r => c[r.chave] = r.valor);
+        
+        // Carrega metadados do certificado digital PFX
+        try {
+            const certPassword = c['cert_password'] || '12345678';
+            const pfxPath = path.join(__dirname, '../certificado/certificado.pfx');
+            
+            if (fs.existsSync(pfxPath)) {
+                const forge = require('node-forge');
+                const pfxFile = fs.readFileSync(pfxPath);
+                const pfxDer = pfxFile.toString('binary');
+                const pfxAsn1 = forge.asn1.fromDer(pfxDer);
+                const pfx = forge.pkcs12.pkcs12FromAsn1(pfxAsn1, certPassword);
+                const bags = pfx.getBags({ bagType: forge.pki.oids.certBag });
+                const cert = bags[forge.pki.oids.certBag][0].cert;
+                
+                c['cert_valid_from'] = cert.validity.notBefore.toISOString();
+                c['cert_valid_to'] = cert.validity.notAfter.toISOString();
+                c['cert_cn'] = cert.subject.getField('CN').value;
+                c['cert_loaded'] = 'true';
+            } else {
+                c['cert_loaded'] = 'false';
+                c['cert_error'] = 'Arquivo certificado.pfx não encontrado';
+            }
+        } catch (certErr) {
+            c['cert_loaded'] = 'false';
+            c['cert_error'] = certErr.message;
+        }
+        
         res.json(c);
     });
 });
@@ -993,6 +1217,79 @@ app.post('/api/configs', authenticateToken, (req, res) => {
         registrarLog(req, 'CONFIG_UPDATE', `Configuração atualizada: ${chave} = ${valor}`);
         res.json({ success: true });
     });
+});
+
+app.get('/api/backups', authenticateToken, (req, res) => {
+    const backupDir = path.join(__dirname, 'backups');
+    if (!fs.existsSync(backupDir)) {
+        fs.mkdirSync(backupDir);
+    }
+    
+    fs.readdir(backupDir, (err, files) => {
+        if (err) return res.status(500).json({ error: err.message });
+        const list = files
+            .filter(f => f.startsWith('database-backup-'))
+            .map(file => {
+                const filePath = path.join(backupDir, file);
+                const stat = fs.statSync(filePath);
+                return {
+                    name: file,
+                    size: stat.size,
+                    created_at: stat.mtime.toISOString()
+                };
+            })
+            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        res.json(list);
+    });
+});
+
+app.post('/api/backups/criar', authenticateToken, (req, res) => {
+    const backupDir = path.join(__dirname, 'backups');
+    if (!fs.existsSync(backupDir)) {
+        fs.mkdirSync(backupDir);
+    }
+    
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupPath = path.join(backupDir, `database-backup-${timestamp}.sqlite`);
+    
+    fs.copyFile(dbPath, backupPath, (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        
+        registrarLog(req, 'SYSTEM_BACKUP', `Backup criado: database-backup-${timestamp}.sqlite`);
+        
+        fs.readdir(backupDir, (err2, files) => {
+            if (err2) return res.json({ success: true, name: `database-backup-${timestamp}.sqlite` });
+            
+            const backups = files
+                .filter(f => f.startsWith('database-backup-'))
+                .sort((a, b) => fs.statSync(path.join(backupDir, b)).mtime - fs.statSync(path.join(backupDir, a)).mtime);
+                
+            if (backups.length > 7) {
+                backups.slice(7).forEach(file => {
+                    try { fs.unlinkSync(path.join(backupDir, file)); } catch (e) {}
+                });
+            }
+            res.json({ success: true, name: `database-backup-${timestamp}.sqlite` });
+        });
+    });
+});
+
+app.delete('/api/backups/:name', authenticateToken, (req, res) => {
+    const fileName = req.params.name;
+    if (fileName.includes('/') || fileName.includes('..') || !fileName.startsWith('database-backup-')) {
+        return res.status(400).json({ error: 'Nome de arquivo inválido' });
+    }
+    
+    const filePath = path.join(__dirname, 'backups', fileName);
+    if (fs.existsSync(filePath)) {
+        fs.unlink(filePath, (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            registrarLog(req, 'BACKUP_DELETE', `Backup removido: ${fileName}`);
+            res.json({ success: true });
+        });
+    } else {
+        res.status(404).json({ error: 'Arquivo de backup não encontrado' });
+    }
 });
 
     app.delete('/api/reset', authenticateToken, (req, res) => {

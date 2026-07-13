@@ -1,11 +1,14 @@
 <header class="top-bar">
     <h2 class="page-title">Controle de Estoque</h2>
-    <div style="display: flex; gap: 12px;">
-        <button class="btn-primary" style="background: #059669;" onclick="showSection('entrada')">
-            <i class="fas fa-plus"></i> Entrada
+    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <button class="btn-primary" style="background: #ea580c; border-color: #ea580c;" onclick="openDescarteModal()">
+            <i class="fas fa-trash-alt"></i> Registrar Perda / Descarte
         </button>
-        <button class="btn-primary" style="background: #dc2626;" onclick="showSection('saida')">
-            <i class="fas fa-minus"></i> Saída
+        <button class="btn-primary" style="background: #059669; border-color: #059669;" onclick="showSection('entrada')">
+            <i class="fas fa-plus"></i> Entrada / Compra
+        </button>
+        <button class="btn-primary" style="background: #dc2626; border-color: #dc2626;" onclick="showSection('saida')">
+            <i class="fas fa-minus"></i> Saída / Venda
         </button>
     </div>
 </header>
@@ -14,7 +17,7 @@
 <div class="panel" style="background: linear-gradient(135deg, var(--primary-dark), #064e3b); color: white; padding: 25px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border: none; box-shadow: 0 10px 25px rgba(0,0,0,0.15);">
     <div>
         <h3 style="font-size: 1.5rem; font-weight: 800; margin-bottom: 5px;">Inventário Global</h3>
-        <p style="opacity: 0.8; font-size: 0.85rem;">Status consolidado de todos os produtos em estoque</p>
+        <p style="opacity: 0.8; font-size: 0.85rem;">Status consolidado (entradas menos saídas e perdas)</p>
     </div>
     <div style="display: flex; gap: 30px; text-align: right;">
         <div>
@@ -33,42 +36,110 @@
     <!-- Injetado via JS -->
 </div>
 
-<div class="panel">
-    <div class="panel-header">
-        <h4 style="font-weight: 700;">Histórico de Movimentações</h4>
-        <div style="display: flex; gap: 10px; align-items: center;">
-            <select id="filter-tipo" onchange="filterTable()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); font-size: 0.85rem;">
-                <option value="">Todos os tipos</option>
-                <option value="entrada">Compras</option>
-                <option value="saida">Vendas</option>
-                <option value="despesa">Despesas</option>
-            </select>
-            <div class="search-box" style="width: 260px;">
-                <i class="fas fa-search"></i>
-                <input type="text" id="search-mov" placeholder="Filtrar movimentação..." onkeyup="filterTable()">
+<!-- Tabs Selector -->
+<div style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 2px solid var(--border); padding-bottom: 10px;">
+    <button class="tab-btn-estoque active" onclick="switchEstoqueTab('movs', this)">
+        <i class="fas fa-exchange-alt"></i> Histórico de Movimentações
+    </button>
+    <button class="tab-btn-estoque" onclick="switchEstoqueTab('descartes', this)">
+        <i class="fas fa-trash-alt"></i> Perdas e Descartes
+    </button>
+</div>
+
+<!-- TAB CONTENT 1: MOVIMENTAÇÕES -->
+<div id="tab-movs" class="estoque-tab-content">
+    <div class="panel">
+        <div class="panel-header">
+            <h4 style="font-weight: 700;">Histórico de Movimentações</h4>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <select id="filter-tipo" onchange="filterTable()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); font-size: 0.85rem;">
+                    <option value="">Todos os tipos</option>
+                    <option value="entrada">Compras</option>
+                    <option value="saida">Vendas</option>
+                    <option value="despesa">Despesas</option>
+                </select>
+                <div class="search-box" style="width: 260px;">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="search-mov" placeholder="Filtrar movimentação..." onkeyup="filterTable()">
+                </div>
             </div>
         </div>
-    </div>
-    <div class="table-container">
-        <table class="table-compact" id="main-table">
-            <thead>
-                <tr>
-                    <th>Data</th>
-                    <th>Tipo</th>
-                    <th>Produto</th>
-                    <th>Descrição / Contato</th>
-                    <th>Caixas</th>
-                    <th>Kg</th>
-                    <th>Valor</th>
-                    <th style="text-align: right;">Ações</th>
-                </tr>
-            </thead>
-            <tbody id="full-table-body">
-                <!-- JS -->
-            </tbody>
-        </table>
+        <div class="table-container">
+            <table class="table-compact" id="main-table">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Tipo</th>
+                        <th>Produto</th>
+                        <th>Descrição / Contato</th>
+                        <th>Caixas</th>
+                        <th>Kg</th>
+                        <th>Valor</th>
+                        <th style="text-align: right;">Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="full-table-body">
+                    <!-- JS -->
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
+
+<!-- TAB CONTENT 2: DESCARTES -->
+<div id="tab-descartes" class="estoque-tab-content" style="display: none;">
+    <div class="panel">
+        <div class="panel-header">
+            <h4 style="font-weight: 700;">Histórico de Descartes e Perdas</h4>
+            <div class="search-box" style="width: 260px;">
+                <i class="fas fa-search"></i>
+                <input type="text" id="search-descarte" placeholder="Filtrar descarte..." onkeyup="filterDescartesTable()">
+            </div>
+        </div>
+        <div class="table-container">
+            <table class="table-compact" id="descartes-table">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Produto</th>
+                        <th>Motivo</th>
+                        <th>Caixas Perdidas</th>
+                        <th>Kg Perdidos</th>
+                        <th style="text-align: right;">Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="descartes-table-body">
+                    <!-- JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+.tab-btn-estoque {
+    padding: 10px 18px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    transition: var(--transition);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+.tab-btn-estoque:hover {
+    color: var(--primary);
+}
+.tab-btn-estoque.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+</style>
 
 <script>
     function filterTable() {
@@ -97,6 +168,26 @@
                 }
             }
             tr[i].style.display = (found && tipoMatch) ? "" : "none";
+        }
+    }
+
+    function filterDescartesTable() {
+        const input = document.getElementById("search-descarte");
+        const filter = input.value.toUpperCase();
+        const table = document.getElementById("descartes-table");
+        const tr = table.getElementsByTagName("tr");
+
+        for (let i = 1; i < tr.length; i++) {
+            let found = false;
+            const tds = tr[i].getElementsByTagName("td");
+
+            for (let j = 0; j < tds.length; j++) {
+                if (tds[j].textContent.toUpperCase().indexOf(filter) > -1) {
+                    found = true;
+                    break;
+                }
+            }
+            tr[i].style.display = found ? "" : "none";
         }
     }
 </script>

@@ -5,6 +5,22 @@
     </div>
 </header>
 
+<!-- Importar XML -->
+<div class="panel" style="background: linear-gradient(135deg, #1e3a8a, #0f172a); color: white; padding: 24px; display: flex; align-items: center; justify-content: space-between; border: none; margin-bottom: 24px; box-shadow: 0 10px 25px rgba(30, 58, 138, 0.15);">
+    <div>
+        <h4 style="font-weight: 800; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; font-size: 1.05rem;">
+            <i class="fas fa-file-code" style="color: #60a5fa; font-size: 1.2rem;"></i> Importação de NFe por XML
+        </h4>
+        <p style="opacity: 0.8; font-size: 0.85rem; margin: 0;">Selecione o arquivo XML enviado pelo seu fornecedor para lançar a compra e o estoque de forma automática.</p>
+    </div>
+    <div>
+        <label class="btn-primary" style="background: #3b82f6; border-color: #3b82f6; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; margin: 0; padding: 12px 20px; font-weight: 700; border-radius: 10px;">
+            <i class="fas fa-upload"></i> Selecionar XML
+            <input type="file" id="xml-upload-input" accept=".xml" onchange="handleXMLImport(event)" style="display: none;">
+        </label>
+    </div>
+</div>
+
 <div class="panel" style="padding: 24px;">
     <h4 style="margin-bottom: 20px; font-weight: 700;">Vitrine de Produtos</h4>
     <div id="product-showcase" class="product-grid">
