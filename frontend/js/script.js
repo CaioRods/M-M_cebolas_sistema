@@ -3229,3 +3229,15 @@ async function saveProfileDetails(event) {
         showError('Erro de rede: ' + e.message);
     }
 }
+
+// --- ESCUTADOR DE EVENTOS DA TOUCH BAR (macOS) ---
+if (typeof require !== 'undefined') {
+    try {
+        const { ipcRenderer } = require('electron');
+        ipcRenderer.on('navegar-para', (event, sectionId) => {
+            showSection(sectionId);
+        });
+    } catch (e) {
+        console.log('Ignorando escutador IPC TouchBar (rodando fora do Electron)');
+    }
+}

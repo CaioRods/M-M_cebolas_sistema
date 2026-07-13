@@ -1,6 +1,7 @@
 // Electron: app desktop consome a API da VPS (https://portalmmcebolas.com.br) quando não for localhost.
 // O frontend em script.js define API_URL dinamicamente (file:// → produção; localhost → :3000).
-const { app, BrowserWindow, ipcMain, dialog, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, nativeImage, TouchBar } = require('electron');
+const { TouchBarButton, TouchBarSpacer } = TouchBar;
 const path = require('path');
 const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
@@ -26,6 +27,76 @@ function createWindow() {
             autoplayPolicy: 'no-user-gesture-required'
         }
     });
+
+    // --- ATALHOS DA TOUCH BAR (macOS) ---
+    const btnDashboard = new TouchBarButton({
+        label: '📊 Dash',
+        backgroundColor: '#1A5632',
+        click: () => { win.webContents.send('navegar-para', 'dashboard'); }
+    });
+
+    const btnCompra = new TouchBarButton({
+        label: '🛒 Compra',
+        backgroundColor: '#2e7d32',
+        click: () => { win.webContents.send('navegar-para', 'entrada'); }
+    });
+
+    const btnVenda = new TouchBarButton({
+        label: '💵 Venda',
+        backgroundColor: '#1565c0',
+        click: () => { win.webContents.send('navegar-para', 'saida'); }
+    });
+
+    const btnEstoque = new TouchBarButton({
+        label: '📦 Estoque',
+        backgroundColor: '#ef6c00',
+        click: () => { win.webContents.send('navegar-para', 'estoque'); }
+    });
+
+    const btnCadastros = new TouchBarButton({
+        label: '📋 Cadastros',
+        click: () => { win.webContents.send('navegar-para', 'cadastro'); }
+    });
+
+    const btnNFe = new TouchBarButton({
+        label: '🧾 NF-e',
+        click: () => { win.webContents.send('navegar-para', 'nfe'); }
+    });
+
+    const btnFinanceiro = new TouchBarButton({
+        label: '💰 Finan',
+        click: () => { win.webContents.send('navegar-para', 'financeiro'); }
+    });
+
+    const btnConfigs = new TouchBarButton({
+        label: '⚙️ Configs',
+        click: () => { win.webContents.send('navegar-para', 'config'); }
+    });
+
+    const btnAdmin = new TouchBarButton({
+        label: '🛡️ Admin',
+        backgroundColor: '#d97706',
+        click: () => { win.webContents.send('navegar-para', 'admin'); }
+    });
+
+    const touchBar = new TouchBar({
+        items: [
+            btnDashboard,
+            new TouchBarSpacer({ size: 'small' }),
+            btnCompra,
+            btnVenda,
+            btnEstoque,
+            new TouchBarSpacer({ size: 'small' }),
+            btnCadastros,
+            btnNFe,
+            btnFinanceiro,
+            new TouchBarSpacer({ size: 'small' }),
+            btnConfigs,
+            btnAdmin
+        ]
+    });
+
+    win.setTouchBar(touchBar);
 
     win.loadFile(path.join(__dirname, 'pages', 'login.html'));
 
