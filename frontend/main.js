@@ -34,7 +34,7 @@ function createWindow() {
         }
     });
 
-    win.webContents.once('did-finish-load', () => {
+    win.webContents.on('did-finish-load', () => {
         try {
             const liquidGlass = require('electron-liquid-glass');
             liquidGlass.addView(win.getNativeWindowHandle());
