@@ -1025,26 +1025,23 @@ tr:hover td { background-color: rgba(248, 250, 252, 0.9); }
         font-size: 0.8rem !important;
         font-weight: 800 !important;
         letter-spacing: 1px !important;
-        color: #ffffff !important;
-    }
-
-    /* Barra de Navegação Inferior Premium (Mobile TabBar) Colorida */
+        color: #ffffff !important;    /* Barra de Navegação Inferior Estilo Dock Apple (Mobile TabBar Frosted Glass) */
     .mobile-tabbar {
         display: flex;
         position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        height: 68px;
-        background: rgba(15, 23, 42, 0.96); /* Slate escuro com transparência */
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        bottom: 20px !important; /* Flutuando sobre a tela */
+        left: 16px !important;
+        right: 16px !important;
+        height: 64px !important;
+        background: rgba(255, 255, 255, 0.86) !important; /* Frost light glass */
+        backdrop-filter: blur(25px) !important;
+        -webkit-backdrop-filter: blur(25px) !important;
+        border: 1.5px solid rgba(255, 255, 255, 0.6) !important;
         z-index: 999;
         justify-content: space-around;
         align-items: center;
-        padding-bottom: env(safe-area-inset-bottom, 8px);
-        box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
+        box-shadow: 0 10px 35px rgba(0, 0, 0, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.2) !important;
+        padding: 0 6px !important;
     }
     
     .tabbar-item {
@@ -1055,58 +1052,38 @@ tr:hover td { background-color: rgba(248, 250, 252, 0.9); }
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 6px;
+        gap: 4px;
         font-size: 0.65rem;
         font-weight: 700;
         cursor: pointer;
         transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        height: 80% !important; /* Espaço para o capsule indicator de seleção */
+        border-radius: 16px !important;
+        color: #8e8e93 !important; /* Muted Apple Gray */
         flex: 1;
-        height: 100%;
     }
     
-    /* Cores personalizadas inativas para os itens da TabBar (Vibrantes porém transparentes) */
-    .mobile-tabbar .tabbar-item:nth-child(1) { color: rgba(16, 185, 129, 0.5); } /* Verde Dashboard */
-    .mobile-tabbar .tabbar-item:nth-child(2) { color: rgba(52, 211, 153, 0.5); } /* Verde-claro Compra */
-    .mobile-tabbar .tabbar-item:nth-child(3) { color: rgba(251, 191, 36, 0.5); } /* Amarelo Venda */
-    .mobile-tabbar .tabbar-item:nth-child(4) { color: rgba(249, 115, 22, 0.5); } /* Laranja Estoque */
-    .mobile-tabbar .tabbar-item:nth-child(5) { color: rgba(167, 139, 250, 0.5); } /* Roxo Mais */
-
     .tabbar-item i {
-        font-size: 1.25rem;
-        transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        font-size: 1.2rem;
+        transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    
-    /* Cores ativas com brilho exclusivo quando selecionados */
-    .mobile-tabbar .tabbar-item:nth-child(1).active { color: #10b981 !important; }
-    .mobile-tabbar .tabbar-item:nth-child(2).active { color: #34d399 !important; }
-    .mobile-tabbar .tabbar-item:nth-child(3).active { color: #fbbf24 !important; }
-    .mobile-tabbar .tabbar-item:nth-child(4).active { color: #f97316 !important; }
-    .mobile-tabbar .tabbar-item:nth-child(5).active { color: #a78bfa !important; }
+
+    /* Capsule indicator de seleção (iPadOS/iOS style select highlight) */
+    .tabbar-item.active {
+        background: rgba(0, 0, 0, 0.05) !important; /* Soft selection capsule pill */
+        color: #1c1c1e !important;
+    }
     
     .tabbar-item.active i {
-        transform: translateY(-4px) scale(1.1);
+        transform: scale(1.1) translateY(-1px) !important;
     }
-    
-    .mobile-tabbar .tabbar-item:nth-child(1).active i { text-shadow: 0 0 12px rgba(16, 185, 129, 0.4); }
-    .mobile-tabbar .tabbar-item:nth-child(2).active i { text-shadow: 0 0 12px rgba(52, 211, 153, 0.4); }
-    .mobile-tabbar .tabbar-item:nth-child(3).active i { text-shadow: 0 0 12px rgba(251, 191, 36, 0.4); }
-    .mobile-tabbar .tabbar-item:nth-child(4).active i { text-shadow: 0 0 12px rgba(249, 115, 22, 0.4); }
-    .mobile-tabbar .tabbar-item:nth-child(5).active i { text-shadow: 0 0 12px rgba(167, 139, 250, 0.4); }
 
-    /* Indicador luminoso exclusivo acima do item ativo */
-    .tabbar-item.active::after {
-        content: '';
-        position: absolute;
-        top: 2px;
-        width: 14px;
-        height: 3px;
-        border-radius: 2px;
-    }
-    .mobile-tabbar .tabbar-item:nth-child(1).active::after { background: #10b981; box-shadow: 0 0 8px #10b981; }
-    .mobile-tabbar .tabbar-item:nth-child(2).active::after { background: #34d399; box-shadow: 0 0 8px #34d399; }
-    .mobile-tabbar .tabbar-item:nth-child(3).active::after { background: #fbbf24; box-shadow: 0 0 8px #fbbf24; }
-    .mobile-tabbar .tabbar-item:nth-child(4).active::after { background: #f97316; box-shadow: 0 0 8px #f97316; }
-    .mobile-tabbar .tabbar-item:nth-child(5).active::after { background: #a78bfa; box-shadow: 0 0 8px #a78bfa; }
+    /* Cores de destaque ativas premium */
+    .mobile-tabbar .tabbar-item:nth-child(1).active { color: #34c759 !important; } /* Apple Green */
+    .mobile-tabbar .tabbar-item:nth-child(2).active { color: #30b0c7 !important; } /* Apple Teal */
+    .mobile-tabbar .tabbar-item:nth-child(3).active { color: #ff9500 !important; } /* Apple Orange */
+    .mobile-tabbar .tabbar-item:nth-child(4).active { color: #ff3b30 !important; } /* Apple Red */
+    .mobile-tabbar .tabbar-item:nth-child(5).active { color: #af52de !important; } /* Apple Purple */
 
     /* Fundo escurecido ao abrir o menu deslizante "Mais" */
     .mobile-more-backdrop {
