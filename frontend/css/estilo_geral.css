@@ -1275,16 +1275,24 @@ tr:hover td { background-color: rgba(248, 250, 252, 0.9); }
         display: none !important; /* Oculta a barra de rolagem horizontal */
     }
     
-    /* Efeito de neon luminoso colorido nos KPIs (Estilo Moderno e Colorido) */
+    /* Efeito de neon luminoso colorido nos KPIs (Estilo Moderno, Colorido e Light Theme) */
     .kpi-card-pro {
         position: relative !important;
         min-width: 270px !important;
         flex-shrink: 0 !important;
         scroll-snap-align: start !important;
         margin-bottom: 0 !important;
-        background: linear-gradient(135deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.95) 100%) !important;
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 0 20px rgba(255, 255, 255, 0.02) !important;
+        background: rgba(255, 255, 255, 0.98) !important; /* Light Theme */
+        border: 1.5px solid #e2e8f0 !important;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.04) !important;
+    }
+    
+    .kpi-card-pro .kpi-label {
+        color: #64748b !important;
+    }
+    
+    .kpi-card-pro .kpi-value {
+        color: #0f172a !important;
     }
     
     .kpi-card-pro::after {
@@ -1296,14 +1304,13 @@ tr:hover td { background-color: rgba(248, 250, 252, 0.9); }
         height: 3px;
         background: var(--kpi-color) !important;
         border-radius: 3px 3px 0 0;
-        box-shadow: 0 0 12px var(--kpi-color), 0 0 20px var(--kpi-color) !important;
+        box-shadow: 0 4px 10px var(--kpi-color) !important;
     }
 
     /* Linha colorida de destaque em cada painel (Mobile) */
     .panel {
         border-top: 3px solid transparent !important;
         border-image: linear-gradient(90deg, #10b981 0%, #fbbf24 50%, #f97316 100%) 1 !important;
-        border-radius: 16px !important;
         overflow: hidden !important;
     }
 
@@ -1311,7 +1318,37 @@ tr:hover td { background-color: rgba(248, 250, 252, 0.9); }
     input, select, textarea {
         min-height: 44px !important;
         font-size: 16px !important; /* Fonte a 16px impede o zoom automático do Safari no iOS */
+    }
+
+    /* Regra geral para bordas levemente arredondadas em todos os componentes no Mobile */
+    .panel, 
+    .kpi-card-pro, 
+    .table-container, 
+    .card, 
+    .modal-content-pro, 
+    .product-card,
+    .sheet-item-icon,
+    .search-box-pro input,
+    input, 
+    select, 
+    textarea, 
+    button, 
+    .btn,
+    .btn-primary,
+    .btn-secondary,
+    .btn-danger,
+    .btn-sheet-logout {
         border-radius: 12px !important;
+    }
+    
+    /* Manter círculos perfeitos para elementos específicos */
+    .avatar-circle, .avatar-placeholder, .legend-dot {
+        border-radius: 50% !important;
+    }
+    
+    /* Impedir cantos arredondados em barras de tela cheia */
+    #titlebar, .mobile-tabbar {
+        border-radius: 0 !important;
     }
     
     input:focus, select:focus, textarea:focus {
