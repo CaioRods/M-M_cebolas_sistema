@@ -108,6 +108,14 @@ function checkEnvironment() {
     if (userRole !== 'admin') {
         document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
     }
+
+    // Notifica o Electron sobre o papel do usuário para ajustar a TouchBar principal
+    if (typeof require !== 'undefined') {
+        try {
+            const { ipcRenderer } = require('electron');
+            ipcRenderer.send('user-logged-in', userRole);
+        } catch(e) {}
+    }
 }
 
 async function loadDataFromAPI() {

@@ -8,6 +8,9 @@ const { autoUpdater } = require('electron-updater');
 
 const isDev = process.env.NODE_ENV === 'development';
 let mainTouchBar = null;
+let loginTouchBar = null;
+let currentUserRole = 'operador';
+let btnDashboard, btnCompra, btnVenda, btnEstoque, btnCadastros, btnNFe, btnFinanceiro, btnConfigs, btnAdmin;
 
 // Configuração básica do autoUpdater
 autoUpdater.autoDownload = !isDev;
@@ -29,75 +32,80 @@ function createWindow() {
         }
     });
 
-    // --- ATALHOS DA TOUCH BAR (macOS) ---
-    const btnDashboard = new TouchBarButton({
+    // --- INICIALIZAÇÃO DOS BOTÕES DA TOUCH BAR ---
+    btnDashboard = new TouchBarButton({
         label: '📊 Dash',
         backgroundColor: '#1A5632',
         click: () => { win.webContents.send('navegar-para', 'dashboard'); }
     });
 
-    const btnCompra = new TouchBarButton({
+    btnCompra = new TouchBarButton({
         label: '🛒 Compra',
         backgroundColor: '#2e7d32',
         click: () => { win.webContents.send('navegar-para', 'entrada'); }
     });
 
-    const btnVenda = new TouchBarButton({
+    btnVenda = new TouchBarButton({
         label: '💵 Venda',
         backgroundColor: '#1565c0',
         click: () => { win.webContents.send('navegar-para', 'saida'); }
     });
 
-    const btnEstoque = new TouchBarButton({
+    btnEstoque = new TouchBarButton({
         label: '📦 Estoque',
         backgroundColor: '#ef6c00',
         click: () => { win.webContents.send('navegar-para', 'estoque'); }
     });
 
-    const btnCadastros = new TouchBarButton({
+    btnCadastros = new TouchBarButton({
         label: '📋 Cadastros',
         click: () => { win.webContents.send('navegar-para', 'cadastro'); }
     });
 
-    const btnNFe = new TouchBarButton({
+    btnNFe = new TouchBarButton({
         label: '🧾 NF-e',
         click: () => { win.webContents.send('navegar-para', 'nfe'); }
     });
 
-    const btnFinanceiro = new TouchBarButton({
+    btnFinanceiro = new TouchBarButton({
         label: '💰 Finan',
         click: () => { win.webContents.send('navegar-para', 'financeiro'); }
     });
 
-    const btnConfigs = new TouchBarButton({
+    btnConfigs = new TouchBarButton({
         label: '⚙️ Configs',
         click: () => { win.webContents.send('navegar-para', 'config'); }
     });
 
-    const btnAdmin = new TouchBarButton({
+    btnAdmin = new TouchBarButton({
         label: '🛡️ Admin',
         backgroundColor: '#d97706',
         click: () => { win.webContents.send('navegar-para', 'admin'); }
     });
 
-    mainTouchBar = new TouchBar({
+    // Touch bar da tela de login (apenas o botão "Logar")
+    loginTouchBar = new TouchBar({
         items: [
-            btnDashboard,
-            new TouchBarSpacer({ size: 'small' }),
-            btnCompra,
-            btnVenda,
-            btnEstoque,
-            new TouchBarSpacer({ size: 'small' }),
-            btnCadastros,
-            btnNFe,
-            btnFinanceiro,
-            new TouchBarSpacer({ size: 'small' }),
-            btnConfigs,
-            btnAdmin
+            new TouchBarSpacer({ size: 'large' }),
+            new TouchBarButton({
+                label: '🔑 Entrar / Logar no Sistema',
+                backgroundColor: '#1A5632',
+                click: () => { win.webContents.send('touchbar-login'); }
+            })
         ]
     });
 
-    win.setTouchBar(mainTouchBar);
+    // Define inicialmente a TouchBar de login
+    win.setTouchBar(loginTouchBar);
+
+    ipcMain.on('login-screen', () => {
+        win.setTouchBar(loginTouchBar);
+    });
+
+    ipcMain.on('user-logged-in', (event, role) => {
+        currentUserRole = role;
+        buildMainTouchBar(win);
+    });
 
     ipcMain.on('section-changed', (event, id) => {
         const sectionTouchBar = getTouchBarForSection(id, win);
@@ -133,6 +141,8 @@ function createWindow() {
         ipcMain.removeAllListeners('maximize-app');
         ipcMain.removeAllListeners('close-app');
         ipcMain.removeAllListeners('section-changed');
+        ipcMain.removeAllListeners('user-logged-in');
+        ipcMain.removeAllListeners('login-screen');
     });
 
     // --- LÓGICA DE AUTO-UPDATE ---
@@ -201,6 +211,10 @@ app.on('window-all-closed', () => {
 });
 
 function getTouchBarForSection(sectionId, win) {
+    if (sectionId === 'admin' && currentUserRole !== 'admin') {
+        return mainTouchBar || loginTouchBar;
+    }
+
     const btnBack = new TouchBarButton({
         label: '⬅️ Menu',
         backgroundColor: '#374151',
@@ -392,4 +406,30 @@ function getTouchBarForSection(sectionId, win) {
     }
 
     return mainTouchBar;
+}
+
+function buildMainTouchBar(win) {
+    const items = [
+        btnDashboard,
+        new TouchBarSpacer({ size: 'small' }),
+        btnCompra,
+        btnVenda,
+        btnEstoque,
+        new TouchBarSpacer({ size: 'small' }),
+        btnCadastros,
+        btnNFe,
+        btnFinanceiro,
+    ];
+
+    if (currentUserRole === 'admin') {
+        items.push(new TouchBarSpacer({ size: 'small' }));
+        items.push(btnConfigs);
+        items.push(btnAdmin);
+    } else {
+        items.push(new TouchBarSpacer({ size: 'small' }));
+        items.push(btnConfigs);
+    }
+
+    mainTouchBar = new TouchBar({ items });
+    win.setTouchBar(mainTouchBar);
 }

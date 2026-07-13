@@ -115,6 +115,15 @@ window.onload = function() {
             document.getElementById('closeBtn')?.addEventListener('click', () => ipcRenderer.send('close-app'));
             document.getElementById('minBtn')?.addEventListener('click', () => ipcRenderer.send('minimize-app'));
             document.getElementById('maxBtn')?.addEventListener('click', () => ipcRenderer.send('maximize-app'));
+
+            // Notifica o Electron que está na tela de login para exibir apenas o botão de entrar
+            ipcRenderer.send('login-screen');
+
+            // Escuta o clique físico do botão da Touch Bar para submeter o formulário
+            ipcRenderer.on('touchbar-login', () => {
+                const form = document.getElementById('formLogin');
+                if (form) fazerLogin(new Event('submit'));
+            });
         } catch(e) {}
     }
 
