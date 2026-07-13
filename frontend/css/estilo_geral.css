@@ -1025,7 +1025,10 @@ tr:hover td { background-color: rgba(248, 250, 252, 0.9); }
         font-size: 0.8rem !important;
         font-weight: 800 !important;
         letter-spacing: 1px !important;
-        color: #ffffff !important;    /* Barra de Navegação Inferior Estilo Dock Apple (Mobile TabBar Frosted Glass) */
+        color: #ffffff !important;
+    }
+
+    /* Barra de Navegação Inferior Estilo Dock Apple (Mobile TabBar Frosted Glass) */
     .mobile-tabbar {
         display: flex;
         position: fixed;
