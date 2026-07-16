@@ -80,7 +80,6 @@ function checkEnvironment() {
     const windowControls = document.querySelector('.window-controls');
     if (titlebar) titlebar.style.display = 'flex';
     if (isElectron) {
-        document.body.classList.add('electron-vibrant');
         if (windowControls) windowControls.style.display = 'flex';
         try {
             const { ipcRenderer } = require('electron');
@@ -639,12 +638,56 @@ function calcularDashboardLocal() {
         }
     });
 
+    // Subtrair descartes para exatidão do estoque
+    (appData.descartes || []).forEach(d => {
+        if (!stockByCaixas[d.produto]) { stockByCaixas[d.produto] = 0; stockByKg[d.produto] = 0; }
+        const caixas = d.quantidade_caixas || 0;
+        const kg = d.peso_kg || 0;
+        stockByCaixas[d.produto] -= caixas;
+        stockByKg[d.produto] -= kg;
+        totalCaixas -= caixas;
+        totalKg -= kg;
+    });
+
+    // Calcular valoração do estoque e lucro estimado em produtos
+    let valorEstoqueEstimado = 0;
+    let lucroEstoqueEstimado = 0;
+
+    (appData.products || []).forEach(p => {
+        const stockCx = Math.max(0, stockByCaixas[p.nome] || 0);
+        if (stockCx <= 0) return;
+
+        const precoVenda = p.preco_venda || 0;
+        const valorVenda = stockCx * precoVenda;
+
+        // Calcular custo unitário médio de compra para este produto
+        const compras = appData.transactions.filter(t => t.produto === p.nome && t.tipo === 'entrada');
+        let avgCost = 0;
+        if (compras.length > 0) {
+            const totalVal = compras.reduce((acc, t) => acc + (t.valor || 0), 0);
+            const totalQty = compras.reduce((acc, t) => acc + (t.qtd_caixas || 0), 0);
+            avgCost = totalQty > 0 ? (totalVal / totalQty) : 0;
+        }
+
+        const custoTotal = stockCx * avgCost;
+        const lucroTotal = valorVenda - custoTotal;
+
+        valorEstoqueEstimado += valorVenda;
+        lucroEstoqueEstimado += lucroTotal;
+    });
+
     const topProdutos = Object.entries(stockByCaixas)
         .map(([nome, caixas]) => ({ nome, caixas: Math.round(caixas * 10) / 10, kg: Math.round((stockByKg[nome] || 0) * 10) / 10 }))
         .filter(p => p.caixas > 0).sort((a, b) => b.caixas - a.caixas).slice(0, 5);
 
     return {
-        estoque: { totalCaixas: Math.round(totalCaixas * 10) / 10, totalKg: Math.round(totalKg * 10) / 10, porProduto: topProdutos },
+        estoque: { 
+            totalCaixas: Math.round(totalCaixas * 10) / 10, 
+            totalKg: Math.round(totalKg * 10) / 10, 
+            porProduto: topProdutos,
+            valorEstimado: valorEstoqueEstimado,
+            lucroEstimado: lucroEstoqueEstimado
+        },
         financeiro: { receitaMes, despesasMes, lucroMes: receitaMes - despesasMes, ticketMedio: qtdVendasMes > 0 ? receitaMes / qtdVendasMes : 0, receitaTotal: 0, despesasTotal: 0, lucroTotal: 0 },
         dre: {
             faturamentoMes: receitaMes,
@@ -755,26 +798,48 @@ function renderKPIs(data) {
             trendBorder: 'rgba(22, 101, 52, 0.15)'
         },
         { 
+            label: 'Valor em Estoque (Est.)', 
+            value: `R$ ${(data.estoque.valorEstimado || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 
+            icon: 'fa-warehouse', 
+            color: '#0891b2', 
+            bg: 'rgba(8, 145, 178, 0.1)', 
+            trend: 'Valoração Venda', 
+            trendColor: '#0891b2',
+            trendBg: 'rgba(8, 145, 178, 0.08)',
+            trendBorder: 'rgba(8, 145, 178, 0.15)'
+        },
+        { 
+            label: 'Lucro em Produtos (Est.)', 
+            value: `R$ ${(data.estoque.lucroEstimado || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 
+            icon: 'fa-coins', 
+            color: '#ea580c', 
+            bg: 'rgba(234, 88, 12, 0.1)', 
+            trend: 'Lucro Potencial', 
+            trendColor: '#ea580c',
+            trendBg: 'rgba(234, 88, 12, 0.08)',
+            trendBorder: 'rgba(234, 88, 12, 0.15)'
+        },
+        { 
             label: 'Receita (Mês)', 
             value: `R$ ${(data.financeiro.receitaMes || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 
             icon: 'fa-hand-holding-usd', 
-            color: '#059669', 
-            bg: 'rgba(5, 150, 105, 0.1)', 
+            color: '#0d9488', 
+            bg: 'rgba(13, 148, 136, 0.1)', 
             trend: growthLabel, 
             trendColor: growthColor,
             trendBg: growthBg,
             trendBorder: growthBorder
         },
         { 
-            label: 'Lucro Estimado', 
+            label: 'Lucro Real (Mês)', 
             value: `R$ ${(data.financeiro.lucroMes || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 
             icon: 'fa-coins', 
-            color: '#d97706', 
-            bg: 'rgba(217, 119, 6, 0.1)', 
-            trend: 'Lucro Real', 
-            trendColor: '#d97706',
-            trendBg: 'rgba(217, 119, 6, 0.08)',
-            trendBorder: 'rgba(217, 119, 6, 0.15)'
+            color: '#16a34a', 
+            bg: 'rgba(22, 163, 74, 0.1)', 
+            trend: 'Resultado Mês', 
+            trendColor: '#16a34a',
+            trendBg: 'rgba(22, 163, 74, 0.08)',
+            trendBorder: 'rgba(22, 163, 74, 0.15)'
         },
         { 
             label: 'Margem de Lucro', 
@@ -1534,12 +1599,25 @@ async function downloadXML(id) {
     try {
         const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
         if (!res.ok) { showError('Erro ao baixar XML'); return; }
-        const blob = await res.blob();
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `NFe_${id}.xml`;
-        a.click();
-    } catch (e) { showError('Erro ao baixar XML'); }
+        const xmlText = await res.text();
+
+        const { ipcRenderer } = require('electron');
+        ipcRenderer.send('salvar-arquivo', {
+            content: xmlText,
+            defaultName: `NFe_${id}.xml`,
+            filters: [{ name: 'XML Files', extensions: ['xml'] }]
+        });
+
+        ipcRenderer.once('salvar-arquivo-status', (event, status) => {
+            if (status.success) {
+                showSuccess('XML salvo com sucesso!');
+            } else if (status.error) {
+                showError('Erro ao salvar XML: ' + status.error);
+            }
+        });
+    } catch (e) {
+        showError('Erro ao baixar XML: ' + e.message);
+    }
 }
 
 async function downloadPDF(id, event) {
@@ -1558,16 +1636,26 @@ async function downloadPDF(id, event) {
         if (!res.ok) { showError('Erro ao gerar PDF'); return; }
         
         const blob = await res.blob();
-        const objectUrl = URL.createObjectURL(blob);
         
-        const a = document.createElement('a');
-        a.href = objectUrl;
-        a.download = `DANFE_${id}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(objectUrl);
-        showSuccess('Download iniciado!');
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const base64data = reader.result;
+            const { ipcRenderer } = require('electron');
+            ipcRenderer.send('salvar-arquivo', {
+                content: base64data,
+                defaultName: `DANFE_${id}.pdf`,
+                filters: [{ name: 'PDF Files', extensions: ['pdf'] }]
+            });
+            
+            ipcRenderer.once('salvar-arquivo-status', (event, status) => {
+                if (status.success) {
+                    showSuccess('PDF salvo com sucesso!');
+                } else if (status.error) {
+                    showError('Erro ao salvar PDF: ' + status.error);
+                }
+            });
+        };
+        reader.readAsDataURL(blob);
     } catch (e) {
         showError('Erro: ' + e.message);
     } finally {
@@ -1698,12 +1786,14 @@ async function confirmarGerarNFe(event) {
     
     if (!vendaId) { showError('Venda não identificada'); return; }
     
-    const destinatario = destId ? appData.clients.find(c => c.id == destId) : { 
+    const clientObj = destId ? appData.clients.find(c => c.id == destId) : null;
+    const destinatario = { 
         nome: destNome, 
         documento: destDoc,
         endereco: document.getElementById('nfe-dest-end')?.value || '',
         uf: document.getElementById('nfe-dest-uf')?.value || 'SP',
-        cep: document.getElementById('nfe-dest-cep')?.value || ''
+        cep: document.getElementById('nfe-dest-cep')?.value || '',
+        ie: clientObj ? clientObj.ie : ''
     };
     
     if (!destinatario?.nome) { showError('Informe o destinatário'); return; }
@@ -2970,11 +3060,33 @@ function globalDashSearch(val) {
 // =============================================
 // FUNÇÃO AUXILIAR: Preencher Destinatário NF-e
 // =============================================
+function extrairDadosEndereco(endereco) {
+    const res = { uf: 'SP', cep: '' };
+    if (!endereco) return res;
+
+    // Extrair CEP: 99999-999 ou 99999999
+    const cepMatch = endereco.match(/(\d{5}-\d{3})|(\b\d{8}\b)/);
+    if (cepMatch) {
+        res.cep = cepMatch[0].replace(/\D/g, '');
+    }
+
+    // Extrair UF: AC|AL|AM|AP|BA|CE|DF|ES|GO|MA|MG|MS|MT|PA|PB|PE|PI|PR|RJ|RN|RO|RR|RS|SC|SE|SP|TO
+    const ufMatch = endereco.match(/[\s,-]\b(AC|AL|AM|AP|BA|CE|DF|ES|GO|MA|MG|MS|MT|PA|PB|PE|PI|PR|RJ|RN|RO|RR|RS|SC|SE|SP|TO)\b/i);
+    if (ufMatch) {
+        res.uf = ufMatch[1].toUpperCase();
+    }
+
+    return res;
+}
+
 function preencherDestNFe(select) {
     const clienteId = select.value;
     if (!clienteId) {
         document.getElementById('nfe-dest-nome').value = '';
         document.getElementById('nfe-dest-doc').value = '';
+        if (document.getElementById('nfe-dest-end')) document.getElementById('nfe-dest-end').value = '';
+        if (document.getElementById('nfe-dest-uf')) document.getElementById('nfe-dest-uf').value = 'SP';
+        if (document.getElementById('nfe-dest-cep')) document.getElementById('nfe-dest-cep').value = '';
         return;
     }
     
@@ -2983,8 +3095,10 @@ function preencherDestNFe(select) {
         document.getElementById('nfe-dest-nome').value = cliente.nome || '';
         document.getElementById('nfe-dest-doc').value = cliente.documento || '';
         if (document.getElementById('nfe-dest-end')) document.getElementById('nfe-dest-end').value = cliente.endereco || '';
-        if (document.getElementById('nfe-dest-uf')) document.getElementById('nfe-dest-uf').value = cliente.uf || 'SP';
-        if (document.getElementById('nfe-dest-cep')) document.getElementById('nfe-dest-cep').value = cliente.cep || '';
+        
+        const ext = extrairDadosEndereco(cliente.endereco);
+        if (document.getElementById('nfe-dest-uf')) document.getElementById('nfe-dest-uf').value = ext.uf;
+        if (document.getElementById('nfe-dest-cep')) document.getElementById('nfe-dest-cep').value = ext.cep;
     }
 }
 

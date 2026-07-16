@@ -1,4 +1,5 @@
 require('dotenv').config();
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
@@ -239,174 +240,201 @@ app.get('/api/dashboard', authenticateToken, (req, res) => {
             const pesoPorCaixa = configRow ? parseFloat(configRow.valor) : 20;
 
             db.all('SELECT * FROM descartes', [], (err3, descartes) => {
-                const now = new Date();
-                const currentMonth = now.getMonth();
-                const currentYear = now.getFullYear();
+                if (err3) return res.status(500).json({ error: err3.message });
 
-                let totalCaixas = 0;
-                let totalKg = 0;
-                let receitaMes = 0;
-                let despesasMes = 0;
-                let receitaTotal = 0;
-                let despesasTotal = 0;
+                db.all('SELECT * FROM produtos', [], (err4, produtos) => {
+                    if (err4) return res.status(500).json({ error: err4.message });
 
-                let comprasMes = 0;
-                let comprasTotal = 0;
-                let despesasOpMes = 0;
-                let despesasOpTotal = 0;
+                    const now = new Date();
+                    const currentMonth = now.getMonth();
+                    const currentYear = now.getFullYear();
 
-                // Estoque por produto
-                const stockByCaixas = {};
-                const stockByKg = {};
+                    let totalCaixas = 0;
+                    let totalKg = 0;
+                    let receitaMes = 0;
+                    let despesasMes = 0;
+                    let receitaTotal = 0;
+                    let despesasTotal = 0;
 
-                // Dados mensais (últimos 6 meses)
-                const monthlyData = {};
-                for (let i = 5; i >= 0; i--) {
-                    const d = new Date(currentYear, currentMonth - i, 1);
-                    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-                    monthlyData[key] = { receita: 0, despesa: 0, caixas_entrada: 0, caixas_saida: 0, kg_entrada: 0, kg_saida: 0 };
-                }
+                    let comprasMes = 0;
+                    let comprasTotal = 0;
+                    let despesasOpMes = 0;
+                    let despesasOpTotal = 0;
 
-                rows.forEach(t => {
-                    const tDate = new Date(t.data);
-                    const monthKey = `${tDate.getFullYear()}-${String(tDate.getMonth() + 1).padStart(2, '0')}`;
-                    const isCurrentMonth = tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear;
+                    // Estoque por produto
+                    const stockByCaixas = {};
+                    const stockByKg = {};
 
-                    let caixas = t.qtd_caixas || 0;
-                    let kg = t.peso_kg || 0;
-
-                    if (caixas === 0 && kg === 0) {
-                        if (t.unidade === 'KG') {
-                            kg = t.quantidade;
-                            caixas = t.quantidade / pesoPorCaixa;
-                        } else {
-                            caixas = t.quantidade;
-                            kg = t.quantidade * pesoPorCaixa;
-                        }
+                    // Dados mensais (últimos 6 meses)
+                    const monthlyData = {};
+                    for (let i = 5; i >= 0; i--) {
+                        const d = new Date(currentYear, currentMonth - i, 1);
+                        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                        monthlyData[key] = { receita: 0, despesa: 0, caixas_entrada: 0, caixas_saida: 0, kg_entrada: 0, kg_saida: 0 };
                     }
 
-                    if (t.tipo === 'entrada') {
-                        if (!stockByCaixas[t.produto]) { stockByCaixas[t.produto] = 0; stockByKg[t.produto] = 0; }
-                        stockByCaixas[t.produto] += caixas;
-                        stockByKg[t.produto] += kg;
-                        totalCaixas += caixas;
-                        totalKg += kg;
-                        despesasTotal += t.valor;
-                        comprasTotal += t.valor;
-                        if (isCurrentMonth) {
-                            despesasMes += t.valor;
-                            comprasMes += t.valor;
+                    rows.forEach(t => {
+                        const tDate = new Date(t.data);
+                        const monthKey = `${tDate.getFullYear()}-${String(tDate.getMonth() + 1).padStart(2, '0')}`;
+                        const isCurrentMonth = tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear;
+
+                        let caixas = t.qtd_caixas || 0;
+                        let kg = t.peso_kg || 0;
+
+                        if (caixas === 0 && kg === 0) {
+                            if (t.unidade === 'KG') {
+                                kg = t.quantidade;
+                                caixas = t.quantidade / pesoPorCaixa;
+                            } else {
+                                caixas = t.quantidade;
+                                kg = t.quantidade * pesoPorCaixa;
+                            }
                         }
-                        if (monthlyData[monthKey]) {
-                            monthlyData[monthKey].despesa += t.valor;
-                            monthlyData[monthKey].caixas_entrada += caixas;
-                            monthlyData[monthKey].kg_entrada += kg;
+
+                        if (t.tipo === 'entrada') {
+                            if (!stockByCaixas[t.produto]) { stockByCaixas[t.produto] = 0; stockByKg[t.produto] = 0; }
+                            stockByCaixas[t.produto] += caixas;
+                            stockByKg[t.produto] += kg;
+                            totalCaixas += caixas;
+                            totalKg += kg;
+                            despesasTotal += t.valor;
+                            comprasTotal += t.valor;
+                            if (isCurrentMonth) {
+                                despesasMes += t.valor;
+                                comprasMes += t.valor;
+                            }
+                            if (monthlyData[monthKey]) {
+                                monthlyData[monthKey].despesa += t.valor;
+                                monthlyData[monthKey].caixas_entrada += caixas;
+                                monthlyData[monthKey].kg_entrada += kg;
+                            }
+                        } else if (t.tipo === 'saida') {
+                            if (!stockByCaixas[t.produto]) { stockByCaixas[t.produto] = 0; stockByKg[t.produto] = 0; }
+                            stockByCaixas[t.produto] -= caixas;
+                            stockByKg[t.produto] -= kg;
+                            totalCaixas -= caixas;
+                            totalKg -= kg;
+                            receitaTotal += t.valor;
+                            if (isCurrentMonth) receitaMes += t.valor;
+                            if (monthlyData[monthKey]) {
+                                monthlyData[monthKey].receita += t.valor;
+                                monthlyData[monthKey].caixas_saida += caixas;
+                                monthlyData[monthKey].kg_saida += kg;
+                            }
+                        } else if (t.tipo === 'despesa') {
+                            despesasTotal += t.valor;
+                            despesasOpTotal += t.valor;
+                            if (isCurrentMonth) {
+                                despesasMes += t.valor;
+                                despesasOpMes += t.valor;
+                            }
+                            if (monthlyData[monthKey]) monthlyData[monthKey].despesa += t.valor;
                         }
-                    } else if (t.tipo === 'saida') {
-                        if (!stockByCaixas[t.produto]) { stockByCaixas[t.produto] = 0; stockByKg[t.produto] = 0; }
-                        stockByCaixas[t.produto] -= caixas;
-                        stockByKg[t.produto] -= kg;
-                        totalCaixas -= caixas;
-                        totalKg -= kg;
-                        receitaTotal += t.valor;
-                        if (isCurrentMonth) receitaMes += t.valor;
-                        if (monthlyData[monthKey]) {
-                            monthlyData[monthKey].receita += t.valor;
-                            monthlyData[monthKey].caixas_saida += caixas;
-                            monthlyData[monthKey].kg_saida += kg;
+                    });
+
+                    // Deduzir descartes do estoque global e estoque por produto
+                    const totalDescarteCx = (descartes || []).reduce((acc, d) => acc + (d.quantidade_caixas || 0), 0);
+                    const totalDescarteKg = (descartes || []).reduce((acc, d) => acc + (d.peso_kg || 0), 0);
+                    totalCaixas -= totalDescarteCx;
+                    totalKg -= totalDescarteKg;
+
+                    (descartes || []).forEach(d => {
+                        if (stockByCaixas[d.produto]) {
+                            stockByCaixas[d.produto] -= d.quantidade_caixas || 0;
+                            stockByKg[d.produto] -= d.peso_kg || 0;
                         }
-                    } else if (t.tipo === 'despesa') {
-                        despesasTotal += t.valor;
-                        despesasOpTotal += t.valor;
-                        if (isCurrentMonth) {
-                            despesasMes += t.valor;
-                            despesasOpMes += t.valor;
+                    });
+
+                    // Top produtos por estoque
+                    const topProdutos = Object.entries(stockByCaixas)
+                        .map(([nome, caixas]) => ({ nome, caixas: Math.round(caixas * 10) / 10, kg: Math.round((stockByKg[nome] || 0) * 10) / 10 }))
+                        .filter(p => p.caixas > 0)
+                        .sort((a, b) => b.caixas - a.caixas)
+                        .slice(0, 5);
+
+                    // Cálculo do Preço Médio de Compra por Produto para valorar perdas e calcular lucro de estoque
+                    const productPrices = {};
+                    const productCounts = {};
+                    rows.filter(t => t.tipo === 'entrada').forEach(t => {
+                        let caixas = t.qtd_caixas || t.quantidade || 0;
+                        if (caixas > 0) {
+                            productPrices[t.produto] = (productPrices[t.produto] || 0) + t.valor;
+                            productCounts[t.produto] = (productCounts[t.produto] || 0) + caixas;
                         }
-                        if (monthlyData[monthKey]) monthlyData[monthKey].despesa += t.valor;
-                    }
-                });
+                    });
 
-                // Deduzir descartes do estoque global e estoque por produto
-                const totalDescarteCx = (descartes || []).reduce((acc, d) => acc + (d.quantidade_caixas || 0), 0);
-                const totalDescarteKg = (descartes || []).reduce((acc, d) => acc + (d.peso_kg || 0), 0);
-                totalCaixas -= totalDescarteCx;
-                totalKg -= totalDescarteKg;
+                    const avgPrices = {};
+                    Object.keys(productPrices).forEach(p => {
+                        avgPrices[p] = productPrices[p] / productCounts[p];
+                    });
 
-                (descartes || []).forEach(d => {
-                    if (stockByCaixas[d.produto]) {
-                        stockByCaixas[d.produto] -= d.quantidade_caixas || 0;
-                        stockByKg[d.produto] -= d.peso_kg || 0;
-                    }
-                });
+                    // Calcular valoração do estoque e lucro estimado em produtos
+                    let valorEstoqueEstimado = 0;
+                    let lucroEstoqueEstimado = 0;
 
-                // Top produtos por estoque
-                const topProdutos = Object.entries(stockByCaixas)
-                    .map(([nome, caixas]) => ({ nome, caixas: Math.round(caixas * 10) / 10, kg: Math.round((stockByKg[nome] || 0) * 10) / 10 }))
-                    .filter(p => p.caixas > 0)
-                    .sort((a, b) => b.caixas - a.caixas)
-                    .slice(0, 5);
+                    (produtos || []).forEach(p => {
+                        const stockCx = Math.max(0, stockByCaixas[p.nome] || 0);
+                        if (stockCx <= 0) return;
 
-                // Cálculo do Preço Médio de Compra por Produto para valorar perdas
-                const productPrices = {};
-                const productCounts = {};
-                rows.filter(t => t.tipo === 'entrada').forEach(t => {
-                    let caixas = t.qtd_caixas || t.quantidade || 0;
-                    if (caixas > 0) {
-                        productPrices[t.produto] = (productPrices[t.produto] || 0) + t.valor;
-                        productCounts[t.produto] = (productCounts[t.produto] || 0) + caixas;
-                    }
-                });
+                        const precoVenda = p.preco_venda || 0;
+                        const valorVenda = stockCx * precoVenda;
 
-                const avgPrices = {};
-                Object.keys(productPrices).forEach(p => {
-                    avgPrices[p] = productPrices[p] / productCounts[p];
-                });
+                        const avgCost = avgPrices[p.nome] || 0;
+                        const custoTotal = stockCx * avgCost;
+                        const lucroTotal = valorVenda - custoTotal;
 
-                let totalDescarteValue = 0;
-                let descarteValueMes = 0;
+                        valorEstoqueEstimado += valorVenda;
+                        lucroEstoqueEstimado += lucroTotal;
+                    });
 
-                (descartes || []).forEach(d => {
-                    const avgPrice = avgPrices[d.produto] || 25; // Padrão 25 reais/caixa se não houver compras
-                    const cost = (d.quantidade_caixas || 0) * avgPrice;
-                    totalDescarteValue += cost;
-                    
-                    const dDate = new Date(d.data);
-                    if (dDate.getMonth() === currentMonth && dDate.getFullYear() === currentYear) {
-                        descarteValueMes += cost;
-                    }
-                });
+                    let totalDescarteValue = 0;
+                    let descarteValueMes = 0;
 
-                const ultimasMovimentacoes = rows.slice(0, 10);
+                    (descartes || []).forEach(d => {
+                        const avgPrice = avgPrices[d.produto] || 25; // Padrão 25 reais/caixa se não houver compras
+                        const cost = (d.quantidade_caixas || 0) * avgPrice;
+                        totalDescarteValue += cost;
+                        
+                        const dDate = new Date(d.data);
+                        if (dDate.getMonth() === currentMonth && dDate.getFullYear() === currentYear) {
+                            descarteValueMes += cost;
+                        }
+                    });
 
-                res.json({
-                    estoque: {
-                        totalCaixas: Math.round(totalCaixas * 10) / 10,
-                        totalKg: Math.round(totalKg * 10) / 10,
-                        porProduto: topProdutos
-                    },
-                    financeiro: {
-                        receitaMes,
-                        despesasMes,
-                        lucroMes: receitaMes - despesasMes,
-                        receitaTotal,
-                        despesasTotal,
-                        lucroTotal: receitaTotal - despesasTotal
-                    },
-                    dre: {
-                        faturamentoMes: receitaMes,
-                        faturamentoTotal: receitaTotal,
-                        cmvMes: comprasMes,
-                        cmvTotal: comprasTotal,
-                        perdasMes: descarteValueMes,
-                        perdasTotal: totalDescarteValue,
-                        despesasOpMes,
-                        despesasOpTotal,
-                        lucroMes: receitaMes - comprasMes - descarteValueMes - despesasOpMes,
-                        lucroTotal: receitaTotal - comprasTotal - totalDescarteValue - despesasOpTotal
-                    },
-                    mensal: monthlyData,
-                    ultimasMovimentacoes,
-                    pesoPorCaixa
+                    const ultimasMovimentacoes = rows.slice(0, 10);
+
+                    res.json({
+                        estoque: {
+                            totalCaixas: Math.round(totalCaixas * 10) / 10,
+                            totalKg: Math.round(totalKg * 10) / 10,
+                            porProduto: topProdutos,
+                            valorEstimado: valorEstoqueEstimado,
+                            lucroEstimado: lucroEstoqueEstimado
+                        },
+                        financeiro: {
+                            receitaMes,
+                            despesasMes,
+                            lucroMes: receitaMes - despesasMes,
+                            receitaTotal,
+                            despesasTotal,
+                            lucroTotal: receitaTotal - despesasTotal
+                        },
+                        dre: {
+                            faturamentoMes: receitaMes,
+                            faturamentoTotal: receitaTotal,
+                            cmvMes: comprasMes,
+                            cmvTotal: comprasTotal,
+                            perdasMes: descarteValueMes,
+                            perdasTotal: totalDescarteValue,
+                            despesasOpMes,
+                            despesasOpTotal,
+                            lucroMes: receitaMes - comprasMes - descarteValueMes - despesasOpMes,
+                            lucroTotal: receitaTotal - comprasTotal - totalDescarteValue - despesasOpTotal
+                        },
+                        mensal: monthlyData,
+                        ultimasMovimentacoes,
+                        pesoPorCaixa
+                    });
                 });
             });
         });
@@ -664,16 +692,199 @@ app.get('/api/nfe', authenticateToken, (req, res) => {
     db.all(query, params, (err, rows) => res.json(rows || []));
 });
 
+// ====================================================
+// HELPERS DE VALIDAÇÃO E DADOS IBGE SEFAZ
+// ====================================================
+const axios = require('axios');
+
+function validarCPF(cpf) {
+    cpf = cpf.replace(/\D/g, '');
+    if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
+    let soma = 0, resto;
+    for (let i = 1; i <= 9; i++) soma += parseInt(cpf.substring(i - 1, i)) * (11 - i);
+    resto = (soma * 10) % 11;
+    if (resto === 10 || resto === 11) resto = 0;
+    if (resto !== parseInt(cpf.substring(9, 10))) return false;
+    soma = 0;
+    for (let i = 1; i <= 10; i++) soma += parseInt(cpf.substring(i - 1, i)) * (12 - i);
+    resto = (soma * 10) % 11;
+    if (resto === 10 || resto === 11) resto = 0;
+    if (resto !== parseInt(cpf.substring(10, 11))) return false;
+    return true;
+}
+
+function validarCNPJ(cnpj) {
+    cnpj = cnpj.replace(/\D/g, '');
+    if (cnpj.length !== 14 || /^(\d)\1{13}$/.test(cnpj)) return false;
+    let tamanho = cnpj.length - 2;
+    let numeros = cnpj.substring(0, tamanho);
+    let digitos = cnpj.substring(tamanho);
+    let soma = 0;
+    let pos = tamanho - 7;
+    for (let i = tamanho; i >= 1; i--) {
+        soma += numeros.charAt(tamanho - i) * pos--;
+        if (pos < 2) pos = 9;
+    }
+    let resultado = soma % 11 < 2 ? 0 : 11 - (soma % 11);
+    if (resultado !== parseInt(digitos.charAt(0))) return false;
+    tamanho = tamanho + 1;
+    numeros = cnpj.substring(0, tamanho);
+    soma = 0;
+    pos = tamanho - 7;
+    for (let i = tamanho; i >= 1; i--) {
+        soma += numeros.charAt(tamanho - i) * pos--;
+        if (pos < 2) pos = 9;
+    }
+    resultado = soma % 11 < 2 ? 0 : 11 - (soma % 11);
+    if (resultado !== parseInt(digitos.charAt(1))) return false;
+    return true;
+}
+
+const CAPITAL_IBGE = {
+    'AC': { cMun: '1200401', xMun: 'RIO BRANCO' },
+    'AL': { cMun: '2704302', xMun: 'MACEIO' },
+    'AM': { cMun: '1302603', xMun: 'MANAUS' },
+    'AP': { cMun: '1600303', xMun: 'MACAPA' },
+    'BA': { cMun: '2927408', xMun: 'SALVADOR' },
+    'CE': { cMun: '2304400', xMun: 'FORTALEZA' },
+    'DF': { cMun: '5300108', xMun: 'BRASILIA' },
+    'ES': { cMun: '3205309', xMun: 'VITORIA' },
+    'GO': { cMun: '5208707', xMun: 'GOIANIA' },
+    'MA': { cMun: '2111300', xMun: 'SAO LUIS' },
+    'MG': { cMun: '3106200', xMun: 'BELO HORIZONTE' },
+    'MS': { cMun: '5002704', xMun: 'CAMPO GRANDE' },
+    'MT': { cMun: '5103403', xMun: 'CUIABA' },
+    'PA': { cMun: '1501402', xMun: 'BELEM' },
+    'PB': { cMun: '2507507', xMun: 'JOAO PESSOA' },
+    'PE': { cMun: '2611606', xMun: 'RECIFE' },
+    'PI': { cMun: '2211002', xMun: 'TERESINA' },
+    'PR': { cMun: '4106902', xMun: 'CURITIBA' },
+    'RJ': { cMun: '3304557', xMun: 'RIO DE JANEIRO' },
+    'RN': { cMun: '2408102', xMun: 'NATAL' },
+    'RO': { cMun: '1100205', xMun: 'PORTO VELHO' },
+    'RR': { cMun: '1400100', xMun: 'BOA VISTA' },
+    'RS': { cMun: '4314902', xMun: 'PORTO ALEGRE' },
+    'SC': { cMun: '4205407', xMun: 'FLORIANOPOLIS' },
+    'SE': { cMun: '2800308', xMun: 'ARACAJU' },
+    'SP': { cMun: '3550308', xMun: 'SAO PAULO' },
+    'TO': { cMun: '1721000', xMun: 'PALMAS' }
+};
+
+async function buscarDadosCEP(cep) {
+    try {
+        const cleanCep = (cep || '').replace(/\D/g, '');
+        if (cleanCep.length !== 8) return null;
+        const response = await axios.get(`https://viacep.com.br/ws/${cleanCep}/json/`, { timeout: 3500 });
+        if (response.data && !response.data.erro) {
+            return {
+                cMun: response.data.ibge,
+                xMun: response.data.localidade.toUpperCase(),
+                uf: response.data.uf.toUpperCase()
+            };
+        }
+    } catch (e) {
+        console.error("Erro ao consultar ViaCEP:", e.message);
+    }
+    return null;
+}
+
 app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
-    const { venda_id, destinatario, itens } = req.body;
+    const { venda_id, destinatario } = req.body;
+    
+    if (!destinatario) {
+        return res.status(400).json({ error: "Dados do destinatário não fornecidos." });
+    }
+
     db.get('SELECT * FROM movimentacoes WHERE id = ?', [venda_id], async (err, venda) => {
         if (err || !venda) return res.status(404).json({ error: "Venda não encontrada" });
         
         // Buscar configurações necessárias
         db.all('SELECT chave, valor FROM configs', [], async (err2, configs) => {
+            if (err2) return res.status(500).json({ error: err2.message });
+
             const configMap = {};
             configs?.forEach(c => configMap[c.chave] = c.valor);
             
+            // --- 1. CHECAGENS DO EMITENTE ---
+            const emitCNPJ = (configMap['emit_cnpj'] || '').replace(/\D/g, '');
+            const emitIE = (configMap['emit_ie'] || '').replace(/\D/g, '');
+            const emitUF = (configMap['emit_uf'] || '').trim().toUpperCase();
+            const emitCEP = (configMap['emit_cep'] || '').replace(/\D/g, '');
+            const emitNome = (configMap['emit_nome'] || '').trim();
+            const emitCMun = (configMap['emit_cmun'] || '').replace(/\D/g, '');
+
+            if (!emitCNPJ || !validarCNPJ(emitCNPJ)) {
+                return res.status(400).json({ error: `Erro de Configuração (Emitente): O CNPJ do emitente (${emitCNPJ || 'vazio'}) é inválido.` });
+            }
+            if (!emitIE) {
+                return res.status(400).json({ error: "Erro de Configuração (Emitente): A Inscrição Estadual (IE) do emitente não está configurada." });
+            }
+            if (!emitUF || emitUF.length !== 2) {
+                return res.status(400).json({ error: "Erro de Configuração (Emitente): A UF do emitente é obrigatória e deve ter 2 caracteres." });
+            }
+            if (emitCEP.length !== 8) {
+                return res.status(400).json({ error: `Erro de Configuração (Emitente): O CEP do emitente (${emitCEP}) deve ter exatamente 8 dígitos.` });
+            }
+            if (emitCMun.length !== 7) {
+                return res.status(400).json({ error: `Erro de Configuração (Emitente): O Código de Município IBGE do emitente (${emitCMun}) é inválido.` });
+            }
+            if (!emitNome) {
+                return res.status(400).json({ error: "Erro de Configuração (Emitente): A Razão Social do emitente não está cadastrada." });
+            }
+
+            // --- 2. CHECAGENS DO DESTINATÁRIO ---
+            const destDoc = (destinatario.documento || '').replace(/\D/g, '');
+            const destNome = (destinatario.nome || '').trim();
+            const destUF = (destinatario.uf || '').trim().toUpperCase();
+            const destCEP = (destinatario.cep || '').replace(/\D/g, '');
+            const destEnd = (destinatario.endereco || '').trim();
+
+            if (!destNome) {
+                return res.status(400).json({ error: "Erro de Validação: A Razão Social ou Nome do destinatário é obrigatório." });
+            }
+            if (destDoc.length === 14) {
+                if (!validarCNPJ(destDoc)) {
+                    return res.status(400).json({ error: `Erro de Validação: O CNPJ do destinatário (${destinatario.documento}) é inválido.` });
+                }
+            } else if (destDoc.length === 11) {
+                if (!validarCPF(destDoc)) {
+                    return res.status(400).json({ error: `Erro de Validação: O CPF do destinatário (${destinatario.documento}) é inválido.` });
+                }
+            } else {
+                return res.status(400).json({ error: `Erro de Validação: O documento do destinatário deve ser um CPF (11 dígitos) ou CNPJ (14 dígitos). Recebido: "${destinatario.documento || ''}"` });
+            }
+
+            if (!destUF || destUF.length !== 2) {
+                return res.status(400).json({ error: "Erro de Validação: A UF do destinatário é obrigatória e deve ter 2 caracteres (ex: SP)." });
+            }
+            if (destCEP.length !== 8) {
+                return res.status(400).json({ error: `Erro de Validação: O CEP do destinatário (${destinatario.cep || 'vazio'}) é inválido ou incompleto (deve conter 8 dígitos).` });
+            }
+            if (!destEnd) {
+                return res.status(400).json({ error: "Erro de Validação: O endereço completo do destinatário é obrigatório." });
+            }
+
+            // --- 3. RESOLUÇÃO DINÂMICA DE MUNICÍPIO (xMun, cMun) ---
+            let cMunFinal = '3541406'; // default Presidente Prudente
+            let xMunFinal = 'PRESIDENTE PRUDENTE';
+
+            // Tenta obter via ViaCEP para garantir exatidão
+            const viaCepData = await buscarDadosCEP(destCEP);
+            if (viaCepData && viaCepData.uf === destUF) {
+                cMunFinal = viaCepData.cMun;
+                xMunFinal = viaCepData.xMun;
+            } else {
+                // Fallback para a capital do estado para prevenir erro de UF diferente
+                const fallback = CAPITAL_IBGE[destUF];
+                if (fallback) {
+                    cMunFinal = fallback.cMun;
+                    xMunFinal = fallback.xMun;
+                } else {
+                    return res.status(400).json({ error: `Erro de Validação: Não foi possível determinar o código de município IBGE correspondente ao estado "${destUF}".` });
+                }
+            }
+
+            // --- 4. PREPARAÇÃO DO CERTIFICADO E SEFAZ SERVICE ---
             const modo = configMap['nfe_modo'] || 'homologacao';
             const isProduction = modo === 'producao';
             const certPassword = configMap['cert_password'] || '12345678';
@@ -685,10 +896,10 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                 // Gerar chave de acesso
                 const cNF = Math.floor(Math.random() * 100000000);
                 const chaveParams = {
-                    cUF: configMap['emit_uf_cod'] || '35',
+                    cUF: emitUF === 'SP' ? '35' : (configMap['emit_uf_cod'] || '35'),
                     year: new Date().getFullYear().toString().slice(-2),
                     month: String(new Date().getMonth() + 1).padStart(2, '0'),
-                    cnpj: (configMap['emit_cnpj'] || '56421395000150').replace(/\D/g, ''),
+                    cnpj: emitCNPJ,
                     mod: '55',
                     serie: parseInt(configMap['nfe_serie'] || '1'),
                     nNF: parseInt(configMap['nfe_prox_numero'] || venda_id),
@@ -697,6 +908,12 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                 };
                 const chaveAcesso = nfeService.generateChaveAcesso(chaveParams);
                 
+                // Tratar dados de endereço
+                const endParts = destEnd.split(',');
+                const xLgr = endParts[0] ? endParts[0].trim() : 'Endereço não informado';
+                const nro = endParts[1] ? endParts[1].trim() : 'S/N';
+                const xBairro = endParts[2] ? endParts[2].trim() : 'Bairro';
+
                 // Montar dados da NF-e
                 const nfeData = {
                     ide: {
@@ -708,8 +925,8 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                         nNF: parseInt(configMap['nfe_prox_numero'] || venda_id),
                         dhEmi: new Date().toISOString(),
                         tpNF: '1',
-                        idDest: '1',
-                        cMunFG: configMap['emit_cmun'] || '3541406',
+                        idDest: (destUF === emitUF) ? '1' : '2', // 1 operação interna, 2 operação interestadual
+                        cMunFG: emitCMun,
                         tpImp: '2',
                         tpEmis: '1',
                         chaveAcesso,
@@ -718,33 +935,35 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                         indPres: '1'
                     },
                     emit: {
-                        cnpj: (configMap['emit_cnpj'] || '56421395000150').replace(/\D/g, ''),
-                        xNome: configMap['emit_nome'] || 'M & M HF COMERCIO DE CEBOLAS LTDA',
-                        xFant: configMap['emit_fant'] || 'M & M HF COMERCIO DE CEBOLAS',
-                        ie: (configMap['emit_ie'] || '562696411110').replace(/\D/g, ''),
+                        cnpj: emitCNPJ,
+                        xNome: emitNome,
+                        xFant: configMap['emit_fant'] || emitNome,
+                        ie: emitIE,
                         crt: configMap['emit_crt'] || '3',
                         enderEmit: {
                             xLgr: configMap['emit_lgr'] || 'RUA MANOEL CRUZ',
                             nro: configMap['emit_nro'] || '36',
                             xBairro: configMap['emit_bairro'] || 'RESIDENCIAL MINERVA I',
-                            cMun: configMap['emit_cmun'] || '3541406',
+                            cMun: emitCMun,
                             xMun: configMap['emit_xmun'] || 'PRESIDENTE PRUDENTE',
-                            UF: configMap['emit_uf'] || 'SP',
-                            CEP: (configMap['emit_cep'] || '19026168').replace(/\D/g, '')
+                            UF: emitUF,
+                            CEP: emitCEP
                         }
                     },
                     dest: {
-                        cnpj: (destinatario.documento || '').replace(/\D/g, ''),
-                        xNome: destinatario.nome || 'Consumidor Final',
-                        indIEDest: '9',
+                        cnpj: destDoc.length === 14 ? destDoc : undefined,
+                        cpf: destDoc.length === 11 ? destDoc : undefined,
+                        xNome: destNome,
+                        indIEDest: destinatario.ie ? '1' : '9', // 1 Contribuinte ICMS, 9 Não Contribuinte
+                        ie: destinatario.ie ? destinatario.ie.replace(/\D/g, '') : undefined,
                         enderDest: {
-                            xLgr: destinatario.endereco?.split(',')[0] || 'Endereço não informado',
-                            nro: destinatario.endereco?.split(',')[1]?.trim() || 'S/N',
-                            xBairro: destinatario.endereco?.split(',')[2]?.trim() || 'Bairro',
-                            cMun: '3541406', // Ideal seria buscar pelo município
-                            xMun: destinatario.endereco?.split(',')[3]?.trim() || 'PRESIDENTE PRUDENTE',
-                            UF: destinatario.uf || 'SP',
-                            CEP: (destinatario.cep || '19000000').replace(/\D/g, '')
+                            xLgr: xLgr,
+                            nro: nro,
+                            xBairro: xBairro,
+                            cMun: cMunFinal,
+                            xMun: xMunFinal,
+                            UF: destUF,
+                            CEP: destCEP
                         }
                     },
                     det: [{
@@ -752,7 +971,7 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                             code: '001',
                             xProd: venda.produto,
                             NCM: '07031019',
-                            CFOP: (destinatario.uf && destinatario.uf !== (configMap['emit_uf'] || 'SP')) ? '6102' : '5102',
+                            CFOP: (destUF !== emitUF) ? '6102' : '5102',
                             uCom: 'CX',
                             qCom: venda.qtd_caixas || 1,
                             vUnCom: venda.valor / (venda.qtd_caixas || 1),

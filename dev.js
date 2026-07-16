@@ -63,7 +63,7 @@ serverProcess.on('exit', (code) => {
 function pingServer() {
     return new Promise((resolve) => {
         const req = http.get(`http://localhost:${SERVER_PORT}/api/health`, (res) => {
-            resolve(res.statusCode < 500);
+            resolve(res.statusCode === 200);
         });
         req.on('error', () => resolve(false));
         req.setTimeout(800, () => { req.destroy(); resolve(false); });

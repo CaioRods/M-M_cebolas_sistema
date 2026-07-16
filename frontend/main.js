@@ -22,25 +22,13 @@ function createWindow() {
         height: 800,
         frame: false,
         autoHideMenuBar: true,
-        transparent: true,
-        vibrancy: false,
-        backgroundColor: '#00000000',
+        backgroundColor: '#000000',
         title: 'M&M Cebolas',
         icon: path.join(__dirname, 'Imgs', 'Logo_M&M_Cebolas.png'),
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
             autoplayPolicy: 'no-user-gesture-required'
-        }
-    });
-
-    win.webContents.on('did-finish-load', () => {
-        try {
-            const liquidGlass = require('electron-liquid-glass');
-            liquidGlass.addView(win.getNativeWindowHandle());
-            console.log('[Liquid Glass] Native glass effect view applied successfully.');
-        } catch (e) {
-            console.error('[Liquid Glass] Failed to apply native glass view:', e);
         }
     });
 
@@ -193,6 +181,31 @@ function createWindow() {
         console.log('[DEV] Auto-updater desativado em modo desenvolvimento.');
     }
 }
+
+ipcMain.on('salvar-arquivo', (event, { content, defaultName, filters }) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const filePath = dialog.showSaveDialogSync(win, {
+        title: 'Salvar Arquivo',
+        defaultPath: path.join(app.getPath('downloads'), defaultName),
+        filters: filters
+    });
+
+    if (filePath) {
+        try {
+            if (content.startsWith('data:')) {
+                const base64Data = content.split(';base64,').pop();
+                fs.writeFileSync(filePath, base64Data, { encoding: 'base64' });
+            } else {
+                fs.writeFileSync(filePath, content, 'utf8');
+            }
+            event.reply('salvar-arquivo-status', { success: true, filePath });
+        } catch (e) {
+            event.reply('salvar-arquivo-status', { success: false, error: e.message });
+        }
+    } else {
+        event.reply('salvar-arquivo-status', { success: false, cancelled: true });
+    }
+});
 
 app.whenReady().then(() => {
     if (process.platform === 'darwin') {
