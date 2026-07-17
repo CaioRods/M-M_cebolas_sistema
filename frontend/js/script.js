@@ -41,16 +41,16 @@ let API_URL = (function () {
     const isElectron = window.location.protocol === 'file:' || (typeof process !== 'undefined' && process.versions && process.versions.electron);
     const host = window.location.hostname;
 
-    // Modo desenvolvimento: NODE_ENV=development (npm run dev) → usar servidor local
+    // Se for Electron (desenvolvimento ou produção), aponta para a VPS
+    if (isElectron) {
+        return localStorage.getItem('api_url_base') || 'https://portalmmcebolas.com/api';
+    }
+
+    // Modo desenvolvimento via navegador:
     const isDev = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development') ||
                   (typeof window.__DEV_MODE__ !== 'undefined' && window.__DEV_MODE__);
 
     if (isDev) return 'http://localhost:3000/api';
-
-    // Electron em produção → aponta para a VPS
-    if (isElectron) {
-        return localStorage.getItem('api_url_base') || 'https://portalmmcebolas.com.br/api';
-    }
 
     // Se for localhost (desenvolvimento via navegador)
     if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:3000/api';
@@ -62,10 +62,15 @@ let API_URL = (function () {
     return window.location.origin + '/api';
 })();
 
-// Testa qual domínio responde (portalmmcebolas.com.br ou portalmmcebolas.com) e atualiza dinamicamente no Electron
+// Testa qual domínio responde e atualiza dinamicamente no Electron
 (async function testApiEndpoints() {
     if (window.location.protocol !== 'file:') return;
-    const urls = ['https://portalmmcebolas.com.br/api', 'https://portalmmcebolas.com/api'];
+    const urls = [
+        'https://portalmmcebolas.com/api',
+        'https://portalmmcebolas.com.br/api',
+        'http://85.31.231.151/api',
+        'http://85.31.231.151:3000/api'
+    ];
     for (const url of urls) {
         try {
             const controller = new AbortController();
@@ -83,6 +88,7 @@ let API_URL = (function () {
         }
     }
 })();
+
 
 window.onload = function () {
     checkLogin();
