@@ -1,0 +1,14 @@
+#!/usr/bin/expect -f
+set timeout 30
+spawn ssh -o StrictHostKeyChecking=no root@85.31.231.151
+expect "password:"
+send "@@Cebolas2025\r"
+expect "#"
+send "cd /var/www/mm_cebolas/server\r"
+expect "#"
+send "pm2 status\r"
+expect "#"
+send "ls -la\r"
+expect "#"
+send "exit\r"
+expect eof

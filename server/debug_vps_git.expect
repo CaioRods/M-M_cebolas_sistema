@@ -1,0 +1,14 @@
+#!/usr/bin/expect -f
+set timeout 30
+spawn ssh -o StrictHostKeyChecking=no root@85.31.231.151
+expect "password:"
+send "@@Cebolas2025\r"
+expect "#"
+send "ls -la /var/www\r"
+expect "#"
+send "ls -la /var/repo\r"
+expect "#"
+send "git --git-dir=/var/repo/mm_cebolas.git branch\r"
+expect "#"
+send "exit\r"
+expect eof
