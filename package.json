@@ -5,6 +5,8 @@
   "main": "frontend/main.js",
   "scripts": {
     "dev": "node dev.js",
+    "local": "node dev.js",
+    "offline": "node dev.js",
     "start": "electron .",
     "build": "electron-builder build",
     "build:win": "electron-builder build --win",

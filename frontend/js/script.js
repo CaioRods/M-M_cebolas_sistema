@@ -15,6 +15,7 @@ let currentSectionId = 'dashboard';
 let mainChart = null;
 let distributionChart = null;
 let dashboardData = null;
+let dashboardExpanded = false;
 let dashboardPeriod = 'mes';
 let dashboardChartType = 'bar';
 let nfeGroupingMode = 'fornecedor';
@@ -36,7 +37,7 @@ const mobileMenus = [
     { id: 'perfil', label: 'Perfil', icon: 'fa-user-circle' }
 ];
 
-const API_URL = (function () {
+let API_URL = (function () {
     const isElectron = window.location.protocol === 'file:' || (typeof process !== 'undefined' && process.versions && process.versions.electron);
     const host = window.location.hostname;
 
@@ -47,7 +48,9 @@ const API_URL = (function () {
     if (isDev) return 'http://localhost:3000/api';
 
     // Electron em produção → aponta para a VPS
-    if (isElectron) return 'https://portalmmcebolas.com/api';
+    if (isElectron) {
+        return localStorage.getItem('api_url_base') || 'https://portalmmcebolas.com.br/api';
+    }
 
     // Se for localhost (desenvolvimento via navegador)
     if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:3000/api';
@@ -57,6 +60,28 @@ const API_URL = (function () {
 
     // Se for domínio (ex: portalmmcebolas.com), assume que há um proxy (Nginx) na porta padrão
     return window.location.origin + '/api';
+})();
+
+// Testa qual domínio responde (portalmmcebolas.com.br ou portalmmcebolas.com) e atualiza dinamicamente no Electron
+(async function testApiEndpoints() {
+    if (window.location.protocol !== 'file:') return;
+    const urls = ['https://portalmmcebolas.com.br/api', 'https://portalmmcebolas.com/api'];
+    for (const url of urls) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2000);
+            const res = await fetch(`${url}/health`, { signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (res.ok) {
+                API_URL = url;
+                localStorage.setItem('api_url_base', url);
+                console.log(`[API] Endpoint ativo detectado: ${url}`);
+                break;
+            }
+        } catch (e) {
+            // Ignora erro de rede e tenta o próximo domínio
+        }
+    }
 })();
 
 window.onload = function () {
@@ -125,8 +150,7 @@ function checkEnvironment() {
     }
 
     // Inicializa a TabBar Mobile
-    const filtered = mobileMenus.filter(m => !m.adminOnly || userRole === 'admin');
-    renderMobileTabbar(filtered);
+    renderMobileTabbar();
 
     // Notifica o Electron sobre o papel do usuário para ajustar a TouchBar principal
     if (typeof require !== 'undefined') {
@@ -262,80 +286,105 @@ function getSkeletonHTML(id) {
     `;
 }
 
-function renderMobileTabbar(filteredList) {
+function renderMobileTabbar() {
     const tabbar = document.querySelector('.mobile-tabbar');
     if (!tabbar) return;
     
-    const itemsPerPage = 4;
-    const startIndex = mobileTabPageIndex * itemsPerPage;
-    const pageItems = filteredList.slice(startIndex, startIndex + itemsPerPage);
+    const mainTabs = [
+        { id: 'home', label: 'Início', icon: 'fa-home' },
+        { id: 'entrada', label: 'Compra', icon: 'fa-shopping-cart' },
+        { id: 'saida', label: 'Venda', icon: 'fa-hand-holding-usd' },
+        { id: 'estoque', label: 'Estoque', icon: 'fa-boxes' }
+    ];
+    
+    const isMainTabActive = mainTabs.some(t => t.id === currentSectionId);
     
     let html = '';
     
-    // Renderiza os 4 itens da página atual
-    pageItems.forEach((item) => {
-        const isActive = (currentSectionId === item.id) ? 'active' : '';
+    mainTabs.forEach(tab => {
+        const isActive = (currentSectionId === tab.id) ? 'active' : '';
         html += `
-            <button class="tabbar-item ${isActive}" onclick="showSection('${item.id}');">
-                <i class="fas ${item.icon}"></i>
-                <span>${item.label}</span>
+            <button class="tabbar-item ${isActive}" onclick="showSection('${tab.id}');">
+                <i class="fas ${tab.icon}"></i>
+                <span>${tab.label}</span>
             </button>
         `;
     });
     
-    // Completa com itens invisíveis vazios caso seja a última página e tenha menos de 4 itens (evita desalinhamento)
-    const emptyCount = itemsPerPage - pageItems.length;
-    for (let i = 0; i < emptyCount; i++) {
-        html += `<div class="tabbar-item-placeholder" style="flex:1;"></div>`;
-    }
-    
-    // Renderiza o 5º item (botão de paginação de seta)
-    const totalPages = Math.ceil(filteredList.length / itemsPerPage);
-    const isLastPage = (mobileTabPageIndex === totalPages - 1);
-    const arrowIcon = isLastPage ? 'fa-chevron-left' : 'fa-chevron-right';
-    const arrowLabel = isLastPage ? 'Voltar' : 'Mais';
-    
+    // Adiciona o botão "Mais" como o 5º item (abre a Bottom Sheet)
+    const isMaisActive = !isMainTabActive ? 'active' : '';
     html += `
-        <button class="tabbar-item tabbar-cycle-btn" onclick="cycleMobileTabbar();">
-            <i class="fas ${arrowIcon}" style="color: #ff9500;"></i>
-            <span>${arrowLabel}</span>
+        <button class="tabbar-item ${isMaisActive}" onclick="toggleMobileMoreSheet(true);">
+            <i class="fas fa-ellipsis-h"></i>
+            <span>Mais</span>
         </button>
     `;
     
     tabbar.innerHTML = html;
 }
 
-function cycleMobileTabbar() {
+function toggleMobileMoreSheet(open) {
+    const backdrop = document.getElementById('mobile-more-backdrop');
+    const sheet = document.getElementById('mobile-more-sheet');
+    if (!backdrop || !sheet) return;
+    
+    if (open) {
+        renderMobileSheetMenu();
+        backdrop.classList.add('active');
+        sheet.classList.add('active');
+    } else {
+        backdrop.classList.remove('active');
+        sheet.classList.remove('active');
+    }
+}
+
+function renderMobileSheetMenu() {
+    const grid = document.getElementById('mobile-sheet-grid');
+    if (!grid) return;
+    
     const userData = JSON.parse(localStorage.getItem('mm_user') || '{}');
     const userObj = userData.user || userData;
     const userRole = userObj.role || 'funcionario';
-    const filtered = mobileMenus.filter(m => !m.adminOnly || userRole === 'admin');
-    const itemsPerPage = 4;
-    const totalPages = Math.ceil(filtered.length / itemsPerPage);
     
-    mobileTabPageIndex = (mobileTabPageIndex + 1) % totalPages;
-    renderMobileTabbar(filtered);
+    const sheetItems = [
+        { id: 'dashboard', label: 'Dashboard', icon: 'fa-chart-line', colorClass: 'color-nfe' },
+        { id: 'cadastro', label: 'Cadastros', icon: 'fa-address-book', colorClass: 'color-cadastro' },
+        { id: 'nfe', label: 'Notas', icon: 'fa-file-invoice', colorClass: 'color-nfe' },
+        { id: 'financeiro', label: 'Financeiro', icon: 'fa-wallet', colorClass: 'color-financeiro' },
+        { id: 'config', label: 'Configs', icon: 'fa-cog', colorClass: 'color-config' },
+        { id: 'admin', label: 'Admin', icon: 'fa-shield-alt', colorClass: 'color-admin', adminOnly: true },
+        { id: 'perfil', label: 'Perfil', icon: 'fa-user-circle', colorClass: 'color-perfil' }
+    ];
+    
+    const filtered = sheetItems.filter(item => !item.adminOnly || userRole === 'admin');
+    
+    grid.innerHTML = filtered.map(item => `
+        <button class="sheet-item" onclick="selectMobileSheetItem('${item.id}');">
+            <div class="sheet-item-icon ${item.colorClass}">
+                <i class="fas ${item.icon}"></i>
+            </div>
+            <span>${item.label}</span>
+        </button>
+    `).join('');
+}
+
+function selectMobileSheetItem(id) {
+    toggleMobileMoreSheet(false);
+    showSection(id);
 }
 
 function syncMobileTabbar(id) {
-    const userData = JSON.parse(localStorage.getItem('mm_user') || '{}');
-    const userObj = userData.user || userData;
-    const userRole = userObj.role || 'funcionario';
-    const filtered = mobileMenus.filter(m => !m.adminOnly || userRole === 'admin');
-    
-    const index = filtered.findIndex(m => m.id === id);
-    if (index !== -1) {
-        const itemsPerPage = 4;
-        const page = Math.floor(index / itemsPerPage);
-        if (page !== mobileTabPageIndex) {
-            mobileTabPageIndex = page;
-        }
-    }
-    renderMobileTabbar(filtered);
+    renderMobileTabbar();
 }
 
 function showSection(id) {
     currentSectionId = id;
+    
+    // Limpa o timer do relógio se estiver navegando para fora da Home
+    if (id !== 'home' && window.restingClockInterval) {
+        clearInterval(window.restingClockInterval);
+        window.restingClockInterval = null;
+    }
     
     // Close mobile sidebar
     const sidebar = document.getElementById('sidebar');
@@ -416,6 +465,7 @@ function initSection(id) {
     const userRole = userData.role || (userData.user ? userData.user.role : null);
     const isAdmin = userRole === 'admin';
 
+    if (id === 'home') initHomeRestingScreen();
     if (id === 'dashboard') loadDashboard();
     if (id === 'entrada' || id === 'saida') {
         renderProductShowcase(id);
@@ -440,6 +490,47 @@ function initSection(id) {
         if (!isAdmin) { showSection('dashboard'); return; }
         loadAdminSection();
     }
+}
+
+function initHomeRestingScreen() {
+    const userData = JSON.parse(localStorage.getItem('mm_user') || '{}');
+    const userObj = userData.user || userData;
+    const userName = userObj.nome || 'Operador';
+    const nameEl = document.getElementById('resting-user-name');
+    if (nameEl) nameEl.textContent = userName;
+
+    function updateRestingClock() {
+        const now = new Date();
+        
+        // Hora formatada
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        
+        const hourEl = document.getElementById('resting-hour');
+        const minuteEl = document.getElementById('resting-minute');
+        const secondEl = document.getElementById('resting-second');
+        
+        if (hourEl) hourEl.textContent = hours;
+        if (minuteEl) minuteEl.textContent = minutes;
+        if (secondEl) secondEl.textContent = seconds;
+        
+        // Data formatada
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        const dateStr = now.toLocaleDateString('pt-BR', options);
+        const formattedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+        const dateEl = document.getElementById('resting-date');
+        if (dateEl) {
+            dateEl.textContent = formattedDate;
+        }
+    }
+    
+    updateRestingClock();
+    
+    if (window.restingClockInterval) {
+        clearInterval(window.restingClockInterval);
+    }
+    window.restingClockInterval = setInterval(updateRestingClock, 1000);
 }
 
 function toggleSidebar() {
@@ -787,8 +878,8 @@ function renderKPIs(data) {
 
     const kpis = [
         { 
-            label: 'Volume em Caixas', 
-            value: `${(data.estoque.totalCaixas || 0).toLocaleString('pt-BR')} Cx`, 
+            label: 'Volume em Sacos', 
+            value: `${(data.estoque.totalCaixas || 0).toLocaleString('pt-BR')} Sc`, 
             icon: 'fa-boxes', 
             color: '#166534', 
             bg: 'rgba(22, 101, 52, 0.1)', 
@@ -807,6 +898,17 @@ function renderKPIs(data) {
             trendColor: '#0891b2',
             trendBg: 'rgba(8, 145, 178, 0.08)',
             trendBorder: 'rgba(8, 145, 178, 0.15)'
+        },
+        { 
+            label: 'Lucro Real (Mês)', 
+            value: `R$ ${(data.financeiro.lucroMes || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 
+            icon: 'fa-coins', 
+            color: '#16a34a', 
+            bg: 'rgba(22, 163, 74, 0.1)', 
+            trend: 'Resultado Mês', 
+            trendColor: '#16a34a',
+            trendBg: 'rgba(22, 163, 74, 0.08)',
+            trendBorder: 'rgba(22, 163, 74, 0.15)'
         },
         { 
             label: 'Lucro em Produtos (Est.)', 
@@ -829,17 +931,6 @@ function renderKPIs(data) {
             trendColor: growthColor,
             trendBg: growthBg,
             trendBorder: growthBorder
-        },
-        { 
-            label: 'Lucro Real (Mês)', 
-            value: `R$ ${(data.financeiro.lucroMes || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 
-            icon: 'fa-coins', 
-            color: '#16a34a', 
-            bg: 'rgba(22, 163, 74, 0.1)', 
-            trend: 'Resultado Mês', 
-            trendColor: '#16a34a',
-            trendBg: 'rgba(22, 163, 74, 0.08)',
-            trendBorder: 'rgba(22, 163, 74, 0.15)'
         },
         { 
             label: 'Margem de Lucro', 
@@ -865,7 +956,9 @@ function renderKPIs(data) {
         }
     ];
     
-    container.innerHTML = kpis.map(kpi => `
+    const visibleKpis = dashboardExpanded ? kpis : kpis.slice(0, 3);
+    
+    container.innerHTML = visibleKpis.map(kpi => `
         <div class="kpi-card-pro" style="--kpi-color: ${kpi.color}; --kpi-bg: ${kpi.bg};">
             <div class="kpi-card-header">
                 <div class="kpi-icon-wrapper">
@@ -882,6 +975,19 @@ function renderKPIs(data) {
             </div>
         </div>
     `).join('');
+}
+
+function toggleKPIsExpansion() {
+    dashboardExpanded = !dashboardExpanded;
+    const btnText = document.getElementById('text-toggle-kpis');
+    const btnIcon = document.getElementById('icon-toggle-kpis');
+    if (btnText) btnText.textContent = dashboardExpanded ? 'Ver menos' : 'Ver mais';
+    if (btnIcon) {
+        btnIcon.className = dashboardExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
+    }
+    if (dashboardData) {
+        renderKPIs(dashboardData);
+    }
 }
 
 function renderMainChart(data) {
@@ -943,7 +1049,7 @@ function renderMainChart(data) {
         datasets = [
             { 
                 label: 'Entrada', 
-                data: values.map(v => metric === 'volume_cx' ? v.caixas_entrada : v.kg_entrada), 
+                data: values.map(v => metric === 'volume_sc' ? v.caixas_entrada : v.kg_entrada), 
                 backgroundColor: '#1A5632', 
                 borderColor: '#1A5632',
                 borderWidth: 0,
@@ -951,7 +1057,7 @@ function renderMainChart(data) {
             },
             { 
                 label: 'Saída', 
-                data: values.map(v => metric === 'volume_cx' ? v.caixas_saida : v.kg_saida), 
+                data: values.map(v => metric === 'volume_sc' ? v.caixas_saida : v.kg_saida), 
                 backgroundColor: '#E89C31', 
                 borderColor: '#E89C31',
                 borderWidth: 0,
@@ -969,7 +1075,7 @@ function renderMainChart(data) {
             interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { position: 'top', align: 'end', labels: { usePointStyle: true, boxWidth: 8, font: { weight: '700', size: 11, family: 'Inter' } } },
-                tooltip: { backgroundColor: 'rgba(255, 255, 255, 0.98)', titleColor: '#0f172a', bodyColor: '#475569', borderColor: '#e2e8f0', borderWidth: 1, padding: 12, bodySpacing: 8, titleFont: { size: 13, weight: '800', family: 'Inter' }, bodyFont: { size: 12, family: 'Inter' }, usePointStyle: true, callbacks: { label: function(context) { let label = context.dataset.label || ''; if (label) label += ': '; if (context.parsed.y !== null) { if (metric === 'financeiro') label += new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(context.parsed.y); else label += context.parsed.y.toLocaleString('pt-BR') + (metric === 'volume_cx' ? ' Cx' : ' Kg'); } return label; } } }
+                tooltip: { backgroundColor: 'rgba(255, 255, 255, 0.98)', titleColor: '#0f172a', bodyColor: '#475569', borderColor: '#e2e8f0', borderWidth: 1, padding: 12, bodySpacing: 8, titleFont: { size: 13, weight: '800', family: 'Inter' }, bodyFont: { size: 12, family: 'Inter' }, usePointStyle: true, callbacks: { label: function(context) { let label = context.dataset.label || ''; if (label) label += ': '; if (context.parsed.y !== null) { if (metric === 'financeiro') label += new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(context.parsed.y); else label += context.parsed.y.toLocaleString('pt-BR') + (metric === 'volume_sc' ? ' Sc' : ' Kg'); } return label; } } }
             },
             scales: {
                 y: { grid: { borderDash: [5, 5], color: '#e2e8f0' }, ticks: { font: { weight: '600', size: 10, family: 'Inter' }, callback: function(value) { if (metric === 'financeiro') return 'R$ ' + value.toLocaleString('pt-BR'); return value; } } },
@@ -1111,7 +1217,7 @@ function renderRecentOps(transactions) {
             </td>
             <td><strong>${t.descricao || '-'}</strong></td>
             <td>${t.produto}</td>
-            <td style="text-align:center; font-weight:700;">${(t.qtd_caixas || t.quantidade).toLocaleString('pt-BR')} Cx</td>
+            <td style="text-align:center; font-weight:700;">${(t.qtd_caixas || t.quantidade).toLocaleString('pt-BR')} Sc</td>
             <td style="text-align:right; font-weight:700;">R$ ${t.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
             <td style="text-align:center;">
                 <button class="btn-icon" onclick="showSection('estoque')" title="Ver estoque">
@@ -1223,7 +1329,7 @@ function renderProdutosTable() {
             <td><i class="fas ${p.icone || 'fa-box'}" style="color:${p.cor};margin-right:8px;"></i> <strong>${p.nome}</strong></td>
             <td>${p.ncm || '-'}</td>
             <td>R$ ${(p.preco_venda || 0).toLocaleString('pt-BR', {minimumFractionDigits:2})}</td>
-            <td>${p.peso_por_caixa || 20} Kg/Cx</td>
+            <td>${p.peso_por_caixa || 20} Kg/Sc</td>
             <td>
                 <button class="btn-icon" onclick="openProdutoModal(${JSON.stringify(p).replace(/"/g, '&quot;')})"><i class="fas fa-edit"></i></button>
                 <button class="btn-icon text-danger" onclick="deleteCadastro('produto', ${p.id})"><i class="fas fa-trash"></i></button>
@@ -2269,7 +2375,7 @@ function toggleQuantityMode(prefix) {
     } else {
         if (simpleDiv) simpleDiv.style.display = 'block';
         if (ambosDiv) ambosDiv.style.display = 'none';
-        if (qtyLabel) qtyLabel.innerText = mode === 'CX' ? 'Quantidade (Caixas)' : 'Quantidade (Kg)';
+        if (qtyLabel) qtyLabel.innerText = mode === 'CX' ? 'Quantidade (Sacos)' : 'Quantidade (Kg)';
     }
     updatePesoCalc(prefix);
 }
@@ -2286,7 +2392,7 @@ function updatePesoCalc(prefix) {
     
     if (qty > 0) {
         if (mode === 'CX') pesoCalc.innerText = `≈ ${(qty * pesoPorCaixa).toFixed(1)} Kg`;
-        else if (mode === 'KG') pesoCalc.innerText = `≈ ${(qty / pesoPorCaixa).toFixed(1)} Cx`;
+        else if (mode === 'KG') pesoCalc.innerText = `≈ ${(qty / pesoPorCaixa).toFixed(1)} Sc`;
     } else {
         pesoCalc.innerText = '';
     }
@@ -2567,7 +2673,7 @@ function renderStockTable() {
             <td><span class="badge ${t.tipo}">${t.tipo.toUpperCase()}</span></td>
             <td>${t.produto}</td>
             <td>${t.descricao || '-'}</td>
-            <td style="font-weight:700">${t.qtd_caixas || 0} Cx</td>
+            <td style="font-weight:700">${t.qtd_caixas || 0} Sc</td>
             <td style="font-weight:700">${t.peso_kg || 0} Kg</td>
             <td>R$ ${t.valor.toLocaleString('pt-BR')}</td>
             <td>
@@ -2644,7 +2750,7 @@ function renderEstoqueResumo() {
             <div style="padding:20px; flex:1;">
                 <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:15px;">
                     <span style="font-size:2.5rem; font-weight:900; color:var(--primary-dark); line-height:1;">${stockCx}</span>
-                    <span style="font-size:1rem; font-weight:700; color:var(--text-muted);">Caixas</span>
+                    <span style="font-size:1rem; font-weight:700; color:var(--text-muted);">Sacos</span>
                 </div>
                 
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:20px;">
@@ -2653,7 +2759,7 @@ function renderEstoqueResumo() {
                         <h5 style="font-weight:800; font-size:1rem; color:var(--text-main);">${stockKg.toLocaleString('pt-BR')} Kg</h5>
                     </div>
                     <div style="background:#f8fafc; padding:12px; border-radius:12px;">
-                        <p style="font-size:0.65rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; margin-bottom:4px;">Custo Médio/Cx</p>
+                        <p style="font-size:0.65rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; margin-bottom:4px;">Custo Médio/Sc</p>
                         <h5 style="font-weight:800; font-size:1rem; color:var(--text-main);">R$ ${avgBuy}</h5>
                     </div>
                 </div>
@@ -2728,7 +2834,7 @@ function renderDescartesTable() {
             <td>${new Date(d.data).toLocaleDateString('pt-BR')}</td>
             <td><strong style="color:var(--primary-dark)">${d.produto}</strong></td>
             <td><span style="font-size:0.85rem;color:var(--text-muted);">${d.motivo}</span></td>
-            <td style="font-weight:700;color:#ea580c;">${d.quantidade_caixas || 0} Cx</td>
+            <td style="font-weight:700;color:#ea580c;">${d.quantidade_caixas || 0} Sc</td>
             <td style="font-weight:700;color:#ea580c;">${d.peso_kg || 0} Kg</td>
             <td style="text-align: right;">
                 <button class="btn-icon text-danger" onclick="deleteDescarte(${d.id})"><i class="fas fa-trash"></i></button>
@@ -2938,7 +3044,7 @@ function renderProductShowcase(section) {
                     gap: 4px;
                 ">
                     <i class="fas ${stock > 5 ? 'fa-check' : 'fa-exclamation-triangle'}" style="font-size: 0.65rem;"></i>
-                    ${stock} Cx
+                    ${stock} Sc
                 </span>
             </div>
         </div>`;
@@ -2950,8 +3056,49 @@ function selectProductPro(nome, section, event) {
     const input = document.getElementById(`${prefix}-product`);
     if (input) input.value = nome;
     document.querySelectorAll('.product-card').forEach(c => c.classList.remove('active'));
-    event.currentTarget.classList.add('active');
+    if (event && event.currentTarget) {
+        event.currentTarget.classList.add('active');
+    }
+    
+    // Se for venda (saida), tenta preencher o valor unitário padrão do produto
+    if (section === 'saida') {
+        const prod = (appData.products || []).find(p => p.nome === nome);
+        const unitPriceInput = document.getElementById('exit-unit-price');
+        if (prod && unitPriceInput) {
+            unitPriceInput.value = prod.preco_venda || '';
+        }
+    }
+    
     updatePesoCalc(prefix);
+    calcTotalFromUnit(prefix);
+}
+
+function calcTotalFromUnit(prefix) {
+    const unitPriceInput = document.getElementById(`${prefix}-unit-price`);
+    const totalInput = document.getElementById(`${prefix}-value`);
+    if (!unitPriceInput || !totalInput) return;
+    
+    const unitPrice = parseFloat(unitPriceInput.value || 0);
+    
+    const unitSelect = document.getElementById(`${prefix}-unit`);
+    const mode = unitSelect ? unitSelect.value : 'CX';
+    let qty = 0;
+    
+    if (mode === 'AMBOS') {
+        qty = parseFloat(document.getElementById(`${prefix}-qtd-caixas`)?.value || 0);
+    } else {
+        const rawQty = parseFloat(document.getElementById(`${prefix}-qty`)?.value || 0);
+        if (mode === 'CX') {
+            qty = rawQty;
+        } else {
+            const pesoPorCaixa = getPesoPorCaixa(prefix);
+            qty = rawQty / pesoPorCaixa;
+        }
+    }
+    
+    if (qty > 0 && unitPrice > 0) {
+        totalInput.value = (qty * unitPrice).toFixed(2);
+    }
 }
 
 // =============================================

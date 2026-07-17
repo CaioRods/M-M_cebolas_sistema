@@ -1,15 +1,39 @@
 const isElectron = window.location.protocol === 'file:' || (typeof process !== 'undefined' && process.versions && process.versions.electron);
 
-const API_URL = (function () {
+let API_URL = (function () {
     const host = window.location.hostname;
     const isDev = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development') ||
                   (typeof window.__DEV_MODE__ !== 'undefined' && window.__DEV_MODE__);
 
     if (isDev) return 'http://localhost:3000/api';
-    if (isElectron) return 'https://portalmmcebolas.com/api';
+    if (isElectron) {
+        return localStorage.getItem('api_url_base') || 'https://portalmmcebolas.com.br/api';
+    }
     if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:3000/api';
     if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) return `http://${host}:3000/api`;
     return window.location.origin + '/api';
+})();
+
+// Testa qual domínio responde (portalmmcebolas.com.br ou portalmmcebolas.com) e atualiza dinamicamente no Electron
+(async function testApiEndpoints() {
+    if (window.location.protocol !== 'file:') return;
+    const urls = ['https://portalmmcebolas.com.br/api', 'https://portalmmcebolas.com/api'];
+    for (const url of urls) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2000);
+            const res = await fetch(`${url}/health`, { signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (res.ok) {
+                API_URL = url;
+                localStorage.setItem('api_url_base', url);
+                console.log(`[API] Endpoint ativo detectado: ${url}`);
+                break;
+            }
+        } catch (e) {
+            // Ignora erro de rede e tenta o próximo domínio
+        }
+    }
 })();
 
 

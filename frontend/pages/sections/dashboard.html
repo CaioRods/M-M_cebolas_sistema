@@ -22,6 +22,13 @@
     <!-- Os cards serão injetados e podem ser reordenados ou ocultados via config -->
 </div>
 
+<div class="toggle-kpis-wrapper animate-fade-up" style="display: flex; justify-content: center; margin: -12px 0 24px 0;">
+    <button id="btn-toggle-kpis" onclick="toggleKPIsExpansion()" class="btn-secondary" style="display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 10px; font-weight: 700; background: var(--bg-panel); border: 1px solid var(--border); cursor: pointer; transition: all 0.2s ease; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); font-size: 0.85rem; color: var(--text-main);">
+        <span id="text-toggle-kpis">Ver mais</span>
+        <i id="icon-toggle-kpis" class="fas fa-chevron-down" style="font-size: 0.75rem;"></i>
+    </button>
+</div>
+
 <!-- SEÇÃO DE ANÁLISE GRÁFICA AVANÇADA -->
 <div class="analysis-row animate-fade-up delay-2">
     <div class="panel main-chart">
@@ -33,7 +40,7 @@
             <div class="chart-controls">
                 <select id="chart-metric-select" onchange="updateMainChart()" class="minimal-select">
                     <option value="financeiro">📊 Financeiro (R$)</option>
-                    <option value="volume_cx">📦 Volume (Caixas)</option>
+                    <option value="volume_sc">📦 Volume (Sacos)</option>
                     <option value="volume_kg">⚖️ Volume (Kg)</option>
                 </select>
                 <div class="toggle-group">
@@ -72,7 +79,7 @@
                 <thead>
                     <tr>
                         <th>Cliente</th>
-                        <th style="text-align: center;">Vol. (Cx)</th>
+                        <th style="text-align: center;">Vol. (Sc)</th>
                         <th style="text-align: right;">Total (R$)</th>
                     </tr>
                 </thead>
@@ -93,7 +100,7 @@
                 <thead>
                     <tr>
                         <th>Fornecedor</th>
-                        <th style="text-align: center;">Vol. (Cx)</th>
+                        <th style="text-align: center;">Vol. (Sc)</th>
                         <th style="text-align: right;">Total (R$)</th>
                     </tr>
                 </thead>
@@ -116,7 +123,7 @@
             <thead>
                 <tr>
                     <th>Produto</th>
-                    <th style="text-align: center;">Caixas em Estoque</th>
+                    <th style="text-align: center;">Sacos em Estoque</th>
                     <th style="text-align: center;">Peso Total (Kg)</th>
                     <th>Tendência</th>
                 </tr>

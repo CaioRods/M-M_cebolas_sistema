@@ -41,13 +41,15 @@ Para parar de usar o FileZilla e fazer com que a sua VPS atualize automaticament
    
    echo "📦 Código copiado para $TARGET."
    
-   # Entra na pasta e instala dependências / reinicia PM2
+   # Entra na pasta e garante a existência dos diretórios de logs e backups
    cd $TARGET/server
+   mkdir -p logs backups
+   
    echo "⚙️ Instalando dependências..."
    npm install --production
    
-   echo "🚀 Reiniciando a aplicação..."
-   pm2 restart mm-cebolas || pm2 start server.js --name "mm-cebolas"
+   echo "🚀 Reiniciando a aplicação com PM2..."
+   pm2 reload ecosystem.config.js || pm2 start ecosystem.config.js
    
    echo "✅ Deploy Concluído com Sucesso!"
    ```
@@ -57,6 +59,24 @@ Para parar de usar o FileZilla e fazer com que a sua VPS atualize automaticament
    ```bash
    chmod +x /var/repo/mm_cebolas.git/hooks/post-receive
    ```
+
+## Passo 1.5: Configurar Variáveis de Ambiente na VPS
+
+No servidor VPS, as variáveis de ambiente devem ser configuradas para que a API funcione de forma segura e correta.
+
+1. Navegue até a pasta do servidor no VPS:
+   ```bash
+   cd /var/www/mm_cebolas/server
+   ```
+2. Copie o arquivo de exemplo de produção para criar o seu `.env`:
+   ```bash
+   cp .env.production.example .env
+   ```
+3. Edite o arquivo `.env` para inserir suas credenciais, chaves JWT seguras e senhas do certificado:
+   ```bash
+   nano .env
+   ```
+   *(Ajuste o `JWT_SECRET`, senhas de usuários e a senha do certificado digital `CERT_PASSWORD`)*
 
 ## Passo 2: Configurar o seu Computador Local (Windows)
 
@@ -82,13 +102,13 @@ Esqueça o FileZilla. Sempre que você fizer alterações no código, tudo o que
    ```
 3. **Fazer o Deploy:**
    ```bash
-   git push vps master
+   git push vps main
    ```
 
 O Git enviará os arquivos por baixo dos panos (comprimidos, bem mais rápido que o FileZilla), e a sua VPS vai imprimir no seu terminal:
 ```text
 remote: 📦 Código copiado para /var/www/mm_cebolas.
 remote: ⚙️ Instalando dependências...
-remote: 🚀 Reiniciando a aplicação...
+remote: 🚀 Reiniciando a aplicação com PM2...
 remote: ✅ Deploy Concluído com Sucesso!
 ```

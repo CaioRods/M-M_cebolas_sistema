@@ -6,9 +6,9 @@
     <title>M&M Cebolas - Gestão</title>
     <link rel="icon" href="../Imgs/logo_M&M.jpg" type="image/jpeg">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="../js/font-awesome.min.js" defer></script>
     <link rel="stylesheet" href="../css/estilo_geral.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="../js/chart.min.js"></script>
     <style>
         body { opacity: 0; transition: opacity 1s ease; }
         body.loaded { opacity: 1; }
@@ -221,12 +221,12 @@
                     <input type="number" step="0.01" id="prod-preco" placeholder="0.00">
                 </div>
                 <div class="form-group span-2">
-                    <label>Peso por Caixa (Kg)</label>
+                    <label>Peso por Saco (Kg)</label>
                     <div style="display:flex;gap:8px;align-items:center;">
                         <input type="number" step="0.1" id="prod-peso-cx" placeholder="20" min="0.1" style="flex:1;">
-                        <span style="background:#dbeafe;color:#1e40af;padding:10px 14px;border-radius:8px;font-weight:700;white-space:nowrap;">Kg/Cx</span>
+                        <span style="background:#dbeafe;color:#1e40af;padding:10px 14px;border-radius:8px;font-weight:700;white-space:nowrap;">Kg/Sc</span>
                     </div>
-                    <small style="color:var(--text-muted);margin-top:4px;display:block;">Peso médio de cada caixa deste produto</small>
+                    <small style="color:var(--text-muted);margin-top:4px;display:block;">Peso médio de cada saco deste produto</small>
                 </div>
                 
                 <div class="form-group span-2">
@@ -285,7 +285,7 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Quantidade (Caixas) *</label>
+                    <label>Quantidade (Sacos) *</label>
                     <input type="number" id="descarte-caixas" required min="0" placeholder="0" oninput="calculateDescarteKg()">
                 </div>
                 <div class="form-group">
@@ -530,6 +530,25 @@
     <!-- TabBar Mobile (Barra de Navegação Inferior Dinâmica) -->
     <div class="mobile-tabbar"></div>
 
+    <!-- Backdrop do Menu Mobile Sheet -->
+    <div id="mobile-more-backdrop" class="mobile-more-backdrop" onclick="toggleMobileMoreSheet(false)"></div>
+
+    <!-- Bottom Sheet Mobile Menu -->
+    <div id="mobile-more-sheet" class="mobile-more-sheet">
+        <div class="sheet-header">
+            <div class="sheet-drag-handle"></div>
+            <h3>Menu do Sistema</h3>
+        </div>
+        <div class="sheet-grid" id="mobile-sheet-grid">
+            <!-- Injetado via JS -->
+        </div>
+        <div class="sheet-logout-container">
+            <button class="btn-sheet-logout" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i> Sair da Conta
+            </button>
+        </div>
+    </div>
+
     <script src="../js/script.js"></script>
     <script>
     // Animação de entrada
@@ -540,7 +559,10 @@
             setTimeout(() => item.classList.add('show'), 400 + (index * 80));
         });
         setTimeout(() => {
-            if (typeof showSection === 'function') showSection('dashboard');
+            if (typeof showSection === 'function') {
+                const isMobile = window.innerWidth <= 768;
+                showSection(isMobile ? 'home' : 'dashboard');
+            }
         }, 150);
     });
 

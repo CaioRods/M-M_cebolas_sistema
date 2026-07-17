@@ -100,6 +100,10 @@ const CORS_ORIGINS = [
     'https://www.portalmmcebolas.com',
     'http://portalmmcebolas.com',
     'http://www.portalmmcebolas.com',
+    'https://portalmmcebolas.com.br',
+    'https://www.portalmmcebolas.com.br',
+    'http://portalmmcebolas.com.br',
+    'http://www.portalmmcebolas.com.br',
     'http://localhost:3000',
     'http://127.0.0.1:3000',
     'http://72.60.8.186'

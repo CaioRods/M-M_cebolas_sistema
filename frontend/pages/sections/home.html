@@ -1,0 +1,251 @@
+<div class="home-resting-container">
+    <div class="resting-bg-glow"></div>
+    
+    <div class="resting-content">
+        <!-- Prominent Brand Logo -->
+        <div class="logo-wrapper">
+            <img src="../Imgs/logo_M&M_arredondado.png" alt="Logo M&M" class="resting-logo">
+        </div>
+        
+        <h1 class="resting-title">M&M CEBOLAS</h1>
+        <p class="resting-subtitle">Sistema de Gestão & Distribuição</p>
+        
+        <!-- Large Standby Clock -->
+        <div class="resting-clock-widget">
+            <div class="time-main">
+                <span id="resting-hour">00</span><span class="time-colon">:</span><span id="resting-minute">00</span>
+            </div>
+            <div class="time-seconds-badge">
+                <span id="resting-second">00</span>
+            </div>
+        </div>
+        
+        <!-- Bottom Info Row -->
+        <div class="resting-info-grid">
+            <!-- Date card -->
+            <div class="info-card-glass">
+                <div class="card-icon"><i class="far fa-calendar-alt"></i></div>
+                <div class="card-details">
+                    <span class="card-label">Data de Hoje</span>
+                    <span id="resting-date" class="card-value">Carregando...</span>
+                </div>
+            </div>
+            
+            <!-- User card -->
+            <div class="info-card-glass">
+                <div class="card-icon"><i class="far fa-user"></i></div>
+                <div class="card-details">
+                    <span class="card-label">Operador</span>
+                    <span id="resting-user-name" class="card-value">Carregando...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&display=swap');
+
+.home-resting-container {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    height: 100vh !important;
+    width: 100vw !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at center, #0a2416 0%, #030a06 100%) !important;
+    font-family: 'Outfit', sans-serif !important;
+    z-index: 98; /* Fica atrás das barras de navegação */
+    padding: calc(var(--titlebar-height) + 20px) 24px 100px 24px;
+    overflow: hidden;
+}
+
+/* Background animated glow */
+.resting-bg-glow {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.03) 50%, rgba(0, 0, 0, 0) 70%);
+    pointer-events: none;
+    z-index: 1;
+    animation: breathingGlow 8s ease-in-out infinite alternate;
+}
+
+@keyframes breathingGlow {
+    0% { width: 500px; height: 500px; opacity: 0.8; }
+    100% { width: 650px; height: 650px; opacity: 1.2; }
+}
+
+.resting-content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    width: 100%;
+    max-width: 400px;
+    animation: restingFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes restingFadeIn {
+    from { opacity: 0; transform: scale(0.97) translateY(10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.logo-wrapper {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    border-radius: 36px;
+    padding: 6px;
+    background: linear-gradient(135deg, #10b981 0%, #1a5632 100%);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4), 
+                0 0 30px rgba(16, 185, 129, 0.3);
+    animation: logoPulse 4s ease-in-out infinite alternate;
+    margin-bottom: 5px;
+}
+
+.resting-logo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 30px;
+}
+
+@keyframes logoPulse {
+    0% { transform: scale(1); box-shadow: 0 15px 35px rgba(0,0,0,0.4), 0 0 25px rgba(16,185,129,0.3); }
+    100% { transform: scale(1.05) translateY(-4px); box-shadow: 0 20px 40px rgba(0,0,0,0.5), 0 0 40px rgba(16,185,129,0.45); }
+}
+
+.resting-title {
+    font-size: 1.8rem;
+    font-weight: 900;
+    letter-spacing: 2px;
+    background: linear-gradient(90deg, #ffffff 0%, #a7f3d0 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin: 0;
+    text-shadow: 0 4px 10px rgba(0,0,0,0.15);
+}
+
+.resting-subtitle {
+    font-size: 0.8rem;
+    color: #64748b;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    margin: -8px 0 0 0;
+    text-transform: uppercase;
+}
+
+/* Large Standby Clock */
+.resting-clock-widget {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 8px;
+    margin: 10px 0;
+}
+
+.time-main {
+    font-size: 5rem;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -2px;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    text-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+}
+
+#resting-minute {
+    color: #10b981;
+    text-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+}
+
+.time-colon {
+    color: rgba(255, 255, 255, 0.3);
+    animation: blinkColon 1s step-end infinite;
+}
+
+@keyframes blinkColon {
+    50% { opacity: 0; }
+}
+
+.time-seconds-badge {
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    color: #34d399;
+    font-size: 1rem;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 8px;
+    margin-top: 10px;
+    font-family: monospace;
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.1);
+}
+
+/* Info Grid Row */
+.resting-info-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    width: 100%;
+}
+
+.info-card-glass {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+    padding: 12px 18px;
+    text-align: left;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2), 
+                inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+}
+
+.card-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    color: #10b981;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+}
+
+.card-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.card-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.card-value {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    margin-top: 1px;
+}
+</style>

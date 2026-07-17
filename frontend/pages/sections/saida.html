@@ -31,18 +31,18 @@
         <div class="form-group">
             <label>Modo de Quantidade</label>
             <select id="exit-unit" onchange="toggleQuantityMode('exit')" class="minimal-select" style="width: 100%; height: 45px;">
-                <option value="CX">📦 Por Caixas (Padrão)</option>
+                <option value="CX">📦 Por Sacos (Padrão)</option>
                 <option value="KG">⚖️ Por Quilos (Peso Real)</option>
-                <option value="AMBOS">📦+⚖️ Ambos (Caixas + Peso)</option>
+                <option value="AMBOS">📦+⚖️ Ambos (Sacos + Peso)</option>
             </select>
         </div>
 
         <!-- Modo CX ou KG (padrão) -->
         <div id="exit-qty-simple" class="form-group span-2">
-            <label id="exit-qty-label">Quantidade (Caixas)</label>
+            <label id="exit-qty-label">Quantidade (Sacos)</label>
             <div style="display: flex; gap: 10px; align-items: center;">
-                <input type="number" id="exit-qty" placeholder="0" style="flex: 1;" min="0" step="0.1" oninput="updatePesoCalc('exit')">
-                <span id="exit-unit-badge" style="background: #fef3c7; color: #92400e; padding: 12px 18px; border-radius: 8px; font-weight: 800; font-size: 1rem; min-width: 80px; text-align: center;">CX</span>
+                <input type="number" id="exit-qty" placeholder="0" style="flex: 1;" min="0" step="0.1" oninput="updatePesoCalc('exit'); calcTotalFromUnit('exit');">
+                <span id="exit-unit-badge" style="background: #fef3c7; color: #92400e; padding: 12px 18px; border-radius: 8px; font-weight: 800; font-size: 1rem; min-width: 80px; text-align: center;">SC</span>
                 <span id="exit-peso-calc" style="font-weight: 800; color: var(--accent); font-size: 1.1rem; min-width: 100px; text-align: right;"></span>
             </div>
         </div>
@@ -50,10 +50,10 @@
         <!-- Modo AMBOS -->
         <div id="exit-qty-ambos-row" class="form-group span-2" style="display: none; background: #fffbeb; padding: 20px; border-radius: 12px; border: 2px dashed var(--accent); gap: 20px;">
             <div style="flex: 1;">
-                <label style="font-weight: 700; color: #92400e;">Qtd. Caixas</label>
+                <label style="font-weight: 700; color: #92400e;">Qtd. Sacos</label>
                 <div style="display: flex; gap: 10px; align-items: center;">
-                    <input type="number" id="exit-qtd-caixas" placeholder="0" style="flex: 1;" min="0" step="1" oninput="calcPesoFromCaixas('exit')">
-                    <span style="background: #fef3c7; color: #92400e; padding: 10px 14px; border-radius: 8px; font-weight: 700;">CX</span>
+                    <input type="number" id="exit-qtd-caixas" placeholder="0" style="flex: 1;" min="0" step="1" oninput="calcPesoFromCaixas('exit'); calcTotalFromUnit('exit');">
+                    <span style="background: #fef3c7; color: #92400e; padding: 10px 14px; border-radius: 8px; font-weight: 700;">SC</span>
                 </div>
             </div>
             <div style="flex: 1;">
@@ -65,6 +65,10 @@
             </div>
         </div>
 
+        <div class="form-group">
+            <label>Valor Unitário (por Saco) (R$)</label>
+            <input type="number" step="0.01" id="exit-unit-price" placeholder="0.00" oninput="calcTotalFromUnit('exit')">
+        </div>
         <div class="form-group">
             <label>Valor Total (R$)</label>
             <input type="number" step="0.01" id="exit-value" placeholder="0.00" required min="0">
