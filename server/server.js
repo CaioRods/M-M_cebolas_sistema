@@ -1548,8 +1548,18 @@ app.get('/api/configs', authenticateToken, (req, res) => {
     });
 });
 
+// Chaves que qualquer usuário autenticado pode alterar. Tudo que não estiver aqui (modo da
+// NF-e, senha do certificado, dados fiscais do emitente etc.) exige admin — a UI já esconde
+// esses campos pra quem não é admin, mas sem essa checagem no servidor bastava chamar a API
+// diretamente com um token de funcionário/chefe pra reconfigurar produção/homologação ou
+// sobrescrever o CNPJ/IE usados em toda NF-e emitida depois.
+const CONFIGS_PUBLICAS = ['peso_por_caixa_padrao', 'nfe_cert_notify'];
+
 app.post('/api/configs', authenticateToken, (req, res) => {
     const { chave, valor } = req.body;
+    if (!CONFIGS_PUBLICAS.includes(chave) && req.user.role !== 'admin') {
+        return res.sendStatus(403);
+    }
     db.run('INSERT OR REPLACE INTO configs (chave, valor) VALUES (?, ?)', [chave, valor], () => {
         registrarLog(req, 'CONFIG_UPDATE', `Configuração atualizada: ${chave} = ${valor}`);
         res.json({ success: true });

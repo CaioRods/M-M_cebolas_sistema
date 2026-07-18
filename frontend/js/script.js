@@ -1943,16 +1943,28 @@ async function loadConfigSection(isAdmin) {
     // Load config values
     const pesoCxEl = document.getElementById('config-peso-cx');
     if (pesoCxEl) pesoCxEl.value = appData.configs.peso_por_caixa_padrao || 20;
-    
+
     // NFe mode
     const nfeModo = appData.configs.nfe_modo || 'homologacao';
     document.querySelectorAll(`input[name="nfe_modo"]`).forEach(r => {
         r.checked = r.value === nfeModo;
     });
-    
+
     if (!isAdmin) {
         document.querySelectorAll('.admin-config-section').forEach(el => el.style.display = 'none');
+        const nonAdminNfe = document.querySelector('.non-admin-nfe-info');
+        if (nonAdminNfe) nonAdminNfe.style.display = 'block';
     }
+
+    // Informações do sistema
+    const infoMovsEl = document.getElementById('info-movs');
+    const infoProdsEl = document.getElementById('info-prods');
+    const infoClisEl = document.getElementById('info-clis');
+    const infoSupsEl = document.getElementById('info-sups');
+    if (infoMovsEl) infoMovsEl.textContent = (appData.transactions || []).length;
+    if (infoProdsEl) infoProdsEl.textContent = (appData.products || []).length;
+    if (infoClisEl) infoClisEl.textContent = (appData.clients || []).length;
+    if (infoSupsEl) infoSupsEl.textContent = (appData.suppliers || []).length;
 
     // Populate certificate info
     const certCNEl = document.getElementById('cert-cn-val');
@@ -1987,6 +1999,10 @@ async function loadConfigSection(isAdmin) {
 
     if (certNotifyToggle) {
         certNotifyToggle.checked = appData.configs?.nfe_cert_notify !== 'false';
+    }
+
+    if (typeof loadBackupsList === 'function') {
+        loadBackupsList();
     }
 }
 
