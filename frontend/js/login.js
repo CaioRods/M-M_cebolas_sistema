@@ -10,7 +10,7 @@ let API_URL = (function () {
         return localStorage.getItem('api_url_base') || 'https://portalmmcebolas.com.br/api';
     }
     if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:3000/api';
-    if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) return `http://${host}:3000/api`;
+    // IP ou domínio em produção: o Nginx já faz proxy da mesma porta (80/443) para a API
     return window.location.origin + '/api';
 })();
 

@@ -55,10 +55,7 @@ let API_URL = (function () {
     // Se for localhost (desenvolvimento via navegador)
     if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:3000/api';
 
-    // Se for acesso via IP direto no navegador, precisa da porta 3000
-    if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) return `http://${host}:3000/api`;
-
-    // Se for domínio (ex: portalmmcebolas.com), assume que há um proxy (Nginx) na porta padrão
+    // Acesso via IP ou domínio em produção: o Nginx já faz proxy da mesma porta (80/443) para a API
     return window.location.origin + '/api';
 })();
 
