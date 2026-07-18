@@ -7,6 +7,7 @@ const fs = require('fs');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const NFeService = require('./nfe-service');
+const { formatSefazDateTime } = require('./nfe-service');
 const { jsPDF } = require('jspdf');
 require('jspdf-autotable');
 const bwipjs = require('bwip-js');
@@ -946,7 +947,7 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                         mod: 55,
                         serie: nfeSerie,
                         nNF: nfeProxNumero,
-                        dhEmi: new Date().toISOString(),
+                        dhEmi: formatSefazDateTime(),
                         tpNF: '1',
                         idDest: (destUF === emitUF) ? '1' : '2', // 1 operação interna, 2 operação interestadual
                         cMunFG: emitCMun,

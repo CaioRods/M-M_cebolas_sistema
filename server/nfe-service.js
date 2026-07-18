@@ -5,6 +5,22 @@ const { SignedXml } = require('xml-crypto');
 const { create } = require('xmlbuilder2');
 const soap = require('soap');
 
+// A NFe exige datas no formato TDateTimeUTC: "AAAA-MM-DDThh:mm:ssTZD" (offset numérico, sem
+// milissegundos, sem "Z" literal). Date.prototype.toISOString() produz "...ss.mmmZ", que a SEFAZ
+// rejeita na validação de schema. O Brasil não usa mais horário de verão desde 2019, então o
+// horário de Brasília é sempre UTC-03:00.
+function formatSefazDateTime(date = new Date()) {
+    const pad = (n) => String(n).padStart(2, '0');
+    const local = new Date(date.getTime() - 3 * 60 * 60 * 1000);
+    const y = local.getUTCFullYear();
+    const mo = pad(local.getUTCMonth() + 1);
+    const d = pad(local.getUTCDate());
+    const h = pad(local.getUTCHours());
+    const mi = pad(local.getUTCMinutes());
+    const s = pad(local.getUTCSeconds());
+    return `${y}-${mo}-${d}T${h}:${mi}:${s}-03:00`;
+}
+
 class NFeService {
     constructor(pfxPath, password, isProduction = false) {
         const defaultPfxPath = path.join(__dirname, '../certificado/certificado.pfx');
@@ -315,7 +331,7 @@ class NFeService {
 
         try {
             const cnpj = chaveAcesso.substring(6, 20);
-            const dhEvento = new Date().toISOString();
+            const dhEvento = formatSefazDateTime();
             const tpAmb = this.isProduction ? '1' : '2';
             const seq = String(nSeqEvento).padStart(2, '0');
             const idEvento = `ID110111${chaveAcesso}${seq}`;
@@ -405,3 +421,4 @@ class NFeService {
 }
 
 module.exports = NFeService;
+module.exports.formatSefazDateTime = formatSefazDateTime;
