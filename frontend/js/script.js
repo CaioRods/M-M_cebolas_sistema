@@ -2193,6 +2193,15 @@ async function loadAdminSection() {
     renderAdminFornecedoresTable();
     renderAdminProdutosTable();
     loadLogs();
+
+    // Aba "Config NF-e" desta seção duplica campos da tela de Configurações
+    // (mesmo name="nfe_modo", mesmos ids de peso) mas nada aqui os pré-preenchia.
+    const nfeModo = appData.configs?.nfe_modo || 'homologacao';
+    document.querySelectorAll('#admin-tab-nfe-config input[name="nfe_modo"]').forEach(r => {
+        r.checked = r.value === nfeModo;
+    });
+    const pesoCxEl = document.getElementById('config-peso-cx');
+    if (pesoCxEl) pesoCxEl.value = appData.configs?.peso_por_caixa_padrao || 20;
 }
 
 function renderUsuariosTable() {
