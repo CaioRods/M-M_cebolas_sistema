@@ -204,9 +204,14 @@ class NFeService {
                 }
             }, (err, client) => {
                 if (err) return reject(err);
-                // Autenticação Mutual TLS (Client Certificate) necessária para a SEFAZ
+                // Autenticação Mutual TLS (Client Certificate) necessária para a SEFAZ.
+                // IMPORTANTE: ClientSSLSecurityPFX.addOptions() substitui o httpsAgent por um novo
+                // (construído só com pfx/passphrase/defaults), descartando o agent configurado acima.
+                // Sem passar rejectUnauthorized:false aqui como "defaults", esse novo agent volta ao
+                // padrão seguro do Node, que rejeita a cadeia da SEFAZ (CA raiz ICP-Brasil não está no
+                // bundle padrão) — por isso precisa ser repassado explicitamente neste 3º parâmetro.
                 try {
-                    client.setSecurity(new soap.ClientSSLSecurityPFX(this.pfxPath, this.password));
+                    client.setSecurity(new soap.ClientSSLSecurityPFX(this.pfxPath, this.password, { rejectUnauthorized: false }));
                 } catch (secErr) {
                     console.warn("Aviso ao configurar segurança PFX no SOAP:", secErr.message);
                 }
