@@ -64,9 +64,7 @@ let API_URL = (function () {
     if (window.location.protocol !== 'file:') return;
     const urls = [
         'https://portalmmcebolas.com/api',
-        'https://portalmmcebolas.com.br/api',
-        'http://85.31.231.151/api',
-        'http://85.31.231.151:3000/api'
+        'http://85.31.231.151/api'
     ];
     for (const url of urls) {
         try {

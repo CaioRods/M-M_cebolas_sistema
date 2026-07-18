@@ -7,17 +7,17 @@ let API_URL = (function () {
 
     if (isDev) return 'http://localhost:3000/api';
     if (isElectron) {
-        return localStorage.getItem('api_url_base') || 'https://portalmmcebolas.com.br/api';
+        return localStorage.getItem('api_url_base') || 'https://portalmmcebolas.com/api';
     }
     if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:3000/api';
     // IP ou domínio em produção: o Nginx já faz proxy da mesma porta (80/443) para a API
     return window.location.origin + '/api';
 })();
 
-// Testa qual domínio responde (portalmmcebolas.com.br ou portalmmcebolas.com) e atualiza dinamicamente no Electron
+// Testa qual endpoint responde e atualiza dinamicamente no Electron
 (async function testApiEndpoints() {
     if (window.location.protocol !== 'file:') return;
-    const urls = ['https://portalmmcebolas.com.br/api', 'https://portalmmcebolas.com/api'];
+    const urls = ['https://portalmmcebolas.com/api', 'http://85.31.231.151/api'];
     for (const url of urls) {
         try {
             const controller = new AbortController();

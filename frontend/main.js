@@ -1,4 +1,4 @@
-// Electron: app desktop consome a API da VPS (https://portalmmcebolas.com.br) quando não for localhost.
+// Electron: app desktop consome a API da VPS (https://portalmmcebolas.com) quando não for localhost.
 // O frontend em script.js define API_URL dinamicamente (file:// → produção; localhost → :3000).
 const { app, BrowserWindow, ipcMain, dialog, nativeImage, TouchBar } = require('electron');
 const { TouchBarButton, TouchBarSpacer } = TouchBar;
