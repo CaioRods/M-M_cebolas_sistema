@@ -917,8 +917,9 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                 const emitCrt = configMap['emit_crt'] || '3';
                 db.run("UPDATE configs SET valor = ? WHERE chave = 'nfe_prox_numero'", [String(nfeProxNumero + 1)]);
 
-                // Gerar chave de acesso
-                const cNF = Math.floor(Math.random() * 100000000);
+                // Gerar chave de acesso. cNF exige exatamente 8 dígitos (schema: [0-9]{8}) — sem
+                // padding, números aleatórios menores que 10.000.000 quebravam a validação.
+                const cNF = String(Math.floor(Math.random() * 100000000)).padStart(8, '0');
                 const chaveParams = {
                     cUF: emitUF === 'SP' ? '35' : (configMap['emit_uf_cod'] || '35'),
                     year: new Date().getFullYear().toString().slice(-2),
