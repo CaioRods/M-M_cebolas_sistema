@@ -67,7 +67,7 @@ class NFeService {
     }
 
     createNFeXML(dados) {
-        const { ide, emit, dest, det, total, transp, infAdic } = dados;
+        const { ide, emit, dest, det, total, transp, pag, infAdic } = dados;
 
         const obj = {
             NFe: {
@@ -125,6 +125,9 @@ class NFeService {
                     },
                     transp: {
                         modFrete: transp.modFrete
+                    },
+                    pag: {
+                        detPag: pag.detPag
                     },
                     infAdic: {
                         infCpl: infAdic.infCpl

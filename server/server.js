@@ -991,19 +991,25 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                     },
                     det: [{
                         prod: {
-                            code: '001',
+                            cProd: '001',
+                            cEAN: 'SEM GTIN',
                             xProd: venda.produto,
                             NCM: '07031019',
                             CFOP: (destUF !== emitUF) ? '6102' : '5102',
                             uCom: 'CX',
                             qCom: venda.qtd_caixas || 1,
                             vUnCom: venda.valor / (venda.qtd_caixas || 1),
-                            vProd: venda.valor
+                            vProd: venda.valor,
+                            cEANTrib: 'SEM GTIN',
+                            uTrib: 'CX',
+                            qTrib: venda.qtd_caixas || 1,
+                            vUnTrib: venda.valor / (venda.qtd_caixas || 1),
+                            indTot: '1'
                         },
                         imposto: {
-                            ICMS: { CST: '00', modBC: '0', vBC: '0', pICMS: '0', vICMS: '0' },
-                            PIS: { CST: '99', vPIS: '0' },
-                            COFINS: { CST: '99', vCOFINS: '0' }
+                            ICMS: { ICMS00: { orig: '0', CST: '00', modBC: '0', vBC: '0.00', pICMS: '0.00', vICMS: '0.00' } },
+                            PIS: { PISOutr: { CST: '99', vBC: '0.00', pPIS: '0.00', vPIS: '0.00' } },
+                            COFINS: { COFINSOutr: { CST: '99', vBC: '0.00', pCOFINS: '0.00', vCOFINS: '0.00' } }
                         }
                     }],
                     total: {
@@ -1027,6 +1033,13 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                     },
                     transp: {
                         modFrete: '9'
+                    },
+                    pag: {
+                        detPag: {
+                            indPag: '0',
+                            tPag: '99',
+                            vPag: venda.valor
+                        }
                     },
                     infAdic: {
                         // CRT 1/2 = Simples Nacional (texto exigido pela SEFAZ); CRT 3 = Regime Normal,
