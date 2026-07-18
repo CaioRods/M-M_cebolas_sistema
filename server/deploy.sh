@@ -11,34 +11,23 @@ REPO_DIR="${APP_DIR}.git"
 echo "🚀 Atualizando código..."
 git --work-tree="${APP_DIR}" --git-dir="${REPO_DIR}" checkout -f
 
-# 2️⃣ Instala / atualiza dependências
-cd "${APP_DIR}"
+# 2️⃣ Instala / atualiza dependências (apenas do backend, que é o que roda na VPS)
+cd "${APP_DIR}/server"
+mkdir -p logs backups
+
 if [ -f pnpm-lock.yaml ]; then
     echo "📦 Instalando dependências via pnpm..."
-    pnpm install --frozen-lockfile
+    pnpm install --frozen-lockfile --prod
 else
     echo "📦 Instalando dependências via npm..."
-    npm ci
+    npm ci --omit=dev
 fi
 
-# 3️⃣ Build (se o projeto precisar)
-if grep -q "\"build\"" package.json; then
-    echo "🏗️ Executando build..."
-    npm run build   # ou pnpm run build
-fi
+# 3️⃣ (Re)inicia a aplicação com PM2
+echo "🚀 (Re)iniciando aplicação com PM2..."
+pm2 reload ecosystem.config.js --update-env || pm2 start ecosystem.config.js
 
-# 4️⃣ (Re)inicia a aplicação com PM2
-APP_NAME="portalmmcebolas"
-START_CMD="npm start"   # ajuste se usar outro comando
-if pm2 list | grep -q "${APP_NAME}"; then
-    echo "♻️ Reiniciando app via PM2..."
-    pm2 restart "${APP_NAME}"
-else
-    echo "⚡ Iniciando app via PM2..."
-    pm2 start "${START_CMD}" --name "${APP_NAME}"
-fi
-
-# 5️⃣ Salva o estado de PM2 para reiniciar após reboot
+# 4️⃣ Salva o estado do PM2 para reiniciar após reboot
 pm2 save
 
 echo "✅ Deploy concluído com sucesso!"

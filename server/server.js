@@ -106,7 +106,9 @@ const CORS_ORIGINS = [
     'http://www.portalmmcebolas.com.br',
     'http://localhost:3000',
     'http://127.0.0.1:3000',
-    'http://72.60.8.186'
+    'http://72.60.8.186',
+    'http://85.31.231.151',
+    'http://85.31.231.151:3000'
 ];
 app.use(cors({
     origin: function (origin, callback) {
