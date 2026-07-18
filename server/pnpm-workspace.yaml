@@ -1,4 +1,4 @@
-onlyBuiltDependencies:
-  - bcrypt
-  - sqlite3
-  - core-js
+allowBuilds:
+  bcrypt: true
+  sqlite3: true
+  core-js: true
