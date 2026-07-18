@@ -29,5 +29,12 @@
     "sqlite3": "^5.1.7",
     "xml-crypto": "^6.1.2",
     "xmlbuilder2": "^4.0.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "bcrypt",
+      "sqlite3",
+      "core-js"
+    ]
   }
 }
