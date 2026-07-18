@@ -37,7 +37,7 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "Z0oom1",
+        "owner": "CaioRods",
         "repo": "M-M_cebolas_sistema"
       }
     ],
