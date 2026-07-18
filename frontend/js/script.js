@@ -393,7 +393,11 @@ function showSection(id) {
     
     document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
     const activeBtn = document.querySelector(`.nav-item[onclick*="'${id}'"]`);
-    if (activeBtn) activeBtn.classList.add('active');
+    if (activeBtn) {
+        activeBtn.classList.add('active');
+        // Garante que o item da seção atual nunca fique escondido fora da área visível do menu
+        activeBtn.scrollIntoView({ block: 'nearest' });
+    }
 
     // Sincroniza o estado ativo da TabBar Mobile e a página atual
     syncMobileTabbar(id);
@@ -1670,6 +1674,7 @@ async function loadNFeTable() {
                             <button class="btn-icon" title="Ver PDF" onclick="previewPDF(${n.id}, event)"><i class="fas fa-eye"></i></button>
                             <button class="btn-icon" title="Baixar PDF" onclick="downloadPDF(${n.id}, event)"><i class="fas fa-file-pdf"></i></button>
                             <button class="btn-icon" title="Baixar XML" onclick="downloadXML(${n.id})"><i class="fas fa-file-code"></i></button>
+                            ${n.status === 'autorizada' ? `<button class="btn-icon text-danger" title="Cancelar NF-e" onclick="cancelarNFe(${n.id})"><i class="fas fa-ban"></i></button>` : ''}
                             <button class="btn-icon text-danger" title="Excluir" onclick="deleteNFe(${n.id})"><i class="fas fa-trash"></i></button>
                         </div>
                     </div>
@@ -3322,6 +3327,34 @@ async function transmitirNFe(id) {
             loadNFeSection();
         } else {
             showError(data.message || 'Erro na transmissão');
+        }
+    } catch (e) {
+        showError('Erro ao conectar com servidor');
+    } finally {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+    }
+}
+
+async function cancelarNFe(id) {
+    const motivo = prompt('Motivo do cancelamento (mínimo 15 caracteres):');
+    if (motivo === null) return;
+    if (motivo.trim().length < 15) { showError('O motivo deve ter ao menos 15 caracteres.'); return; }
+    if (!confirm('Confirma o cancelamento desta NF-e junto à SEFAZ? Esta ação é irreversível.')) return;
+
+    const btn = event.currentTarget;
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    btn.disabled = true;
+
+    try {
+        const res = await fetchWithAuth(`/nfe/${id}/cancelar`, { method: 'POST', body: JSON.stringify({ motivo: motivo.trim() }) });
+        const data = await res.json();
+        if (data.success) {
+            showSuccess(data.message || 'NF-e cancelada!');
+            loadNFeSection();
+        } else {
+            showError(data.error || data.message || 'Erro ao cancelar NF-e');
         }
     } catch (e) {
         showError('Erro ao conectar com servidor');

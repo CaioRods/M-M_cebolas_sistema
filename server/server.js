@@ -1,5 +1,4 @@
 require('dotenv').config();
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
@@ -44,6 +43,17 @@ db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS fornecedores (id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT, documento TEXT UNIQUE, telefone TEXT, ie TEXT, email TEXT, endereco TEXT)`);
     db.run(`CREATE TABLE IF NOT EXISTS movimentacoes (id INTEGER PRIMARY KEY AUTOINCREMENT, tipo TEXT, produto TEXT, quantidade INTEGER, valor REAL, descricao TEXT, data TEXT)`);
     db.run(`CREATE TABLE IF NOT EXISTS nfe (id INTEGER PRIMARY KEY AUTOINCREMENT, venda_id INTEGER, chave_acesso TEXT, xml_content TEXT, status TEXT, data_emissao TEXT)`);
+    db.run(`CREATE TABLE IF NOT EXISTS nfe_cancelamentos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nfe_id INTEGER NOT NULL,
+        motivo_cancelamento TEXT NOT NULL,
+        data_cancelamento TEXT NOT NULL,
+        usuario_id INTEGER,
+        protocolo_cancelamento TEXT,
+        xml_cancelamento TEXT,
+        status TEXT DEFAULT 'pendente',
+        FOREIGN KEY (nfe_id) REFERENCES nfe(id)
+    )`);
     db.run(`CREATE TABLE IF NOT EXISTS configs (chave TEXT PRIMARY KEY, valor TEXT)`);
     db.run(`CREATE TABLE IF NOT EXISTS logs (id INTEGER PRIMARY KEY AUTOINCREMENT, usuario_id INTEGER, username TEXT, acao TEXT, detalhes TEXT, data TEXT)`);
     db.run(`CREATE TABLE IF NOT EXISTS descartes (id INTEGER PRIMARY KEY AUTOINCREMENT, produto TEXT, quantidade_caixas INTEGER, peso_kg REAL, motivo TEXT, data TEXT)`);
@@ -83,11 +93,14 @@ db.serialize(() => {
     upsertUser('Vinicius', 'vinicius', 'VINICIUS_PASSWORD', 'chefe');
     upsertUser('Funcionario', 'funcionario', 'FUNCIONARIO_PASSWORD', 'funcionario');
 
+    // OR IGNORE: semeia um valor padrão só se a chave ainda não existir. Usar OR REPLACE aqui
+    // faria o .env sobrescrever silenciosamente uma escolha que o usuário já fez pela tela de
+    // Configurações a cada restart do servidor (que acontece a cada deploy automático).
     if (process.env.NFE_MODO) {
-        db.run("INSERT OR REPLACE INTO configs (chave, valor) VALUES (?, ?)", ['nfe_modo', process.env.NFE_MODO]);
+        db.run("INSERT OR IGNORE INTO configs (chave, valor) VALUES (?, ?)", ['nfe_modo', process.env.NFE_MODO]);
     }
     if (process.env.CERT_PASSWORD) {
-        db.run("INSERT OR REPLACE INTO configs (chave, valor) VALUES (?, ?)", ['cert_password', process.env.CERT_PASSWORD]);
+        db.run("INSERT OR IGNORE INTO configs (chave, valor) VALUES (?, ?)", ['cert_password', process.env.CERT_PASSWORD]);
     }
 
     // Config padrão: peso por caixa = 20kg
@@ -892,7 +905,17 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
             
             try {
                 const nfeService = new NFeService(pfxPath, certPassword, isProduction);
-                
+
+                // Reserva o próximo número da nota e já persiste o incremento ANTES de chamar a
+                // SEFAZ (sem await entre a leitura e este db.run, então nenhuma outra requisição
+                // pode intercalar). Uma vez reservado, o número não é revertido mesmo se a
+                // transmissão falhar/for rejeitada — reaproveitar um número já colocado na rede
+                // pode gerar duplicidade real perante a SEFAZ.
+                const nfeProxNumero = parseInt(configMap['nfe_prox_numero'] || venda_id);
+                const nfeSerie = parseInt(configMap['nfe_serie'] || '1');
+                const emitCrt = configMap['emit_crt'] || '3';
+                db.run("UPDATE configs SET valor = ? WHERE chave = 'nfe_prox_numero'", [String(nfeProxNumero + 1)]);
+
                 // Gerar chave de acesso
                 const cNF = Math.floor(Math.random() * 100000000);
                 const chaveParams = {
@@ -901,8 +924,8 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                     month: String(new Date().getMonth() + 1).padStart(2, '0'),
                     cnpj: emitCNPJ,
                     mod: '55',
-                    serie: parseInt(configMap['nfe_serie'] || '1'),
-                    nNF: parseInt(configMap['nfe_prox_numero'] || venda_id),
+                    serie: nfeSerie,
+                    nNF: nfeProxNumero,
                     tpEmis: '1',
                     cNF
                 };
@@ -921,8 +944,8 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                         cNF,
                         natOp: 'Venda de mercadoria adquirida de terceiros',
                         mod: 55,
-                        serie: parseInt(configMap['nfe_serie'] || '1'),
-                        nNF: parseInt(configMap['nfe_prox_numero'] || venda_id),
+                        serie: nfeSerie,
+                        nNF: nfeProxNumero,
                         dhEmi: new Date().toISOString(),
                         tpNF: '1',
                         idDest: (destUF === emitUF) ? '1' : '2', // 1 operação interna, 2 operação interestadual
@@ -939,7 +962,7 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                         xNome: emitNome,
                         xFant: configMap['emit_fant'] || emitNome,
                         ie: emitIE,
-                        crt: configMap['emit_crt'] || '3',
+                        crt: emitCrt,
                         enderEmit: {
                             xLgr: configMap['emit_lgr'] || 'RUA MANOEL CRUZ',
                             nro: configMap['emit_nro'] || '36',
@@ -1006,7 +1029,11 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                         modFrete: '9'
                     },
                     infAdic: {
-                        infCpl: 'Documento emitido por ME ou EPP optante pelo Simples Nacional.'
+                        // CRT 1/2 = Simples Nacional (texto exigido pela SEFAZ); CRT 3 = Regime Normal,
+                        // onde essa frase não se aplica e não deve ser impressa na nota.
+                        infCpl: configMap['emit_infcpl'] || ((emitCrt === '1' || emitCrt === '2')
+                            ? 'Documento emitido por ME ou EPP optante pelo Simples Nacional.'
+                            : 'Não gera direito a crédito fiscal de ICMS/IPI.')
                     }
                 };
                 
@@ -1015,15 +1042,28 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                 
                 // Transmitir para SEFAZ
                 const transmissaoResult = await nfeService.transmitirSefaz(xmlAssinado, configMap['emit_uf_cod'] || '35');
-                
+
                 const dataEmissao = new Date().toISOString();
-                const status = transmissaoResult.status || 'assinada';
-                
-                db.run(`INSERT INTO nfe (venda_id, chave_acesso, xml_content, status, data_emissao, protocolo_autorizacao) VALUES (?, ?, ?, ?, ?, ?)`,
-                    [venda_id, chaveAcesso, xmlAssinado, status, dataEmissao, transmissaoResult.protocolo || ''], function (err3) {
+                const status = transmissaoResult.status;
+
+                // Status HTTP reflete o resultado real: 200 só quando realmente autorizada pela
+                // SEFAZ; 422 quando a SEFAZ recusou explicitamente a nota (dado inválido, precisa
+                // correção); 502 quando não foi possível nem falar com a SEFAZ (rede/config) —
+                // nunca 200 para um caso que não seja autorização de verdade.
+                const httpStatus = status === 'autorizada' ? 200 : (status === 'rejeitada' ? 422 : 502);
+
+                db.run(`INSERT INTO nfe (venda_id, chave_acesso, xml_content, status, data_emissao, protocolo_autorizacao, numero_nfe, serie_nfe) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [venda_id, chaveAcesso, xmlAssinado, status, dataEmissao, transmissaoResult.protocolo || '', nfeProxNumero, nfeSerie], function (err3) {
                         if (err3) return res.status(500).json({ error: err3.message });
                         registrarLog(req, 'NFE_GERAR', `NF-e gerada para venda #${venda_id} - Status: ${status}`);
-                        res.json({ id: this.lastID, chave: chaveAcesso, status, message: transmissaoResult.message });
+                        res.status(httpStatus).json({
+                            id: this.lastID,
+                            chave: chaveAcesso,
+                            status,
+                            success: transmissaoResult.success,
+                            message: transmissaoResult.message,
+                            error: transmissaoResult.success ? undefined : transmissaoResult.message
+                        });
                     });
             } catch (nfeErr) {
                 console.error('Erro ao gerar NF-e:', nfeErr);
@@ -1060,14 +1100,73 @@ app.post('/api/nfe/:id/transmitir', authenticateToken, async (req, res) => {
                 const nfeService = new NFeService(pfxPath, certPassword, isProduction);
                 const transmissaoResult = await nfeService.transmitirSefaz(nfe.xml_content, configMap['emit_uf_cod'] || '35');
                 
+                const httpStatus = transmissaoResult.status === 'autorizada' ? 200 : (transmissaoResult.status === 'rejeitada' ? 422 : 502);
+
                 if (transmissaoResult.status === 'autorizada') {
                     db.run(`UPDATE nfe SET status = ?, protocolo_autorizacao = ? WHERE id = ?`,
                         [transmissaoResult.status, transmissaoResult.protocolo, req.params.id], (err3) => {
                             if (err3) return res.status(500).json({ error: err3.message });
-                            res.json({ success: true, status: transmissaoResult.status, message: transmissaoResult.message });
+                            res.status(httpStatus).json({ success: true, status: transmissaoResult.status, message: transmissaoResult.message });
                         });
                 } else {
-                    res.json({ success: false, status: transmissaoResult.status, message: transmissaoResult.message });
+                    // Persiste também a tentativa que falhou, pra não deixar a nota com status
+                    // desatualizado na listagem enquanto o problema não é corrigido/retentado.
+                    db.run(`UPDATE nfe SET status = ? WHERE id = ?`, [transmissaoResult.status, req.params.id], () => {
+                        res.status(httpStatus).json({ success: false, status: transmissaoResult.status, message: transmissaoResult.message, error: transmissaoResult.message });
+                    });
+                }
+            } catch (nfeErr) {
+                res.status(500).json({ error: nfeErr.message });
+            }
+        });
+    });
+});
+
+app.post('/api/nfe/:id/cancelar', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'chefe') return res.sendStatus(403);
+
+    const motivo = (req.body.motivo || '').trim();
+    if (motivo.length < 15 || motivo.length > 255) {
+        return res.status(400).json({ error: "O motivo do cancelamento deve ter entre 15 e 255 caracteres." });
+    }
+
+    db.get('SELECT * FROM nfe WHERE id = ?', [req.params.id], async (err, nfe) => {
+        if (err || !nfe) return res.status(404).json({ error: "NF-e não encontrada" });
+        if (nfe.status !== 'autorizada') return res.status(400).json({ error: "Apenas notas autorizadas podem ser canceladas." });
+        if (!nfe.protocolo_autorizacao) return res.status(400).json({ error: "NF-e sem protocolo de autorização registrado — não é possível cancelar." });
+
+        const horasDesdeEmissao = (Date.now() - new Date(nfe.data_emissao).getTime()) / (1000 * 60 * 60);
+        if (horasDesdeEmissao > 24) {
+            return res.status(400).json({ error: "Prazo legal de cancelamento (24h após autorização) expirado." });
+        }
+
+        db.all('SELECT chave, valor FROM configs', [], async (err2, configs) => {
+            const configMap = {};
+            configs?.forEach(c => configMap[c.chave] = c.valor);
+
+            const modo = configMap['nfe_modo'] || 'homologacao';
+            const isProduction = modo === 'producao';
+            const certPassword = configMap['cert_password'] || '12345678';
+            const pfxPath = path.join(__dirname, '../certificado/certificado.pfx');
+            const dataCancelamento = new Date().toISOString();
+
+            try {
+                const nfeService = new NFeService(pfxPath, certPassword, isProduction);
+                const result = await nfeService.cancelarNFe(nfe.chave_acesso, motivo, nfe.protocolo_autorizacao, configMap['emit_uf_cod'] || '35');
+
+                const httpStatus = result.status === 'cancelada' ? 200 : (result.status === 'erro_sefaz_cancelamento' ? 422 : 502);
+
+                db.run(`INSERT INTO nfe_cancelamentos (nfe_id, motivo_cancelamento, data_cancelamento, usuario_id, protocolo_cancelamento, xml_cancelamento, status) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    [nfe.id, motivo, dataCancelamento, req.user.id, result.protocolo || '', result.xmlCancelamento || '', result.success ? 'concluido' : 'rejeitado']);
+
+                if (result.success) {
+                    db.run(`UPDATE nfe SET status = 'cancelada' WHERE id = ?`, [nfe.id], (err3) => {
+                        if (err3) return res.status(500).json({ error: err3.message });
+                        registrarLog(req, 'NFE_CANCELAR', `NF-e #${nfe.id} cancelada - Motivo: ${motivo}`);
+                        res.status(httpStatus).json({ success: true, status: 'cancelada', message: result.message });
+                    });
+                } else {
+                    res.status(httpStatus).json({ success: false, status: result.status, message: result.message, error: result.message });
                 }
             } catch (nfeErr) {
                 res.status(500).json({ error: nfeErr.message });
