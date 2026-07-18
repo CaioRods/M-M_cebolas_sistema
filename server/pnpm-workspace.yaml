@@ -1,0 +1,4 @@
+onlyBuiltDependencies:
+  - bcrypt
+  - sqlite3
+  - core-js
