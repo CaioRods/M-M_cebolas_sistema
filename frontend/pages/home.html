@@ -472,75 +472,76 @@
 
     <!-- Modal Gerar NF-e -->
     <div id="modal-gerar-nfe" class="modal-overlay">
-        <div class="edit-modal" style="max-width:520px;">
-            <div class="modal-header" style="background:#059669;color:white;padding:20px 24px;border-radius:20px 20px 0 0;display:flex;justify-content:space-between;align-items:center;">
-                <h3 style="margin:0;font-size:1.1rem;"><i class="fas fa-file-invoice"></i> Emitir NF-e</h3>
-                <button onclick="closeNFeModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:white;line-height:1;">&times;</button>
+        <div class="edit-modal" style="max-width:540px;">
+            <div class="modal-header" style="background:linear-gradient(135deg, #059669 0%, #047857 100%);color:white;padding:22px 24px;border-radius:20px 20px 0 0;display:flex;justify-content:space-between;align-items:center;">
+                <h3 style="margin:0;font-size:1.15rem;display:flex;align-items:center;gap:10px;"><i class="fas fa-file-invoice"></i> Emitir NF-e</h3>
+                <button onclick="closeNFeModal()" style="background:rgba(255,255,255,0.15);border:none;width:32px;height:32px;border-radius:9px;font-size:1.3rem;cursor:pointer;color:white;line-height:1;">&times;</button>
             </div>
-            <form onsubmit="confirmarGerarNFe(event)" style="padding:24px;display:flex;flex-direction:column;gap:16px;">
+            <form onsubmit="confirmarGerarNFe(event)" style="padding:24px;display:flex;flex-direction:column;gap:18px;">
                 <input type="hidden" id="nfe-venda-id">
                 <input type="hidden" id="nfe-avulsa-data">
 
                 <div id="nfe-avulsa-fields" style="display:none;flex-direction:column;gap:16px;">
-                    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px;">
-                        <p style="font-size:0.85rem;color:#1e40af;font-weight:600;"><i class="fas fa-info-circle"></i> Nota avulsa: informe o produto vendido. Use o interruptor abaixo se o estoque desse produto já foi baixado por outro meio.</p>
+                    <div class="nfe-modal-section tint-blue">
+                        <div class="nfe-modal-section-title"><i class="fas fa-box-open"></i> Nota Avulsa</div>
+                        <p style="font-size:0.82rem;color:#1e40af;">Informe o produto vendido. Use o interruptor abaixo se o estoque desse produto já foi baixado por outro meio.</p>
+                        <div class="form-group">
+                            <label>Produto</label>
+                            <select id="nfe-avulsa-produto"></select>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                            <div class="form-group">
+                                <label>Quantidade (caixas)</label>
+                                <input type="number" step="0.01" id="nfe-avulsa-qtd" placeholder="0">
+                            </div>
+                            <div class="form-group">
+                                <label>Valor Total (R$)</label>
+                                <input type="number" step="0.01" id="nfe-avulsa-valor" placeholder="0,00">
+                            </div>
+                        </div>
+                        <div class="nfe-toggle-row">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="nfe-avulsa-baixa" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <div class="nfe-toggle-text">
+                                <p onclick="document.getElementById('nfe-avulsa-baixa').click()">Dar baixa no estoque</p>
+                                <p>Desligue se o estoque desse produto já foi baixado antes.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="nfe-modal-section tint-green">
+                    <div class="nfe-modal-section-title"><i class="fas fa-user"></i> Destinatário</div>
+                    <div class="form-group">
+                        <label>Cliente Cadastrado</label>
+                        <select id="nfe-destinatario-id" onchange="preencherDestNFe(this)">
+                            <option value="">Selecione um cliente cadastrado...</option>
+                        </select>
+                    </div>
+                    <div class="nfe-modal-divider">ou informe manualmente</div>
+                    <div class="form-group">
+                        <label>Nome / Razão Social</label>
+                        <input type="text" id="nfe-dest-nome" placeholder="Nome do destinatário">
                     </div>
                     <div class="form-group">
-                        <label>Produto</label>
-                        <select id="nfe-avulsa-produto"></select>
+                        <label>CNPJ / CPF</label>
+                        <input type="text" id="nfe-dest-doc" placeholder="Documento do destinatário">
+                    </div>
+                    <div class="form-group">
+                        <label>Endereço</label>
+                        <input type="text" id="nfe-dest-end" placeholder="Rua, Número, Bairro, Cidade">
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                         <div class="form-group">
-                            <label>Quantidade (caixas)</label>
-                            <input type="number" step="0.01" id="nfe-avulsa-qtd" placeholder="0">
+                            <label>UF</label>
+                            <input type="text" id="nfe-dest-uf" placeholder="SP" maxlength="2">
                         </div>
                         <div class="form-group">
-                            <label>Valor Total (R$)</label>
-                            <input type="number" step="0.01" id="nfe-avulsa-valor" placeholder="0,00">
+                            <label>CEP</label>
+                            <input type="text" id="nfe-dest-cep" placeholder="00000-000">
                         </div>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:12px;background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:12px 16px;">
-                        <input type="checkbox" id="nfe-avulsa-baixa" checked style="width:20px;height:20px;flex-shrink:0;">
-                        <div>
-                            <p style="font-weight:600;font-size:0.85rem;cursor:pointer;" onclick="document.getElementById('nfe-avulsa-baixa').click()">Dar baixa no estoque</p>
-                            <p style="font-size:0.75rem;color:var(--text-muted);">Desligue se o estoque desse produto já foi baixado antes.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;">
-                    <p style="font-size:0.85rem;color:#166534;font-weight:600;"><i class="fas fa-info-circle"></i> Selecione o destinatário da NF-e ou informe manualmente.</p>
-                </div>
-
-                <div class="form-group">
-                    <label>Destinatário (Clientes cadastrados)</label>
-                    <select id="nfe-destinatario-id" onchange="preencherDestNFe(this)">
-                        <option value="">Selecione um cliente cadastrado...</option>
-                    </select>
-                </div>
-
-                <div style="text-align:center;color:var(--text-muted);font-size:0.8rem;">— ou informe manualmente —</div>
-
-                <div class="form-group">
-                    <label>Nome / Razão Social</label>
-                    <input type="text" id="nfe-dest-nome" placeholder="Nome do destinatário">
-                </div>
-                <div class="form-group">
-                    <label>CNPJ / CPF</label>
-                    <input type="text" id="nfe-dest-doc" placeholder="Documento do destinatário">
-                </div>
-                <div class="form-group">
-                    <label>Endereço</label>
-                    <input type="text" id="nfe-dest-end" placeholder="Rua, Número, Bairro, Cidade">
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                    <div class="form-group">
-                        <label>UF</label>
-                        <input type="text" id="nfe-dest-uf" placeholder="SP" maxlength="2">
-                    </div>
-                    <div class="form-group">
-                        <label>CEP</label>
-                        <input type="text" id="nfe-dest-cep" placeholder="00000-000">
                     </div>
                 </div>
 
@@ -562,9 +563,9 @@
                     <input type="text" id="nfe-desc-pagamento" placeholder="Ex: A combinar, Outros" value="Outros">
                 </div>
 
-                <div style="display:flex;gap:12px;margin-top:8px;">
+                <div style="display:flex;gap:12px;margin-top:4px;">
                     <button type="button" class="btn-danger" onclick="closeNFeModal()" style="flex:1;">Cancelar</button>
-                    <button type="submit" class="btn-primary" style="flex:2;background:#059669;">
+                    <button type="submit" class="btn-primary" style="flex:2;background:linear-gradient(135deg, #059669 0%, #047857 100%);">
                         <i class="fas fa-file-invoice"></i> Emitir NF-e
                     </button>
                 </div>
@@ -572,14 +573,20 @@
         </div>
     </div>
 
-    <!-- Overlay de Confirmação (Sucesso Visual) -->
+    <!-- Overlay de Confirmação (Sucesso/Erro com animação) -->
     <div id="confirmation-overlay" class="confirmation-overlay">
-        <div class="check-container">
-            <svg class="check-svg" viewBox="0 0 52 52">
-                <circle cx="26" cy="26" r="25" fill="none" stroke="#10b981" stroke-width="2"/>
-                <path class="check-path" fill="none" stroke="#10b981" stroke-width="4" stroke-linecap="round" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+        <div class="confirmation-icon-container">
+            <svg class="confirmation-svg icon-check" viewBox="0 0 52 52">
+                <circle class="confirmation-circle circle-success" cx="26" cy="26" r="25" fill="none" stroke-width="2"/>
+                <path class="confirmation-path path-check" fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+            </svg>
+            <svg class="confirmation-svg icon-x" viewBox="0 0 52 52">
+                <circle class="confirmation-circle circle-error" cx="26" cy="26" r="25" fill="none" stroke-width="2"/>
+                <path class="confirmation-path path-x1" fill="none" stroke-width="4" stroke-linecap="round" d="M16 16 L36 36"/>
+                <path class="confirmation-path path-x2" fill="none" stroke-width="4" stroke-linecap="round" d="M36 16 L16 36"/>
             </svg>
         </div>
+        <p class="confirmation-message" id="confirmation-message"></p>
     </div>
 
     <!-- Áudios do Sistema -->

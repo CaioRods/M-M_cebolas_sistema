@@ -1436,3 +1436,283 @@ tr:hover td { background-color: rgba(248, 250, 252, 0.9); }
         gap: 16px !important;
     }
 }
+
+/* ===================================================
+   OVERLAY DE CONFIRMAÇÃO (sucesso/erro com animação)
+   =================================================== */
+.confirmation-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(6px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    z-index: 20000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+}
+
+.confirmation-overlay.active {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.confirmation-icon-container {
+    width: 110px;
+    height: 110px;
+    position: relative;
+    transform: scale(0.6);
+    opacity: 0;
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease;
+}
+
+.confirmation-overlay.active .confirmation-icon-container {
+    transform: scale(1);
+    opacity: 1;
+}
+
+.confirmation-svg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+}
+
+.confirmation-overlay.state-success .icon-check,
+.confirmation-overlay.state-error .icon-x {
+    display: block;
+}
+
+.confirmation-circle {
+    stroke-dasharray: 166;
+    stroke-dashoffset: 166;
+}
+
+.confirmation-overlay.active .confirmation-circle {
+    animation: confirmationCircleDraw 0.5s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+}
+
+.circle-success { stroke: #10b981; }
+.circle-error { stroke: #ef4444; }
+
+.path-check {
+    stroke: #10b981;
+    stroke-dasharray: 48;
+    stroke-dashoffset: 48;
+}
+
+.confirmation-overlay.active.state-success .path-check {
+    animation: confirmationPathDraw 0.35s 0.35s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+}
+
+.path-x1, .path-x2 {
+    stroke: #ef4444;
+    stroke-dasharray: 30;
+    stroke-dashoffset: 30;
+}
+
+.confirmation-overlay.active.state-error .path-x1 {
+    animation: confirmationPathDraw 0.25s 0.35s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+}
+
+.confirmation-overlay.active.state-error .path-x2 {
+    animation: confirmationPathDraw 0.25s 0.55s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+}
+
+@keyframes confirmationCircleDraw {
+    to { stroke-dashoffset: 0; }
+}
+
+@keyframes confirmationPathDraw {
+    to { stroke-dashoffset: 0; }
+}
+
+.confirmation-message {
+    color: white;
+    font-size: 1.1rem;
+    font-weight: 700;
+    text-align: center;
+    max-width: 340px;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.3s 0.3s ease, transform 0.3s 0.3s ease;
+}
+
+.confirmation-overlay.active .confirmation-message {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* ===================================================
+   TOGGLE SWITCH
+   =================================================== */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 46px;
+    height: 26px;
+    flex-shrink: 0;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-switch .toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #cbd5e1;
+    border-radius: 100px;
+    transition: background-color 0.25s ease;
+}
+
+.toggle-switch .toggle-slider::before {
+    content: '';
+    position: absolute;
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    border-radius: 50%;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background-color: var(--primary);
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(20px);
+}
+
+/* ===================================================
+   MODAL DE EMISSÃO DE NF-e
+   =================================================== */
+.nfe-modal-section {
+    border-radius: 14px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.nfe-modal-section.tint-blue { background: #eff6ff; border-color: #bfdbfe; }
+.nfe-modal-section.tint-green { background: #f0fdf4; border-color: #bbf7d0; }
+
+.nfe-modal-section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.tint-blue .nfe-modal-section-title { color: #1e40af; }
+.tint-green .nfe-modal-section-title { color: #166534; }
+
+.nfe-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+}
+
+.nfe-toggle-row .nfe-toggle-text p:first-child {
+    font-weight: 700;
+    font-size: 0.88rem;
+    color: var(--text-main);
+    cursor: pointer;
+}
+
+.nfe-toggle-row .nfe-toggle-text p:last-child {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.nfe-modal-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.nfe-modal-divider::before, .nfe-modal-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+}
+
+/* ===================================================
+   SEÇÃO DE NOTAS FISCAIS (lista)
+   =================================================== */
+.nfe-group-header {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+.nfe-group-header:hover {
+    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.06);
+}
+
+.nfe-list-item {
+    transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.nfe-list-item:hover {
+    background: #f8fafc;
+    transform: translateX(2px);
+}
+
+.nfe-list-item .btn-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.nfe-list-item .btn-icon:hover {
+    background: #f1f5f9;
+    border-color: var(--border);
+    transform: translateY(-1px);
+}
+
+.nfe-list-item .btn-icon.text-danger:hover {
+    background: #fef2f2;
+    border-color: #fecaca;
+}
+
+.kpi-grid-pro .panel {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.kpi-grid-pro .panel:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 24px -8px rgba(15, 23, 42, 0.15);
+}

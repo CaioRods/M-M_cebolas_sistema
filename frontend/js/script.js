@@ -1729,28 +1729,59 @@ function filterNFeBySearch(val) {
     loadNFeTable();
 }
 
+// Salva um arquivo tanto no app Electron (via IPC, com diálogo nativo "Salvar como") quanto no
+// navegador comum (via link de download temporário) — require('electron') não existe fora do
+// Electron e quebrava silenciosamente o download no site.
+function salvarArquivoUniversal({ blob, defaultName, mimeType, filters }) {
+    return new Promise((resolve, reject) => {
+        const isElectron = window.location.protocol === 'file:' ||
+            (typeof process !== 'undefined' && process.versions && process.versions.electron);
+
+        if (isElectron && typeof require !== 'undefined') {
+            try {
+                const { ipcRenderer } = require('electron');
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    ipcRenderer.send('salvar-arquivo', { content: reader.result, defaultName, filters });
+                    ipcRenderer.once('salvar-arquivo-status', (event, status) => {
+                        if (status.success) resolve();
+                        else reject(new Error(status.error || 'Falha ao salvar'));
+                    });
+                };
+                reader.readAsDataURL(blob);
+                return;
+            } catch (e) {
+                // Cai no fallback do navegador se o IPC falhar por algum motivo
+            }
+        }
+
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = defaultName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+        resolve();
+    });
+}
+
 async function downloadXML(id) {
     const token = localStorage.getItem('token');
     const url = `${API_URL}/nfe/${id}/xml`;
     try {
         const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
         if (!res.ok) { showError('Erro ao baixar XML'); return; }
-        const xmlText = await res.text();
+        const blob = await res.blob();
 
-        const { ipcRenderer } = require('electron');
-        ipcRenderer.send('salvar-arquivo', {
-            content: xmlText,
+        await salvarArquivoUniversal({
+            blob,
             defaultName: `NFe_${id}.xml`,
+            mimeType: 'application/xml',
             filters: [{ name: 'XML Files', extensions: ['xml'] }]
         });
-
-        ipcRenderer.once('salvar-arquivo-status', (event, status) => {
-            if (status.success) {
-                showSuccess('XML salvo com sucesso!');
-            } else if (status.error) {
-                showError('Erro ao salvar XML: ' + status.error);
-            }
-        });
+        showSuccess('XML salvo com sucesso!');
     } catch (e) {
         showError('Erro ao baixar XML: ' + e.message);
     }
@@ -1759,7 +1790,7 @@ async function downloadXML(id) {
 async function downloadPDF(id, event) {
     const token = localStorage.getItem('token');
     const url = `${API_URL}/nfe/${id}/pdf`;
-    
+
     const btn = event?.currentTarget;
     const origContent = btn ? btn.innerHTML : null;
     if (btn) {
@@ -1770,28 +1801,15 @@ async function downloadPDF(id, event) {
     try {
         const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
         if (!res.ok) { showError('Erro ao gerar PDF'); return; }
-        
+
         const blob = await res.blob();
-        
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            const base64data = reader.result;
-            const { ipcRenderer } = require('electron');
-            ipcRenderer.send('salvar-arquivo', {
-                content: base64data,
-                defaultName: `DANFE_${id}.pdf`,
-                filters: [{ name: 'PDF Files', extensions: ['pdf'] }]
-            });
-            
-            ipcRenderer.once('salvar-arquivo-status', (event, status) => {
-                if (status.success) {
-                    showSuccess('PDF salvo com sucesso!');
-                } else if (status.error) {
-                    showError('Erro ao salvar PDF: ' + status.error);
-                }
-            });
-        };
-        reader.readAsDataURL(blob);
+        await salvarArquivoUniversal({
+            blob,
+            defaultName: `DANFE_${id}.pdf`,
+            mimeType: 'application/pdf',
+            filters: [{ name: 'PDF Files', extensions: ['pdf'] }]
+        });
+        showSuccess('PDF salvo com sucesso!');
     } catch (e) {
         showError('Erro: ' + e.message);
     } finally {
@@ -2008,15 +2026,15 @@ async function confirmarGerarNFe(event) {
 
         if (res && res.ok) {
             const data = await res.json();
-            showSuccess(`NF-e gerada! Chave: ${(data.chave || '').substring(0, 20)}...`);
+            showConfirmationOverlay(true, 'NF-e autorizada com sucesso!');
             closeNFeModal();
             if (currentSectionId === 'nfe') loadNFeTable();
         } else {
             const err = res ? await res.json() : {};
-            showError(err.error || 'Erro ao gerar NF-e');
+            showConfirmationOverlay(false, err.error || 'Erro ao gerar NF-e');
         }
     } catch (e) {
-        showError('Erro ao gerar NF-e: ' + e.message);
+        showConfirmationOverlay(false, 'Erro ao gerar NF-e: ' + e.message);
     } finally {
         if (btn) { btn.innerHTML = origText; btn.disabled = false; }
     }
@@ -3278,6 +3296,29 @@ async function fetchWithAuth(url, options = {}) {
 }
 
 function logout() { localStorage.clear(); window.location.href = 'login.html'; }
+
+// Overlay de tela cheia com animação de check (sucesso, com som) ou X (erro) — usado em ações
+// importantes como a emissão de NF-e, onde um toast discreto não é destaque suficiente.
+function showConfirmationOverlay(success, message) {
+    const overlay = document.getElementById('confirmation-overlay');
+    if (!overlay) { success ? showSuccess(message) : showError(message); return; }
+
+    const msgEl = document.getElementById('confirmation-message');
+    if (msgEl) msgEl.textContent = message || '';
+
+    overlay.classList.remove('state-success', 'state-error', 'active');
+    // Força reflow para reiniciar a animação CSS mesmo se o overlay acabou de ser usado
+    void overlay.offsetWidth;
+    overlay.classList.add(success ? 'state-success' : 'state-error');
+    overlay.classList.add('active');
+
+    if (success) {
+        const sound = document.getElementById('sound-success');
+        if (sound) { sound.currentTime = 0; sound.play().catch(() => {}); }
+    }
+
+    setTimeout(() => overlay.classList.remove('active'), 2200);
+}
 
 function showSuccess(msg) {
     const t = document.createElement('div');
