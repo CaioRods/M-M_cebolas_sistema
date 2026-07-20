@@ -972,7 +972,9 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                             cMun: emitCMun,
                             xMun: configMap['emit_xmun'] || 'PRESIDENTE PRUDENTE',
                             UF: emitUF,
-                            CEP: emitCEP
+                            CEP: emitCEP,
+                            cPais: '1058',
+                            xPais: 'BRASIL'
                         }
                     },
                     dest: {
@@ -988,7 +990,9 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                             cMun: cMunFinal,
                             xMun: xMunFinal,
                             UF: destUF,
-                            CEP: destCEP
+                            CEP: destCEP,
+                            cPais: '1058',
+                            xPais: 'BRASIL'
                         }
                     },
                     det: [{
@@ -1010,6 +1014,9 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                         },
                         imposto: {
                             ICMS: { ICMS00: { orig: '0', CST: '00', modBC: '0', vBC: '0.00', pICMS: '0.00', vICMS: '0.00' } },
+                            // Opcional no XSD, mas presente em toda NF-e real deste CNPJ — replicado
+                            // da mesma forma (CST 99 = não tributado).
+                            IPI: { cEnq: '999', IPITrib: { CST: '99', vBC: '0.00', pIPI: '0.00', vIPI: '0.00' } },
                             PIS: { PISOutr: { CST: '99', vBC: '0.00', pPIS: '0.00', vPIS: '0.00' } },
                             COFINS: { COFINSOutr: { CST: '99', vBC: '0.00', pCOFINS: '0.00', vCOFINS: '0.00' } },
                             // Grupo IBS/CBS da Reforma Tributária (obrigatório na prática desde 2026,
