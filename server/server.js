@@ -201,18 +201,48 @@ app.post('/api/movimentacoes', authenticateToken, (req, res) => {
             finalQuantidade = finalQtdCaixas; // quantidade principal = caixas
         }
 
-        db.run(
-            `INSERT INTO movimentacoes (tipo, produto, quantidade, valor, descricao, data, unidade, peso_kg, qtd_caixas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [tipo, produto, finalQuantidade, valor, descricao, data, unidade || 'CX', finalPesoKg, finalQtdCaixas],
-            function (err) {
-                if (err) return res.status(500).json({ error: err.message });
-                const unidadeLabel = unidade === 'AMBOS'
-                    ? `${finalQtdCaixas}CX / ${finalPesoKg}KG`
-                    : `${finalQuantidade}${unidade || 'CX'}`;
-                registrarLog(req, 'MOVIMENTACAO', `${tipo.toUpperCase()}: ${unidadeLabel} de ${produto} - R$ ${valor}`);
-                res.json({ id: this.lastID });
-            }
-        );
+        const inserirMovimentacao = () => {
+            db.run(
+                `INSERT INTO movimentacoes (tipo, produto, quantidade, valor, descricao, data, unidade, peso_kg, qtd_caixas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [tipo, produto, finalQuantidade, valor, descricao, data, unidade || 'CX', finalPesoKg, finalQtdCaixas],
+                function (err) {
+                    if (err) return res.status(500).json({ error: err.message });
+                    const unidadeLabel = unidade === 'AMBOS'
+                        ? `${finalQtdCaixas}CX / ${finalPesoKg}KG`
+                        : `${finalQuantidade}${unidade || 'CX'}`;
+                    registrarLog(req, 'MOVIMENTACAO', `${tipo.toUpperCase()}: ${unidadeLabel} de ${produto} - R$ ${valor}`);
+                    res.json({ id: this.lastID });
+                }
+            );
+        };
+
+        if (tipo === 'saida') {
+            // Impede vender mais do que existe em estoque (estoque atual = entradas - saídas -
+            // descartes já registrados para o produto).
+            db.get(
+                `SELECT
+                    COALESCE(SUM(CASE WHEN tipo='entrada' THEN qtd_caixas WHEN tipo='saida' THEN -qtd_caixas ELSE 0 END), 0) AS saldo
+                 FROM movimentacoes WHERE produto = ?`,
+                [produto],
+                (errStock, rowStock) => {
+                    if (errStock) return res.status(500).json({ error: errStock.message });
+                    db.get(
+                        `SELECT COALESCE(SUM(quantidade_caixas), 0) AS descartado FROM descartes WHERE produto = ?`,
+                        [produto],
+                        (errDesc, rowDesc) => {
+                            if (errDesc) return res.status(500).json({ error: errDesc.message });
+                            const estoqueAtual = (rowStock?.saldo || 0) - (rowDesc?.descartado || 0);
+                            if (finalQtdCaixas > estoqueAtual) {
+                                return res.status(400).json({ error: `Estoque insuficiente de "${produto}": disponível ${estoqueAtual} Sc, tentando vender ${finalQtdCaixas} Sc.` });
+                            }
+                            inserirMovimentacao();
+                        }
+                    );
+                }
+            );
+        } else {
+            inserirMovimentacao();
+        }
     });
 });
 
