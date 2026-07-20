@@ -24,7 +24,11 @@ let LOGO_CACHE = null;
 function getLogoBase64() {
     if (LOGO_CACHE) return LOGO_CACHE;
     try {
-        const logoPath = path.join(__dirname, '../frontend/Imgs/Logo_M&M_Cebolas.png');
+        // Versão pequena (240x240) feita especialmente para o DANFE — a original (1006x1006,
+        // ~300KB) era embutida em tamanho integral pelo jsPDF mesmo sendo exibida a ~25mm,
+        // inflando cada PDF gerado para mais de 4MB.
+        const smallPath = path.join(__dirname, '../frontend/Imgs/Logo_M&M_Cebolas_danfe.png');
+        const logoPath = fs.existsSync(smallPath) ? smallPath : path.join(__dirname, '../frontend/Imgs/Logo_M&M_Cebolas.png');
         if (fs.existsSync(logoPath)) {
             const logoData = fs.readFileSync(logoPath).toString('base64');
             LOGO_CACHE = `data:image/png;base64,${logoData}`;
@@ -86,6 +90,15 @@ db.serialize(() => {
     // e a receita nos relatórios). Ficam de fora das listagens/estatísticas gerais, mas continuam
     // acessíveis via join direto pelas rotas de NF-e/DANFE.
     safeMigrate(`ALTER TABLE movimentacoes ADD COLUMN afeta_estoque INTEGER DEFAULT 1`, 'movimentacoes.afeta_estoque');
+    // O destinatário informado na emissão nunca era persistido — o DANFE gerado depois não tinha
+    // como saber nome/documento/endereço de quem comprou (só existia dentro do XML transmitido).
+    safeMigrate(`ALTER TABLE nfe ADD COLUMN dest_nome TEXT`, 'nfe.dest_nome');
+    safeMigrate(`ALTER TABLE nfe ADD COLUMN dest_doc TEXT`, 'nfe.dest_doc');
+    safeMigrate(`ALTER TABLE nfe ADD COLUMN dest_endereco TEXT`, 'nfe.dest_endereco');
+    safeMigrate(`ALTER TABLE nfe ADD COLUMN dest_bairro TEXT`, 'nfe.dest_bairro');
+    safeMigrate(`ALTER TABLE nfe ADD COLUMN dest_cidade TEXT`, 'nfe.dest_cidade');
+    safeMigrate(`ALTER TABLE nfe ADD COLUMN dest_uf TEXT`, 'nfe.dest_uf');
+    safeMigrate(`ALTER TABLE nfe ADD COLUMN dest_cep TEXT`, 'nfe.dest_cep');
 
     const upsertUser = async (label, username, envPassword, role) => {
         const password = process.env[envPassword] || '123';
@@ -1238,8 +1251,8 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                 // nunca 200 para um caso que não seja autorização de verdade.
                 const httpStatus = status === 'autorizada' ? 200 : (status === 'rejeitada' ? 422 : 502);
 
-                db.run(`INSERT INTO nfe (venda_id, chave_acesso, xml_content, status, data_emissao, protocolo_autorizacao, numero_nfe, serie_nfe) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [venda.id, chaveAcesso, xmlAssinado, status, dataEmissao, transmissaoResult.protocolo || '', nfeProxNumero, nfeSerie], function (err3) {
+                db.run(`INSERT INTO nfe (venda_id, chave_acesso, xml_content, status, data_emissao, protocolo_autorizacao, numero_nfe, serie_nfe, dest_nome, dest_doc, dest_endereco, dest_bairro, dest_cidade, dest_uf, dest_cep) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [venda.id, chaveAcesso, xmlAssinado, status, dataEmissao, transmissaoResult.protocolo || '', nfeProxNumero, nfeSerie, destNome, destinatario.documento || '', destEnd, xBairro, xMunFinal, destUF, destCEP], function (err3) {
                         if (err3) return res.status(500).json({ error: err3.message });
                         registrarLog(req, 'NFE_GERAR', `NF-e gerada para venda #${venda.id} - Status: ${status}`);
                         res.status(httpStatus).json({
@@ -1419,48 +1432,111 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
                 });
             });
 
+            // Extrai os dados fiscais reais direto do XML transmitido à SEFAZ (não do que foi
+            // originalmente hardcoded no PDF) — garante que o DANFE sempre reflita exatamente o
+            // que foi autorizado, nunca um NCM/CST/CFOP genérico e desatualizado.
+            const xml = row.xml_content || '';
+            const extractTag = (tag) => {
+                const m = xml.match(new RegExp(`<${tag}>([^<]*)</${tag}>`));
+                return m ? m[1] : '';
+            };
+            const icmsMatch = xml.match(/<ICMS>[\s\S]*?<CST>(\d+)<\/CST>/);
+            const fiscal = {
+                cProd: extractTag('cProd') || '001',
+                ncm: extractTag('NCM') || '07031011',
+                cfop: extractTag('CFOP') || '5102',
+                cst: icmsMatch ? icmsMatch[1] : '60'
+            };
+
+            // Cores da identidade visual do sistema (verde primário / laranja de destaque)
+            const BRAND_PRIMARY = [26, 86, 50];
+            const BRAND_PRIMARY_DARK = [15, 56, 32];
+            const BRAND_ACCENT = [232, 156, 49];
+            const BRAND_TINT = [240, 247, 242];
+
+            const sectionBar = (x, y, w, h, label) => {
+                doc.setFillColor(...BRAND_TINT);
+                doc.rect(x, y, w, h, 'F');
+                doc.setDrawColor(...BRAND_PRIMARY);
+                doc.setLineWidth(0.25);
+                doc.rect(x, y, w, h);
+                doc.setTextColor(...BRAND_PRIMARY_DARK);
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(7);
+                doc.text(label, x + 2, y + h - 1.5);
+                doc.setTextColor(0, 0, 0);
+                doc.setDrawColor(0, 0, 0);
+                doc.setLineWidth(0.1);
+            };
+
             // --- DANFE LAYOUT ---
             doc.setFont("helvetica", "normal");
 
-            // 0. LOGO (Otimizado com Cache)
+            // 0. FAIXA SUPERIOR DE MARCA
+            doc.setFillColor(...BRAND_PRIMARY);
+            doc.rect(0, 0, 210, 6, 'F');
+            doc.setFillColor(...BRAND_ACCENT);
+            doc.rect(0, 6, 210, 1.2, 'F');
+
             const logoBase64 = getLogoBase64();
             if (logoBase64) {
                 doc.addImage(logoBase64, 'PNG', 12, 24, 25, 25);
             }
-            
+
             // 1. RECEBEMOS DE... (Topo)
             doc.rect(10, 10, 155, 12);
             doc.setFontSize(6);
             doc.text("RECEBEMOS DE " + (configs['emit_nome'] || "M&M HF COMERCIO DE CEBOLAS LTDA") + " OS PRODUTOS/SERVIÇOS CONSTANTES DA NOTA FISCAL INDICADA AO LADO", 12, 13);
             doc.text("DATA DE RECEBIMENTO", 12, 20);
             doc.text("IDENTIFICAÇÃO E ASSINATURA DO RECEBEDOR", 50, 20);
-            
+
+            doc.setDrawColor(...BRAND_PRIMARY);
+            doc.setLineWidth(0.3);
             doc.rect(165, 10, 35, 12);
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.1);
             doc.setFont("helvetica", "bold");
             doc.setFontSize(10);
+            doc.setTextColor(...BRAND_PRIMARY_DARK);
             doc.text("NF-e", 182.5, 15, { align: 'center' });
+            doc.setTextColor(0, 0, 0);
             doc.setFontSize(7);
             doc.text(`Nº ${row.numero_nfe || row.venda_id}`, 182.5, 19, { align: 'center' });
             doc.text(`SÉRIE ${row.serie_nfe || '1'}`, 182.5, 21, { align: 'center' });
 
             // 2. IDENTIFICAÇÃO DO EMITENTE
             doc.rect(10, 22, 85, 28);
-            const xText = 38; 
+            const xText = 38;
             doc.setFont("helvetica", "bold");
             doc.setFontSize(8.5);
+            doc.setTextColor(...BRAND_PRIMARY_DARK);
             doc.text(configs['emit_nome'] || "M&M HF COMERCIO DE CEBOLAS LTDA", xText, 28);
+            doc.setTextColor(0, 0, 0);
             doc.setFontSize(7);
             doc.setFont("helvetica", "normal");
             doc.text(configs['emit_lgr'] || "RUA MANOEL CRUZ, 36", xText, 32);
             doc.text(`${configs['emit_bairro'] || 'RESIDENCIAL MINERVA I'} - ${configs['emit_cep'] || '19026-168'}`, xText, 35);
             doc.text(`${configs['emit_xmun'] || 'PRESIDENTE PRUDENTE'} - ${configs['emit_uf'] || 'SP'}`, xText, 38);
-            doc.text("Fone: " + (configs['emit_tel'] || "(18) 9999-9999"), xText, 41);
+            doc.text("Fone: " + (configs['emit_tel'] || "(18) 9999-9999") + (configs['emit_email'] ? "  |  " + configs['emit_email'] : ""), xText, 41);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(...BRAND_PRIMARY);
+            doc.text(configs['emit_site'] || "www.mmcebolas.com", xText, 44);
+            doc.setTextColor(0, 0, 0);
+            doc.setFont("helvetica", "normal");
 
             // 3. DANFE BOX
+            doc.setFillColor(...BRAND_TINT);
+            doc.rect(95, 22, 22, 28, 'F');
+            doc.setDrawColor(...BRAND_ACCENT);
+            doc.setLineWidth(0.4);
             doc.rect(95, 22, 22, 28);
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.1);
             doc.setFont("helvetica", "bold");
             doc.setFontSize(9);
+            doc.setTextColor(...BRAND_PRIMARY_DARK);
             doc.text("DANFE", 106, 28, { align: 'center' });
+            doc.setTextColor(0, 0, 0);
             doc.setFontSize(5);
             doc.setFont("helvetica", "normal");
             doc.text("Documento Auxiliar da", 106, 31, { align: 'center' });
@@ -1499,7 +1575,7 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
             doc.text("NATUREZA DA OPERAÇÃO", 11.5, 53);
             doc.setFontSize(7.5); doc.setFont("helvetica", "bold");
             doc.text(row.descricao || "VENDA DE MERCADORIA", 11.5, 56.5);
-            
+
             doc.rect(117, 50, 83, 8);
             doc.setFontSize(5.5); doc.setFont("helvetica", "normal");
             doc.text("PROTOCOLO DE AUTORIZAÇÃO DE USO", 118.5, 53);
@@ -1512,51 +1588,56 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
             doc.text("INSCRIÇÃO ESTADUAL", 11.5, 61);
             doc.setFontSize(7.5); doc.setFont("helvetica", "bold");
             doc.text(configs['emit_ie'] || "562.696.411.110", 11.5, 65);
-            
+
             doc.rect(80, 58, 60, 8);
             doc.setFontSize(5.5); doc.text("INSC. ESTADUAL DO SUBST. TRIBUTÁRIO", 81.5, 61);
-            
+
             doc.rect(140, 58, 60, 8);
             doc.setFontSize(5.5); doc.text("CNPJ", 141.5, 61);
             doc.setFontSize(7.5); doc.text(configs['emit_cnpj'] || "56.421.395/0001-50", 141.5, 65);
 
             // 7. DESTINATÁRIO
-            doc.setFillColor(245, 245, 245);
-            doc.rect(10, 68, 190, 5, 'F');
-            doc.rect(10, 68, 190, 5);
-            doc.setFontSize(7); doc.setFont("helvetica", "bold");
-            doc.text("DESTINATÁRIO / REMETENTE", 12, 71.5);
-            
+            sectionBar(10, 68, 190, 5, "DESTINATÁRIO / REMETENTE");
+
             doc.rect(10, 73, 140, 8);
             doc.setFontSize(5.5); doc.setFont("helvetica", "normal"); doc.text("NOME / RAZÃO SOCIAL", 11.5, 76);
-            doc.setFontSize(8.5); doc.setFont("helvetica", "bold"); doc.text(row.contato_nome || "CONSUMIDOR FINAL", 11.5, 80);
+            doc.setFontSize(8.5); doc.setFont("helvetica", "bold"); doc.text(row.dest_nome || "CONSUMIDOR FINAL", 11.5, 80);
 
             doc.rect(150, 73, 50, 8);
             doc.setFontSize(5.5); doc.setFont("helvetica", "normal"); doc.text("CNPJ / CPF", 151.5, 76);
-            doc.setFontSize(8.5); doc.text(row.contato_doc || "", 151.5, 80);
+            doc.setFontSize(8.5); doc.text(row.dest_doc || "", 151.5, 80);
 
             doc.rect(10, 81, 100, 8);
             doc.setFontSize(5.5); doc.text("ENDEREÇO", 11.5, 84);
-            doc.setFontSize(7.5); doc.text(row.contato_end || "", 11.5, 88);
-            
+            doc.setFontSize(7.5); doc.text(row.dest_endereco || "", 11.5, 88);
+
             doc.rect(110, 81, 40, 8);
             doc.setFontSize(5.5); doc.text("BAIRRO / DISTRITO", 111.5, 84);
-            
+            doc.setFontSize(7.5); doc.text(row.dest_bairro || "", 111.5, 88);
+
             doc.rect(150, 81, 25, 8);
             doc.setFontSize(5.5); doc.text("CEP", 151.5, 84);
-            
+            doc.setFontSize(7.5); doc.text(row.dest_cep || "", 151.5, 88);
+
             doc.rect(175, 81, 25, 8);
             doc.setFontSize(5.5); doc.text("DATA DA EMISSÃO", 176.5, 84);
             doc.setFontSize(7.5); doc.setFont("helvetica", "bold");
             doc.text(new Date(row.data_emissao).toLocaleDateString('pt-BR'), 176.5, 88);
 
+            // Cidade/UF do destinatário (linha extra, sem tirar nenhum campo padrão do DANFE)
+            doc.rect(10, 89, 165, 6);
+            doc.setFontSize(5); doc.setFont("helvetica", "normal"); doc.text("MUNICÍPIO / UF", 11.5, 91.5);
+            doc.setFontSize(7); doc.setFont("helvetica", "bold");
+            doc.text(`${row.dest_cidade || ''}${row.dest_uf ? ' - ' + row.dest_uf : ''}`, 11.5, 94.3);
+            doc.rect(175, 89, 25, 6);
+            doc.setFontSize(5); doc.setFont("helvetica", "normal"); doc.text("UF", 176.5, 91.5);
+            doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.text(row.dest_uf || "", 176.5, 94.3);
+            doc.setFont("helvetica", "normal");
+
             // 8. CÁLCULO DO IMPOSTO
             const Y_IMP = 95;
-            doc.setFillColor(240, 240, 240);
-            doc.rect(10, Y_IMP, 190, 5, 'F');
-            doc.rect(10, Y_IMP, 190, 5);
-            doc.setFont("helvetica", "bold"); doc.text("CÁLCULO DO IMPOSTO", 12, Y_IMP + 3.5);
-            
+            sectionBar(10, Y_IMP, 190, 5, "CÁLCULO DO IMPOSTO");
+
             const field = (x, y, w, h, label, value, align = 'right') => {
                 doc.rect(x, y, w, h);
                 doc.setFontSize(5); doc.setFont("helvetica", "normal");
@@ -1581,9 +1662,8 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
 
             // 9. TRANSPORTADOR
             const Y_TRA = 113;
-            doc.setFillColor(240, 240, 240); doc.rect(10, Y_TRA, 190, 5, 'F'); doc.rect(10, Y_TRA, 190, 5);
-            doc.setFont("helvetica", "bold"); doc.text("TRANSPORTADOR / VOLUMES TRANSPORTADOS", 12, Y_TRA + 3.5);
-            
+            sectionBar(10, Y_TRA, 190, 5, "TRANSPORTADOR / VOLUMES TRANSPORTADOS");
+
             field(10, Y_TRA+5, 80, 8, "RAZÃO SOCIAL", "O MESMO", 'left');
             field(90, Y_TRA+5, 25, 8, "FRETE POR CONTA", "9-Sem Frete", 'left');
             field(115, Y_TRA+5, 20, 8, "CÓDIGO ANTT", "", 'left');
@@ -1593,9 +1673,8 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
 
             // 10. DADOS DOS PRODUTOS
             const Y_PROD = 130;
-            doc.setFillColor(240, 240, 240); doc.rect(10, Y_PROD, 190, 5, 'F'); doc.rect(10, Y_PROD, 190, 5);
-            doc.setFont("helvetica", "bold"); doc.text("DADOS DO PRODUTO / SERVIÇO", 12, Y_PROD + 3.5);
-            
+            sectionBar(10, Y_PROD, 190, 5, "DADOS DO PRODUTO / SERVIÇO");
+
             const columns = [
                 { header: 'CÓDIGO', dataKey: 'cod' },
                 { header: 'DESCRIÇÃO DO PRODUTO / SERVIÇO', dataKey: 'desc' },
@@ -1607,16 +1686,16 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
                 { header: 'V.UNIT', dataKey: 'vunit' },
                 { header: 'V.TOTAL', dataKey: 'vtotal' }
             ];
-            
+
             const unidadeLabel = row.unidade === 'AMBOS' ? `${row.qtd_caixas}CX/${row.peso_kg}KG` : (row.unidade || 'CX');
             const qtdValue = row.unidade === 'AMBOS' ? row.qtd_caixas : row.quantidade;
 
             const tableData = [{
-                cod: '001',
+                cod: fiscal.cProd,
                 desc: row.produto || "CEBOLA",
-                ncm: '07031019',
-                cst: '0102',
-                cfop: '5102',
+                ncm: fiscal.ncm,
+                cst: fiscal.cst,
+                cfop: fiscal.cfop,
                 un: unidadeLabel,
                 qtd: (qtdValue || 1).toString(),
                 vunit: (row.valor / (qtdValue || 1)).toLocaleString('pt-BR', {minimumFractionDigits:2}),
@@ -1631,7 +1710,7 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
                 body: tableData,
                 theme: 'plain',
                 styles: { fontSize: 7, cellPadding: 1, lineColor: [0, 0, 0], lineWidth: 0.1 },
-                headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 6 },
+                headStyles: { fillColor: BRAND_TINT, textColor: BRAND_PRIMARY_DARK, fontStyle: 'bold', fontSize: 6 },
                 columnStyles: {
                     cod: { cellWidth: 15 },
                     desc: { cellWidth: 'auto' },
@@ -1647,18 +1726,17 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
 
             // 11. DADOS ADICIONAIS
             const Y_FINAL = doc.lastAutoTable.finalY + 5;
-            doc.setFillColor(240, 240, 240); doc.rect(10, Y_FINAL, 190, 5, 'F'); doc.rect(10, Y_FINAL, 190, 5);
-            doc.setFont("helvetica", "bold"); doc.text("DADOS ADICIONAIS", 12, Y_FINAL + 3.5);
-            
+            sectionBar(10, Y_FINAL, 190, 5, "DADOS ADICIONAIS");
+
             doc.rect(10, Y_FINAL + 5, 150, 35);
             doc.setFontSize(5); doc.setFont("helvetica", "normal");
             doc.text("INFORMAÇÕES COMPLEMENTARES", 11, Y_FINAL + 8);
             doc.setFontSize(7);
             doc.text("Documento emitido por ME ou EPP optante pelo Simples Nacional.\nNão gera direito a crédito fiscal de IPI.\nTransação vinculada à venda #" + row.venda_id + "\n\n" + (row.protocolo_autorizacao ? "Protocolo: " + row.protocolo_autorizacao : "EMISSÃO EM HOMOLOGAÇÃO"), 11, Y_FINAL + 13);
-            
+
             doc.rect(160, Y_FINAL + 5, 40, 35);
             doc.setFontSize(5); doc.text("RESERVADO AO FISCO / QR CODE", 161, Y_FINAL + 8);
-            
+
             // Gerar e adicionar QR Code no final
             if (row.chave_acesso) {
                 try {
@@ -1668,6 +1746,25 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
                     doc.addImage(qrBase64, 'PNG', 167, Y_FINAL + 10, 26, 26);
                 } catch (e) { console.error("Erro QR Code:", e); }
             }
+
+            // 12. RODAPÉ DE MARCA
+            const Y_FOOTER = Y_FINAL + 42;
+            doc.setDrawColor(...BRAND_PRIMARY);
+            doc.setLineWidth(0.3);
+            doc.line(10, Y_FOOTER, 200, Y_FOOTER);
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.1);
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(7);
+            doc.setTextColor(...BRAND_PRIMARY_DARK);
+            doc.text("M&M Cebolas", 10, Y_FOOTER + 5);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(...BRAND_PRIMARY);
+            doc.text(configs['emit_site'] || "www.mmcebolas.com", 33, Y_FOOTER + 5);
+            doc.setTextColor(140, 140, 140);
+            doc.setFontSize(6);
+            doc.text("Documento gerado pelo sistema de gestão M&M Cebolas", 200, Y_FOOTER + 5, { align: 'right' });
+            doc.setTextColor(0, 0, 0);
 
             const pdfOutput = doc.output('arraybuffer');
             res.setHeader('Content-Type', 'application/pdf');
