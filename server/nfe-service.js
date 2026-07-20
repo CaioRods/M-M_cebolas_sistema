@@ -3,7 +3,6 @@ const fs = require('fs');
 const path = require('path');
 const { SignedXml } = require('xml-crypto');
 const { create } = require('xmlbuilder2');
-const soap = require('soap');
 
 // A NFe exige datas no formato TDateTimeUTC: "AAAA-MM-DDThh:mm:ssTZD" (offset numérico, sem
 // milissegundos, sem "Z" literal). Date.prototype.toISOString() produz "...ss.mmmZ", que a SEFAZ
@@ -212,102 +211,101 @@ class NFeService {
         });
     }
 
-    async _criarClienteSoap(wsdlUrl) {
+    // Envia o envelope SOAP 1.2 via HTTPS puro (TLS mutual com o certificado do cliente), sem
+    // passar pela serialização automática do pacote `soap`. O WSDL da SEFAZ define o elemento
+    // nfeDadosMsg como mixed="true" com <xsd:any/> — ou seja, espera o XML de negócio (enviNFe /
+    // envEvento) embutido literalmente dentro de UM único <nfeDadosMsg>. A serialização automática
+    // do node-soap duplicava esse wrapper (usando o mesmo nome tanto para o elemento da mensagem
+    // WSDL quanto para o valor do parâmetro) e escapava o XML interno como texto
+    // (`&lt;enviNFe&gt;...`), produzindo um envelope que a SEFAZ não conseguia interpretar —
+    // sempre rejeitado com cStat 242 "Mensagem SOAP inválida", mesmo com o XML da NF-e
+    // schema-válido e corretamente assinado. Montar o envelope manualmente resolve isso.
+    async _postSoap(url, soapAction, bodyInnerXml) {
+        const https = require('https');
+        const { hostname, pathname } = new URL(url);
+        const envelope = `<?xml version="1.0" encoding="utf-8"?><soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope"><soap12:Body>${bodyInnerXml}</soap12:Body></soap12:Envelope>`;
         const agent = this._soapAgent();
+
         return new Promise((resolve, reject) => {
-            soap.createClient(wsdlUrl, {
-                forceSoap12Headers: true,
-                httpsAgent: agent,
-                wsdl_options: {
-                    httpsAgent: agent,
-                    rejectUnauthorized: false
+            const req = https.request({
+                hostname,
+                path: pathname,
+                method: 'POST',
+                agent,
+                headers: {
+                    'Content-Type': `application/soap+xml; charset=utf-8; action="${soapAction}"`,
+                    'Content-Length': Buffer.byteLength(envelope)
                 }
-            }, (err, client) => {
-                if (err) return reject(err);
-                // Autenticação Mutual TLS (Client Certificate) necessária para a SEFAZ.
-                // IMPORTANTE: ClientSSLSecurityPFX.addOptions() substitui o httpsAgent por um novo
-                // (construído só com pfx/passphrase/defaults), descartando o agent configurado acima.
-                // Sem passar rejectUnauthorized:false aqui como "defaults", esse novo agent volta ao
-                // padrão seguro do Node, que rejeita a cadeia da SEFAZ (CA raiz ICP-Brasil não está no
-                // bundle padrão) — por isso precisa ser repassado explicitamente neste 3º parâmetro.
-                try {
-                    client.setSecurity(new soap.ClientSSLSecurityPFX(this.pfxPath, this.password, { rejectUnauthorized: false }));
-                } catch (secErr) {
-                    console.warn("Aviso ao configurar segurança PFX no SOAP:", secErr.message);
-                }
-                resolve(client);
+            }, (res) => {
+                let data = '';
+                res.on('data', (c) => data += c);
+                res.on('end', () => resolve(data));
             });
+            req.on('error', reject);
+            req.write(envelope);
+            req.end();
         });
     }
 
     async transmitirSefaz(xmlAssinado, cUF) {
         const urlSet = this._autorizacaoUrls(cUF);
-        const wsdlUrl = urlSet ? (this.isProduction ? urlSet.producao : urlSet.homologacao) : null;
+        const baseUrl = urlSet ? (this.isProduction ? urlSet.producao : urlSet.homologacao) : null;
 
-        if (!wsdlUrl) {
+        if (!baseUrl) {
             return { success: false, status: 'nao_configurado', message: `URL da SEFAZ não configurada para a UF (código ${cUF}). A nota NÃO foi transmitida.` };
         }
 
         try {
-            const client = await this._criarClienteSoap(wsdlUrl);
-
-            // Estrutura exata exigida pela SEFAZ 4.00
-            // O XML assinado já contém a tag <NFe>, precisamos envolvê-lo em <enviNFe>
-            // Removemos qualquer declaração XML interna do xmlAssinado para evitar duplicidade
+            const url = baseUrl.replace(/\?WSDL$/i, '');
+            // Estrutura exata exigida pela SEFAZ 4.00: o XML assinado já contém a tag <NFe>,
+            // precisamos envolvê-lo em <enviNFe>. Sem declaração XML interna (não é um documento
+            // separado, é conteúdo embutido dentro do <nfeDadosMsg>).
             const xmlNFeClean = xmlAssinado.replace(/^<\?xml.*?\?>/, '');
-            const xmlLote = `<?xml version="1.0" encoding="UTF-8"?><enviNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><idLote>${Math.floor(Date.now() / 1000)}</idLote><indSinc>1</indSinc>${xmlNFeClean}</enviNFe>`;
+            const enviNFe = `<enviNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><idLote>${Math.floor(Date.now() / 1000)}</idLote><indSinc>1</indSinc>${xmlNFeClean}</enviNFe>`;
+            const bodyInnerXml = `<nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4">${enviNFe}</nfeDadosMsg>`;
 
-            return new Promise((resolve) => {
-                client.nfeAutorizacaoLote({ nfeDadosMsg: xmlLote }, (err, result, rawResponse) => {
-                    if (err) {
-                        console.error("Erro SOAP:", err.message);
-                        resolve({ success: false, status: 'erro_comunicacao', message: `Erro de comunicação com a SEFAZ: ${err.message}. A nota NÃO foi transmitida.` });
-                        return;
-                    }
+            const rawResponse = await this._postSoap(url, 'http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4/nfeAutorizacaoLote', bodyInnerXml);
 
-                    // Log do retorno bruto para depuração na VPS se necessário
-                    console.log("Retorno SEFAZ:", rawResponse);
+            // Log do retorno bruto para depuração na VPS se necessário
+            console.log("Retorno SEFAZ:", rawResponse);
 
-                    // A nota só está autorizada se o cStat de retorno no protocolo for 100 (Autorizado o uso)
-                    const isAuthorized = rawResponse && rawResponse.includes('<cStat>100</cStat>');
+            // A nota só está autorizada se o cStat de retorno no protocolo for 100 (Autorizado o uso)
+            const isAuthorized = rawResponse && rawResponse.includes('<cStat>100</cStat>');
 
-                    if (isAuthorized) {
-                        const protMatch = rawResponse.match(/<nProt>(\d+)<\/nProt>/);
-                        if (!protMatch) {
-                            // A SEFAZ sinalizou autorização (cStat 100) mas não conseguimos extrair o
-                            // protocolo real da resposta. Nunca inventar um número aqui — sem o protocolo
-                            // real a nota não pode ser cancelada nem comprovada depois. Reporta como
-                            // falha para forçar verificação manual (consulta de protocolo na SEFAZ).
-                            resolve({ success: false, status: 'erro_comunicacao', message: 'SEFAZ retornou autorização mas o protocolo não pôde ser lido da resposta. Verifique manualmente na SEFAZ antes de considerar esta nota válida.' });
-                            return;
-                        }
+            if (isAuthorized) {
+                const protMatch = rawResponse.match(/<nProt>(\d+)<\/nProt>/);
+                if (!protMatch) {
+                    // A SEFAZ sinalizou autorização (cStat 100) mas não conseguimos extrair o
+                    // protocolo real da resposta. Nunca inventar um número aqui — sem o protocolo
+                    // real a nota não pode ser cancelada nem comprovada depois. Reporta como
+                    // falha para forçar verificação manual (consulta de protocolo na SEFAZ).
+                    return { success: false, status: 'erro_comunicacao', message: 'SEFAZ retornou autorização mas o protocolo não pôde ser lido da resposta. Verifique manualmente na SEFAZ antes de considerar esta nota válida.' };
+                }
 
-                        resolve({
-                            success: true,
-                            status: 'autorizada',
-                            protocolo: protMatch[1],
-                            cStat: '100',
-                            message: 'NF-e Autorizada com Sucesso na SEFAZ'
-                        });
-                    } else {
-                        // Extrai o motivo do erro de dentro do infProt (rejeição da nota) ou do lote
-                        const infProtMatch = rawResponse.match(/<infProt>([\s\S]*?)<\/infProt>/);
-                        const searchSource = infProtMatch ? infProtMatch[1] : rawResponse;
+                return {
+                    success: true,
+                    status: 'autorizada',
+                    protocolo: protMatch[1],
+                    cStat: '100',
+                    message: 'NF-e Autorizada com Sucesso na SEFAZ'
+                };
+            } else {
+                // Extrai o motivo do erro de dentro do infProt (rejeição da nota) ou do lote
+                const infProtMatch = rawResponse.match(/<infProt>([\s\S]*?)<\/infProt>/);
+                const searchSource = infProtMatch ? infProtMatch[1] : rawResponse;
 
-                        const xMotivoMatch = searchSource.match(/<xMotivo>([^<]+)<\/xMotivo>/);
-                        const cStatMatch = searchSource.match(/<cStat>([^<]+)<\/cStat>/);
-                        const motivo = xMotivoMatch ? xMotivoMatch[1] : 'Lote rejeitado ou erro na estrutura SOAP.';
-                        const cStat = cStatMatch ? cStatMatch[1] : '???';
+                const xMotivoMatch = searchSource.match(/<xMotivo>([^<]+)<\/xMotivo>/);
+                const cStatMatch = searchSource.match(/<cStat>([^<]+)<\/cStat>/);
+                const motivo = xMotivoMatch ? xMotivoMatch[1] : 'Lote rejeitado ou erro na estrutura SOAP.';
+                const cStat = cStatMatch ? cStatMatch[1] : '???';
 
-                        resolve({
-                            success: false,
-                            status: 'rejeitada',
-                            cStat,
-                            message: `SEFAZ Rejeitou (cStat ${cStat}): ${motivo}`
-                        });
-                    }
-                });
-            });
+                return {
+                    success: false,
+                    status: 'rejeitada',
+                    cStat,
+                    message: `SEFAZ Rejeitou (cStat ${cStat}): ${motivo}`
+                };
+            }
 
         } catch (error) {
             console.error("Erro na transmissão:", error.message);
@@ -368,51 +366,42 @@ class NFeService {
             const xml = create({ version: '1.0', encoding: 'UTF-8' }, eventoObj).end({ prettyPrint: false, headless: true });
             const xmlAssinado = this._signXML(xml, 'infEvento');
 
-            const client = await this._criarClienteSoap(wsdlUrl);
+            const url = wsdlUrl.replace(/\?WSDL$/i, '');
+            const bodyInnerXml = `<nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4">${xmlAssinado}</nfeDadosMsg>`;
+            const rawResponse = await this._postSoap(url, 'http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4/nfeRecepcaoEvento', bodyInnerXml);
 
-            return new Promise((resolve) => {
-                client.nfeRecepcaoEvento({ nfeDadosMsg: xmlAssinado }, (err, result, rawResponse) => {
-                    if (err) {
-                        console.error("Erro SOAP (cancelamento):", err.message);
-                        resolve({ success: false, status: 'erro_comunicacao', message: `Erro de comunicação com a SEFAZ: ${err.message}. O cancelamento NÃO foi confirmado.` });
-                        return;
-                    }
+            console.log("Retorno SEFAZ (cancelamento):", rawResponse);
 
-                    console.log("Retorno SEFAZ (cancelamento):", rawResponse);
+            // cStat 135 = Evento registrado e vinculado a NF-e (cancelamento confirmado)
+            const isCancelled = rawResponse && rawResponse.includes('<cStat>135</cStat>');
 
-                    // cStat 135 = Evento registrado e vinculado a NF-e (cancelamento confirmado)
-                    const isCancelled = rawResponse && rawResponse.includes('<cStat>135</cStat>');
+            if (isCancelled) {
+                const protMatch = rawResponse.match(/<nProt>(\d+)<\/nProt>/);
+                if (!protMatch) {
+                    return { success: false, status: 'erro_comunicacao', message: 'SEFAZ sinalizou cancelamento (cStat 135) mas o protocolo não pôde ser lido da resposta. Verifique manualmente na SEFAZ.' };
+                }
+                return {
+                    success: true,
+                    status: 'cancelada',
+                    protocolo: protMatch[1],
+                    cStat: '135',
+                    xmlCancelamento: xmlAssinado,
+                    message: 'NF-e cancelada com sucesso na SEFAZ'
+                };
+            } else {
+                const xMotivoMatch = rawResponse.match(/<xMotivo>([^<]+)<\/xMotivo>/);
+                const cStatMatch = rawResponse.match(/<cStat>([^<]+)<\/cStat>/);
+                const motivoErro = xMotivoMatch ? xMotivoMatch[1] : 'Evento rejeitado ou erro na estrutura SOAP.';
+                const cStat = cStatMatch ? cStatMatch[1] : '???';
 
-                    if (isCancelled) {
-                        const protMatch = rawResponse.match(/<nProt>(\d+)<\/nProt>/);
-                        if (!protMatch) {
-                            resolve({ success: false, status: 'erro_comunicacao', message: 'SEFAZ sinalizou cancelamento (cStat 135) mas o protocolo não pôde ser lido da resposta. Verifique manualmente na SEFAZ.' });
-                            return;
-                        }
-                        resolve({
-                            success: true,
-                            status: 'cancelada',
-                            protocolo: protMatch[1],
-                            cStat: '135',
-                            xmlCancelamento: xmlAssinado,
-                            message: 'NF-e cancelada com sucesso na SEFAZ'
-                        });
-                    } else {
-                        const xMotivoMatch = rawResponse.match(/<xMotivo>([^<]+)<\/xMotivo>/);
-                        const cStatMatch = rawResponse.match(/<cStat>([^<]+)<\/cStat>/);
-                        const motivoErro = xMotivoMatch ? xMotivoMatch[1] : 'Evento rejeitado ou erro na estrutura SOAP.';
-                        const cStat = cStatMatch ? cStatMatch[1] : '???';
-
-                        resolve({
-                            success: false,
-                            status: 'erro_sefaz_cancelamento',
-                            cStat,
-                            xmlCancelamento: xmlAssinado,
-                            message: `SEFAZ Rejeitou o cancelamento (cStat ${cStat}): ${motivoErro}`
-                        });
-                    }
-                });
-            });
+                return {
+                    success: false,
+                    status: 'erro_sefaz_cancelamento',
+                    cStat,
+                    xmlCancelamento: xmlAssinado,
+                    message: `SEFAZ Rejeitou o cancelamento (cStat ${cStat}): ${motivoErro}`
+                };
+            }
 
         } catch (error) {
             console.error("Erro no cancelamento:", error.message);
