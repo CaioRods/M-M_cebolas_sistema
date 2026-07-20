@@ -1011,7 +1011,24 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                         imposto: {
                             ICMS: { ICMS00: { orig: '0', CST: '00', modBC: '0', vBC: '0.00', pICMS: '0.00', vICMS: '0.00' } },
                             PIS: { PISOutr: { CST: '99', vBC: '0.00', pPIS: '0.00', vPIS: '0.00' } },
-                            COFINS: { COFINSOutr: { CST: '99', vBC: '0.00', pCOFINS: '0.00', vCOFINS: '0.00' } }
+                            COFINS: { COFINSOutr: { CST: '99', vBC: '0.00', pCOFINS: '0.00', vCOFINS: '0.00' } },
+                            // Grupo IBS/CBS da Reforma Tributária (obrigatório na prática desde 2026,
+                            // mesmo com minOccurs=0 no XSD — sem ele a SEFAZ rejeita com mensagem
+                            // genérica "Mensagem SOAP inválida" em vez de apontar o campo faltando.
+                            // Estrutura e valores replicados de uma NF-e real autorizada deste mesmo
+                            // CNPJ/certificado (cClassTrib 000001 = tributação padrão, sem incidência
+                            // efetiva de IBS/CBS nesta fase de transição).
+                            IBSCBS: {
+                                CST: '000',
+                                cClassTrib: '000001',
+                                gIBSCBS: {
+                                    vBC: '0.00',
+                                    gIBSUF: { pIBSUF: '0.1000', vIBSUF: '0.00' },
+                                    gIBSMun: { pIBSMun: '0.0000', vIBSMun: '0.00' },
+                                    vIBS: '0.00',
+                                    gCBS: { pCBS: '0.9000', vCBS: '0.00' }
+                                }
+                            }
                         }
                     }],
                     total: {
@@ -1035,6 +1052,24 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                             vCOFINS: '0.00',
                             vOutro: '0.00',
                             vNF: venda.valor
+                        },
+                        ibscbsTot: {
+                            vBCIBSCBS: '0.00',
+                            gIBS: {
+                                gIBSUF: { vDif: '0.00', vDevTrib: '0.00', vIBSUF: '0.00' },
+                                gIBSMun: { vDif: '0.00', vDevTrib: '0.00', vIBSMun: '0.00' },
+                                vIBS: '0.00',
+                                vCredPres: '0.00',
+                                vCredPresCondSus: '0.00'
+                            },
+                            gCBS: {
+                                vDif: '0.00',
+                                vDevTrib: '0.00',
+                                vCBS: '0.00',
+                                vCredPres: '0.00',
+                                vCredPresCondSus: '0.00'
+                            },
+                            gEstornoCred: { vIBSEstCred: '0.00', vCBSEstCred: '0.00' }
                         }
                     },
                     transp: {

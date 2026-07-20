@@ -137,7 +137,8 @@ class NFeService {
                         imposto: item.imposto
                     })),
                     total: {
-                        ICMSTot: total.icmsTot
+                        ICMSTot: total.icmsTot,
+                        ...(total.ibscbsTot ? { IBSCBSTot: total.ibscbsTot } : {})
                     },
                     transp: {
                         modFrete: transp.modFrete
