@@ -1657,7 +1657,7 @@ async function loadNFeTable() {
     });
 
     if (Object.keys(groups).length === 0) {
-        container.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">Nenhuma nota encontrada com os filtros aplicados.</div>';
+        container.innerHTML = `<div class="nfe-empty-state"><i class="fas fa-file-invoice"></i><p style="font-weight:600;">Nenhuma nota encontrada</p><p style="font-size:0.85rem;">Ajuste os filtros ou emita uma nova NF-e.</p></div>`;
         return;
     }
 
@@ -1683,7 +1683,7 @@ async function loadNFeTable() {
                     <span>Data</span><span>Produto / Chave</span><span style="text-align:right">Valor</span><span style="text-align:center">Status</span><span style="text-align:right">Ações</span>
                 </div>
                 ${items.map(n => `
-                    <div class="nfe-list-item">
+                    <div class="nfe-list-item status-${n.status || 'pendente'}">
                         <span class="date">${new Date(n.data_emissao).toLocaleDateString('pt-BR')}</span>
                         <div class="info">
                             <span style="font-weight:700">${n.produto || '-'}</span>

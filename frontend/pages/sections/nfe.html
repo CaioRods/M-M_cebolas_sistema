@@ -18,36 +18,39 @@
 </header>
 
 <!-- RESUMO FISCAL -->
-<div class="kpi-grid-pro" style="margin-bottom: 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
-    <div class="panel" style="padding: 16px; border-left: 4px solid var(--primary); display: flex; align-items: center; gap: 12px;">
-        <div style="width: 40px; height: 40px; background: #dcfce7; color: #166534; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">
-            <i class="fas fa-file-invoice-dollar"></i>
-        </div>
+<div class="kpi-grid-pro nfe-kpi-grid">
+    <div class="panel nfe-kpi-card">
+        <div class="nfe-kpi-icon tint-green"><i class="fas fa-file-invoice-dollar"></i></div>
         <div>
-            <p style="font-size: 0.65rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Total Emitido (Mês)</p>
-            <h4 id="nfe-total-mes" style="font-size: 1.1rem; font-weight: 800; color: var(--primary);">R$ 0,00</h4>
+            <p class="nfe-kpi-label">Total Emitido (Mês)</p>
+            <h4 id="nfe-total-mes" class="nfe-kpi-value" style="color: var(--primary);">R$ 0,00</h4>
         </div>
     </div>
-    <div class="panel" style="padding: 16px; border-left: 4px solid var(--accent); display: flex; align-items: center; gap: 12px;">
-        <div style="width: 40px; height: 40px; background: #fef3c7; color: #92400e; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">
-            <i class="fas fa-clock"></i>
-        </div>
+    <div class="panel nfe-kpi-card">
+        <div class="nfe-kpi-icon tint-orange"><i class="fas fa-clock"></i></div>
         <div>
-            <p style="font-size: 0.65rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Aguardando Emissão</p>
-            <h4 id="nfe-pending-count" style="font-size: 1.1rem; font-weight: 800; color: var(--accent);">0 Notas</h4>
+            <p class="nfe-kpi-label">Aguardando Emissão</p>
+            <h4 id="nfe-pending-count" class="nfe-kpi-value" style="color: var(--accent);">0 Notas</h4>
+        </div>
+    </div>
+    <div class="panel nfe-kpi-card">
+        <div class="nfe-kpi-icon tint-blue"><i class="fas fa-layer-group"></i></div>
+        <div>
+            <p class="nfe-kpi-label">Total de Notas</p>
+            <h4 id="nfe-total-count" class="nfe-kpi-value" style="color: #1e40af;">0 Notas</h4>
         </div>
     </div>
 </div>
 
 <!-- FILTROS E ORGANIZAÇÃO -->
 <div class="panel">
-    <div class="panel-header">
-        <div style="display: flex; gap: 20px; align-items: center;">
-            <h4 style="font-weight: 700;">Arquivo de Notas Fiscais</h4>
+    <div class="panel-header nfe-panel-header">
+        <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+            <h4 style="font-weight: 800; display:flex; align-items:center; gap:8px;"><i class="fas fa-box-archive" style="color:var(--primary);"></i> Arquivo de Notas Fiscais</h4>
             <div class="filter-group-pro">
-                <button onclick="setNFeGrouping('fornecedor')" class="filter-btn active" id="btn-group-forn">Por Fornecedor</button>
-                <button onclick="setNFeGrouping('data')" class="filter-btn" id="btn-group-data">Por Data</button>
-                <button onclick="setNFeGrouping('status')" class="filter-btn" id="btn-group-status">Por Status</button>
+                <button onclick="setNFeGrouping('fornecedor')" class="filter-btn active" id="btn-group-forn"><i class="fas fa-user-tie"></i> Fornecedor</button>
+                <button onclick="setNFeGrouping('data')" class="filter-btn" id="btn-group-data"><i class="fas fa-calendar"></i> Data</button>
+                <button onclick="setNFeGrouping('status')" class="filter-btn" id="btn-group-status"><i class="fas fa-tag"></i> Status</button>
             </div>
         </div>
         <div style="display: flex; gap: 10px;">
@@ -58,7 +61,7 @@
             </select>
         </div>
     </div>
-    
+
     <!-- CONTAINER DINÂMICO DE NOTAS -->
     <div id="nfe-dynamic-container" style="padding: 20px;">
         <!-- Injetado via JS: Grupos de notas por fornecedor ou data -->
@@ -66,6 +69,56 @@
 </div>
 
 <style>
+.nfe-kpi-grid {
+    margin-bottom: 24px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+}
+
+.nfe-kpi-card {
+    padding: 18px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    border: 1px solid var(--border);
+    background: white;
+}
+
+.nfe-kpi-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    flex-shrink: 0;
+}
+
+.nfe-kpi-icon.tint-green { background: linear-gradient(135deg, #dcfce7, #bbf7d0); color: #166534; }
+.nfe-kpi-icon.tint-orange { background: linear-gradient(135deg, #fef3c7, #fde68a); color: #92400e; }
+.nfe-kpi-icon.tint-blue { background: linear-gradient(135deg, #dbeafe, #bfdbfe); color: #1e40af; }
+
+.nfe-kpi-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 2px;
+}
+
+.nfe-kpi-value {
+    font-size: 1.25rem;
+    font-weight: 800;
+}
+
+.nfe-panel-header {
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
 .filter-group-pro {
     display: flex;
     background: #f1f5f9;
@@ -73,10 +126,15 @@
     border-radius: 100px;
 }
 
+.filter-group-pro .filter-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
 .nfe-group-header {
-    background: #f8fafc;
-    padding: 12px 20px;
-    border-radius: 10px;
+    padding: 14px 20px;
+    border-radius: 12px;
     margin-bottom: 10px;
     display: flex;
     justify-content: space-between;
@@ -84,10 +142,6 @@
     border: 1px solid var(--border);
     cursor: pointer;
     transition: all 0.2s;
-}
-
-.nfe-group-header:hover {
-    background: #f1f5f9;
 }
 
 .nfe-group-header h5 {
@@ -111,13 +165,14 @@
     grid-template-columns: 100px 1fr 120px 110px 180px;
     padding: 14px 20px;
     border-bottom: 1px solid #f1f5f9;
+    border-left: 3px solid transparent;
     align-items: center;
-    transition: background 0.2s;
 }
 
-.nfe-list-item:hover {
-    background: #fcfcfc;
-}
+.nfe-list-item.status-autorizada { border-left-color: #10b981; }
+.nfe-list-item.status-rejeitada { border-left-color: var(--danger); }
+.nfe-list-item.status-cancelada { border-left-color: #6b7280; }
+.nfe-list-item.status-pendente { border-left-color: var(--accent); }
 
 .nfe-list-item .date { font-size: 0.8rem; color: var(--text-muted); }
 .nfe-list-item .info { font-weight: 600; }
@@ -135,6 +190,19 @@
     to { opacity: 1; transform: translateY(0); }
 }
 
+.nfe-empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+}
+
+.nfe-empty-state i {
+    font-size: 2.5rem;
+    color: #cbd5e1;
+    margin-bottom: 12px;
+    display: block;
+}
+
 .minimal-select {
     border: 1px solid var(--border);
     padding: 6px 12px;
@@ -146,7 +214,7 @@
 }
 
 .filter-btn {
-    padding: 6px 16px;
+    padding: 7px 16px;
     border: none;
     background: transparent;
     color: var(--text-muted);

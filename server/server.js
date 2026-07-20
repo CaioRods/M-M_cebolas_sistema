@@ -1664,36 +1664,36 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
                 doc.setFontSize(5); doc.setFont("helvetica", "normal");
                 doc.text(label, x + 1, y + 2.5);
                 doc.setFontSize(8);
-                if (align === 'right') doc.text(value, x + w - 1, y + h - 1.5, { align: 'right' });
-                else doc.text(value, x + 1, y + h - 1.5);
+                if (align === 'right') doc.text(value, x + w - 1, y + h - 2, { align: 'right' });
+                else doc.text(value, x + 1, y + h - 2);
             };
 
-            field(10, Y_IMP+5, 38, 8, "BASE DE CÁLCULO DO ICMS", "0,00");
-            field(48, Y_IMP+5, 38, 8, "VALOR DO ICMS", "0,00");
-            field(86, Y_IMP+5, 38, 8, "BASE DE CÁLCULO DO ICMS S.T.", "0,00");
-            field(124, Y_IMP+5, 38, 8, "VALOR DO ICMS S.T.", "0,00");
-            field(162, Y_IMP+5, 38, 8, "VALOR TOTAL DOS PRODUTOS", row.valor.toLocaleString('pt-BR', {minimumFractionDigits:2}));
+            field(10, Y_IMP+5, 38, 10, "BASE DE CÁLCULO DO ICMS", "0,00");
+            field(48, Y_IMP+5, 38, 10, "VALOR DO ICMS", "0,00");
+            field(86, Y_IMP+5, 38, 10, "BASE DE CÁLCULO DO ICMS S.T.", "0,00");
+            field(124, Y_IMP+5, 38, 10, "VALOR DO ICMS S.T.", "0,00");
+            field(162, Y_IMP+5, 38, 10, "VALOR TOTAL DOS PRODUTOS", row.valor.toLocaleString('pt-BR', {minimumFractionDigits:2}));
 
-            field(10, Y_IMP+13, 30, 8, "VALOR DO FRETE", "0,00");
-            field(40, Y_IMP+13, 30, 8, "VALOR DO SEGURO", "0,00");
-            field(70, Y_IMP+13, 30, 8, "DESCONTO", "0,00");
-            field(100, Y_IMP+13, 31, 8, "OUTRAS DESPESAS ACESSÓRIAS", "0,00");
-            field(131, Y_IMP+13, 31, 8, "VALOR DO IPI", "0,00");
-            field(162, Y_IMP+13, 38, 8, "VALOR TOTAL DA NOTA", row.valor.toLocaleString('pt-BR', {minimumFractionDigits:2}));
+            field(10, Y_IMP+15, 30, 10, "VALOR DO FRETE", "0,00");
+            field(40, Y_IMP+15, 30, 10, "VALOR DO SEGURO", "0,00");
+            field(70, Y_IMP+15, 30, 10, "DESCONTO", "0,00");
+            field(100, Y_IMP+15, 31, 10, "OUTRAS DESPESAS ACESSÓRIAS", "0,00");
+            field(131, Y_IMP+15, 31, 10, "VALOR DO IPI", "0,00");
+            field(162, Y_IMP+15, 38, 10, "VALOR TOTAL DA NOTA", row.valor.toLocaleString('pt-BR', {minimumFractionDigits:2}));
 
-            // 9. TRANSPORTADOR
-            const Y_TRA = 113;
+            // 9. TRANSPORTADOR (com espaçamento de segurança para não sobrepor a linha acima)
+            const Y_TRA = Y_IMP + 15 + 10 + 4;
             sectionBar(10, Y_TRA, 190, 5, "TRANSPORTADOR / VOLUMES TRANSPORTADOS");
 
-            field(10, Y_TRA+5, 80, 8, "RAZÃO SOCIAL", "O MESMO", 'left');
-            field(90, Y_TRA+5, 25, 8, "FRETE POR CONTA", "9-Sem Frete", 'left');
-            field(115, Y_TRA+5, 20, 8, "CÓDIGO ANTT", "", 'left');
-            field(135, Y_TRA+5, 20, 8, "PLACA DO VEÍCULO", "", 'left');
-            field(155, Y_TRA+5, 10, 8, "UF", "", 'left');
-            field(165, Y_TRA+5, 35, 8, "CNPJ / CPF", "", 'left');
+            field(10, Y_TRA+5, 80, 10, "RAZÃO SOCIAL", "O MESMO", 'left');
+            field(90, Y_TRA+5, 25, 10, "FRETE POR CONTA", "9-Sem Frete", 'left');
+            field(115, Y_TRA+5, 20, 10, "CÓDIGO ANTT", "", 'left');
+            field(135, Y_TRA+5, 20, 10, "PLACA DO VEÍCULO", "", 'left');
+            field(155, Y_TRA+5, 10, 10, "UF", "", 'left');
+            field(165, Y_TRA+5, 35, 10, "CNPJ / CPF", "", 'left');
 
             // 10. DADOS DOS PRODUTOS
-            const Y_PROD = 130;
+            const Y_PROD = Y_TRA + 5 + 10 + 4;
             sectionBar(10, Y_PROD, 190, 5, "DADOS DO PRODUTO / SERVIÇO");
 
             const columns = [
@@ -1745,46 +1745,85 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
                 }
             });
 
-            // 11. DADOS ADICIONAIS
+            // Forma de pagamento (existe no XML transmitido mas nunca aparecia impressa)
+            const TPAG_LABELS = { '01': 'Dinheiro', '02': 'Cheque', '03': 'Cartão de Crédito', '04': 'Cartão de Débito',
+                '05': 'Crédito Loja', '10': 'Vale Alimentação', '11': 'Vale Refeição', '12': 'Vale Presente',
+                '13': 'Vale Combustível', '15': 'Boleto Bancário', '16': 'Depósito Bancário', '17': 'PIX',
+                '18': 'Transferência Bancária', '19': 'Programa de Fidelidade', '90': 'Sem Pagamento', '99': 'Outros' };
+            const tPag = extractTag('tPag');
+            const xPag = extractTag('xPag');
+            const pagamentoLabel = (TPAG_LABELS[tPag] || xPag || 'Não informada') + (xPag && TPAG_LABELS[tPag] ? ` (${unescapeXml(xPag)})` : '');
+
+            // 11. DADOS ADICIONAIS (caixa maior, com mais informação — aproveita melhor a página)
             const Y_FINAL = doc.lastAutoTable.finalY + 5;
             sectionBar(10, Y_FINAL, 190, 5, "DADOS ADICIONAIS");
 
-            doc.rect(10, Y_FINAL + 5, 150, 35);
+            const INFO_H = 62;
+            doc.rect(10, Y_FINAL + 5, 150, INFO_H);
+            doc.setFontSize(5.5); doc.setFont("helvetica", "normal");
+            doc.text("INFORMAÇÕES COMPLEMENTARES", 12, Y_FINAL + 9);
+            doc.setFontSize(8);
+            const infoLines = [
+                (configs['emit_infcpl'] || "Documento emitido por ME ou EPP optante pelo Simples Nacional."),
+                "Não gera direito a crédito fiscal de ICMS/IPI.",
+                "",
+                `Forma de pagamento: ${pagamentoLabel}`,
+                `Transação vinculada à venda #${row.venda_id}`,
+                row.protocolo_autorizacao ? `Protocolo de autorização: ${row.protocolo_autorizacao}` : "EMISSÃO EM HOMOLOGAÇÃO — SEM VALOR FISCAL",
+                "",
+                "Obrigado pela preferência! Qualquer dúvida sobre esta nota,",
+                "entre em contato com nossa equipe pelos canais abaixo."
+            ];
+            doc.text(infoLines.join('\n'), 12, Y_FINAL + 14, { lineHeightFactor: 1.6 });
+
+            doc.rect(160, Y_FINAL + 5, 40, INFO_H);
             doc.setFontSize(5); doc.setFont("helvetica", "normal");
-            doc.text("INFORMAÇÕES COMPLEMENTARES", 11, Y_FINAL + 8);
-            doc.setFontSize(7);
-            doc.text("Documento emitido por ME ou EPP optante pelo Simples Nacional.\nNão gera direito a crédito fiscal de IPI.\nTransação vinculada à venda #" + row.venda_id + "\n\n" + (row.protocolo_autorizacao ? "Protocolo: " + row.protocolo_autorizacao : "EMISSÃO EM HOMOLOGAÇÃO"), 11, Y_FINAL + 13);
+            doc.text("CONSULTA RÁPIDA / QR CODE", 162, Y_FINAL + 9);
 
-            doc.rect(160, Y_FINAL + 5, 40, 35);
-            doc.setFontSize(5); doc.text("RESERVADO AO FISCO / QR CODE", 161, Y_FINAL + 8);
-
-            // Gerar e adicionar QR Code no final
             if (row.chave_acesso) {
                 try {
                     const qrUrl = `https://www.nfe.fazenda.gov.br/portal/consultaRecaptcha.aspx?tipoConsulta=completa&chaveAcesso=${row.chave_acesso}`;
                     const qrBuffer = await generateQRCode(qrUrl);
                     const qrBase64 = `data:image/png;base64,${qrBuffer.toString('base64')}`;
-                    doc.addImage(qrBase64, 'PNG', 167, Y_FINAL + 10, 26, 26);
+                    doc.addImage(qrBase64, 'PNG', 165, Y_FINAL + 12, 30, 30);
                 } catch (e) { console.error("Erro QR Code:", e); }
             }
+            doc.setFontSize(5.5);
+            doc.text("Aponte a câmera do celular", 180, Y_FINAL + 47, { align: 'center' });
+            doc.text("para conferir a autenticidade", 180, Y_FINAL + 50, { align: 'center' });
 
-            // 12. RODAPÉ DE MARCA
-            const Y_FOOTER = Y_FINAL + 42;
+            // 12. RODAPÉ DE MARCA — faixa colorida espelhando o topo, preenchendo o restante da folha
+            const Y_FOOTER = Y_FINAL + 5 + INFO_H + 10;
+            doc.setFillColor(...BRAND_TINT);
+            doc.rect(10, Y_FOOTER, 190, 24, 'F');
             doc.setDrawColor(...BRAND_PRIMARY);
-            doc.setLineWidth(0.3);
-            doc.line(10, Y_FOOTER, 200, Y_FOOTER);
+            doc.setLineWidth(0.4);
+            doc.rect(10, Y_FOOTER, 190, 24);
             doc.setDrawColor(0, 0, 0);
             doc.setLineWidth(0.1);
+
+            if (logoBase64) doc.addImage(logoBase64, 'PNG', 16, Y_FOOTER + 4, 16, 16);
+
             doc.setFont("helvetica", "bold");
-            doc.setFontSize(7);
+            doc.setFontSize(10);
             doc.setTextColor(...BRAND_PRIMARY_DARK);
-            doc.text("M&M Cebolas", 10, Y_FOOTER + 5);
+            doc.text(configs['emit_nome'] || "M&M Cebolas", 38, Y_FOOTER + 9);
             doc.setFont("helvetica", "normal");
+            doc.setFontSize(7.5);
+            doc.setTextColor(60, 60, 60);
+            doc.text("Obrigado pela preferência! Qualidade e confiança em cada entrega.", 38, Y_FOOTER + 14.5);
+            doc.setFont("helvetica", "bold");
             doc.setTextColor(...BRAND_PRIMARY);
-            doc.text(configs['emit_site'] || "www.mmcebolas.com", 33, Y_FOOTER + 5);
-            doc.setTextColor(140, 140, 140);
+            doc.text(configs['emit_site'] || "www.mmcebolas.com", 38, Y_FOOTER + 19.5);
+
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(7);
+            doc.setTextColor(60, 60, 60);
+            doc.text(`Fone: ${configs['emit_tel'] || "(18) 9999-9999"}`, 198, Y_FOOTER + 9, { align: 'right' });
+            if (configs['emit_email']) doc.text(configs['emit_email'], 198, Y_FOOTER + 14.5, { align: 'right' });
+            doc.setTextColor(150, 150, 150);
             doc.setFontSize(6);
-            doc.text("Documento gerado pelo sistema de gestão M&M Cebolas", 200, Y_FOOTER + 5, { align: 'right' });
+            doc.text("Documento gerado pelo sistema de gestão M&M Cebolas", 198, Y_FOOTER + 20.5, { align: 'right' });
             doc.setTextColor(0, 0, 0);
 
             const pdfOutput = doc.output('arraybuffer');
