@@ -77,6 +77,10 @@ db.serialize(() => {
     safeMigrate(`ALTER TABLE nfe ADD COLUMN serie_nfe INTEGER DEFAULT 1`, 'serie_nfe');
     safeMigrate(`ALTER TABLE nfe ADD COLUMN protocolo_autorizacao TEXT`, 'protocolo_autorizacao');
     safeMigrate(`ALTER TABLE produtos ADD COLUMN peso_por_caixa REAL DEFAULT 20`, 'peso_por_caixa');
+    safeMigrate(`ALTER TABLE clientes ADD COLUMN cep TEXT`, 'clientes.cep');
+    safeMigrate(`ALTER TABLE clientes ADD COLUMN uf TEXT`, 'clientes.uf');
+    safeMigrate(`ALTER TABLE fornecedores ADD COLUMN cep TEXT`, 'fornecedores.cep');
+    safeMigrate(`ALTER TABLE fornecedores ADD COLUMN uf TEXT`, 'fornecedores.uf');
 
     const upsertUser = async (label, username, envPassword, role) => {
         const password = process.env[envPassword] || '123';
@@ -617,17 +621,17 @@ app.get('/api/consultar/:type/:doc', authenticateToken, async (req, res) => {
 
 app.get('/api/clientes', authenticateToken, (req, res) => db.all('SELECT * FROM clientes', [], (err, rows) => res.json(rows || [])));
 app.post('/api/clientes', authenticateToken, (req, res) => {
-    const { id, nome, documento, telefone, ie, email, endereco } = req.body;
+    const { id, nome, documento, telefone, ie, email, endereco, cep, uf } = req.body;
     if (!nome) return res.status(400).json({ error: 'Nome é obrigatório' });
-    
+
     if (id) {
-        db.run(`UPDATE clientes SET nome=?,documento=?,telefone=?,ie=?,email=?,endereco=? WHERE id=?`, [nome, documento, telefone, ie, email, endereco, id], (err) => {
+        db.run(`UPDATE clientes SET nome=?,documento=?,telefone=?,ie=?,email=?,endereco=?,cep=?,uf=? WHERE id=?`, [nome, documento, telefone, ie, email, endereco, cep, uf, id], (err) => {
             if (err) return res.status(500).json({ error: err.message });
             registrarLog(req, 'CLIENTE_EDIT', `Editou cliente: ${nome}`);
             res.json({ success: true });
         });
     } else {
-        db.run(`INSERT INTO clientes (nome,documento,telefone,ie,email,endereco) VALUES (?,?,?,?,?,?)`, [nome, documento, telefone, ie, email, endereco], function (err) {
+        db.run(`INSERT INTO clientes (nome,documento,telefone,ie,email,endereco,cep,uf) VALUES (?,?,?,?,?,?,?,?)`, [nome, documento, telefone, ie, email, endereco, cep, uf], function (err) {
             if (err) return res.status(500).json({ error: err.message });
             registrarLog(req, 'CLIENTE_ADD', `Adicionou cliente: ${nome}`);
             res.json({ id: this.lastID });
@@ -637,17 +641,17 @@ app.post('/api/clientes', authenticateToken, (req, res) => {
 
 app.get('/api/fornecedores', authenticateToken, (req, res) => db.all('SELECT * FROM fornecedores', [], (err, rows) => res.json(rows || [])));
 app.post('/api/fornecedores', authenticateToken, (req, res) => {
-    const { id, nome, documento, telefone, ie, email, endereco } = req.body;
+    const { id, nome, documento, telefone, ie, email, endereco, cep, uf } = req.body;
     if (!nome) return res.status(400).json({ error: 'Nome é obrigatório' });
-    
+
     if (id) {
-        db.run(`UPDATE fornecedores SET nome=?,documento=?,telefone=?,ie=?,email=?,endereco=? WHERE id=?`, [nome, documento, telefone, ie, email, endereco, id], (err) => {
+        db.run(`UPDATE fornecedores SET nome=?,documento=?,telefone=?,ie=?,email=?,endereco=?,cep=?,uf=? WHERE id=?`, [nome, documento, telefone, ie, email, endereco, cep, uf, id], (err) => {
             if (err) return res.status(500).json({ error: err.message });
             registrarLog(req, 'FORNECEDOR_EDIT', `Editou fornecedor: ${nome}`);
             res.json({ success: true });
         });
     } else {
-        db.run(`INSERT INTO fornecedores (nome,documento,telefone,ie,email,endereco) VALUES (?,?,?,?,?,?)`, [nome, documento, telefone, ie, email, endereco], function (err) {
+        db.run(`INSERT INTO fornecedores (nome,documento,telefone,ie,email,endereco,cep,uf) VALUES (?,?,?,?,?,?,?,?)`, [nome, documento, telefone, ie, email, endereco, cep, uf], function (err) {
             if (err) return res.status(500).json({ error: err.message });
             registrarLog(req, 'FORNECEDOR_ADD', `Adicionou fornecedor: ${nome}`);
             res.json({ id: this.lastID });
@@ -1131,6 +1135,11 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                         detPag: {
                             indPag: '0',
                             tPag: '99',
+                            // SEFAZ exige xPag (descrição) sempre que tPag=99 (Outros) — sem isso a
+                            // nota é rejeitada com cStat 441. O sistema ainda não guarda a forma de
+                            // pagamento de cada venda, então "Outros" com descrição genérica é o que
+                            // cobre qualquer meio de pagamento sem precisar adivinhar.
+                            xPag: 'Outros',
                             vPag: venda.valor
                         }
                     },

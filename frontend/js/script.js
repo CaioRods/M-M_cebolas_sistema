@@ -1374,8 +1374,28 @@ function openEditModal(type, data = null) {
     document.getElementById('edit-tel').value = data ? (data.telefone || '') : '';
     document.getElementById('edit-email').value = data ? (data.email || '') : '';
     document.getElementById('edit-end').value = data ? (data.endereco || '') : '';
-    
+    document.getElementById('edit-cep').value = data ? (data.cep || '') : '';
+    document.getElementById('edit-uf').value = data ? (data.uf || '') : '';
+
     updateDocMask();
+}
+
+async function consultarCEP() {
+    const cepInput = document.getElementById('edit-cep');
+    const cep = (cepInput?.value || '').replace(/\D/g, '');
+    if (cep.length !== 8) return;
+
+    try {
+        const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+        const data = await res.json();
+        if (data.erro) { showError('CEP não encontrado'); return; }
+
+        document.getElementById('edit-uf').value = data.uf || '';
+        const parts = [data.logradouro, data.bairro, data.localidade, data.uf].filter(Boolean);
+        if (parts.length) document.getElementById('edit-end').value = parts.join(', ');
+    } catch (e) {
+        showError('Erro ao consultar CEP');
+    }
 }
 
 function closeEditModal() { document.getElementById('modal-edit')?.classList.remove('active'); }
@@ -1405,11 +1425,13 @@ async function consultarDocumento() {
                 document.getElementById('edit-nome').value = data.nome || data.razao_social || '';
                 document.getElementById('edit-tel').value = data.telefone || '';
                 document.getElementById('edit-email').value = data.email || '';
-                
+                document.getElementById('edit-cep').value = data.cep || '';
+                document.getElementById('edit-uf').value = data.uf || '';
+
                 // Montar endereço
                 const parts = [data.logradouro, data.numero, data.bairro, data.municipio, data.uf].filter(Boolean);
                 if (parts.length) document.getElementById('edit-end').value = parts.join(', ');
-                
+
                 showSuccess('Dados preenchidos automaticamente!');
             }
         } else {
@@ -1433,7 +1455,9 @@ async function saveCadastro(event) {
         ie: document.getElementById('edit-ie').value,
         telefone: document.getElementById('edit-tel').value,
         email: document.getElementById('edit-email').value,
-        endereco: document.getElementById('edit-end').value
+        endereco: document.getElementById('edit-end').value,
+        cep: document.getElementById('edit-cep').value,
+        uf: document.getElementById('edit-uf').value
     };
     
     const endpoint = type === 'cliente' ? '/clientes' : '/fornecedores';

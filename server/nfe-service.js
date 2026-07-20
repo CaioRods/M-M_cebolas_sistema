@@ -232,6 +232,7 @@ class NFeService {
                 path: pathname,
                 method: 'POST',
                 agent,
+                timeout: 30000,
                 headers: {
                     'Content-Type': `application/soap+xml; charset=utf-8; action="${soapAction}"`,
                     'Content-Length': Buffer.byteLength(envelope)
@@ -241,6 +242,7 @@ class NFeService {
                 res.on('data', (c) => data += c);
                 res.on('end', () => resolve(data));
             });
+            req.on('timeout', () => req.destroy(new Error('Tempo limite excedido ao conectar com a SEFAZ (30s).')));
             req.on('error', reject);
             req.write(envelope);
             req.end();

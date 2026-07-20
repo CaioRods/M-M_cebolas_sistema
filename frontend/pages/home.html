@@ -150,6 +150,19 @@
                     <label>E-mail</label>
                     <input type="email" id="edit-email" placeholder="email@exemplo.com">
                 </div>
+                <div class="form-group">
+                    <label>CEP</label>
+                    <div style="display:flex;gap:8px;">
+                        <input type="text" id="edit-cep" placeholder="00000-000" onblur="consultarCEP()" style="flex:1;">
+                        <button type="button" class="btn-primary" onclick="consultarCEP()" title="Buscar endereço pelo CEP" style="padding:12px 14px;flex-shrink:0;">
+                            <i class="fas fa-map-marker-alt"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>UF</label>
+                    <input type="text" id="edit-uf" placeholder="SP" maxlength="2" style="text-transform:uppercase;">
+                </div>
                 <div class="form-group span-2">
                     <label>Endereço Completo</label>
                     <input type="text" id="edit-end" placeholder="Rua, Número, Bairro, Cidade - UF">
@@ -574,6 +587,9 @@
         if (client) {
             document.getElementById('nfe-dest-nome').value = client.nome || '';
             document.getElementById('nfe-dest-doc').value = client.documento || '';
+            document.getElementById('nfe-dest-end').value = client.endereco || '';
+            document.getElementById('nfe-dest-uf').value = client.uf || '';
+            document.getElementById('nfe-dest-cep').value = client.cep || '';
         }
     }
 
