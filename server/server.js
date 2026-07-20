@@ -1040,7 +1040,8 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                             cProd: '001',
                             cEAN: 'SEM GTIN',
                             xProd: venda.produto,
-                            NCM: '07031019',
+                            NCM: '07031011',
+                            CEST: '0000000',
                             CFOP: (destUF !== emitUF) ? '6102' : '5102',
                             uCom: 'CX',
                             qCom: venda.qtd_caixas || 1,
@@ -1053,12 +1054,16 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                             indTot: '1'
                         },
                         imposto: {
-                            ICMS: { ICMS00: { orig: '0', CST: '00', modBC: '0', vBC: '0.00', pICMS: '0.00', vICMS: '0.00' } },
+                            // CST 60 (ICMS já retido por substituição tributária) + PIS/COFINS
+                            // alíquota básica (CST 01): mesma classificação usada em NF-e reais já
+                            // autorizadas deste CNPJ para este mesmo tipo de produto (cebola). Evita
+                            // adivinhar uma combinação de CST/cClassTrib que nunca foi comprovada.
+                            ICMS: { ICMS60: { orig: '0', CST: '60', vBCSTRet: '0.00', pST: '0.00', vICMSSubstituto: '0.00', vICMSSTRet: '0.00' } },
                             // Opcional no XSD, mas presente em toda NF-e real deste CNPJ — replicado
                             // da mesma forma (CST 99 = não tributado).
                             IPI: { cEnq: '999', IPITrib: { CST: '99', vBC: '0.00', pIPI: '0.00', vIPI: '0.00' } },
-                            PIS: { PISOutr: { CST: '99', vBC: '0.00', pPIS: '0.00', vPIS: '0.00' } },
-                            COFINS: { COFINSOutr: { CST: '99', vBC: '0.00', pCOFINS: '0.00', vCOFINS: '0.00' } },
+                            PIS: { PISAliq: { CST: '01', vBC: '0.00', pPIS: '0.00', vPIS: '0.00' } },
+                            COFINS: { COFINSAliq: { CST: '01', vBC: '0.00', pCOFINS: '0.00', vCOFINS: '0.00' } },
                             // Grupo IBS/CBS da Reforma Tributária (obrigatório na prática desde 2026,
                             // mesmo com minOccurs=0 no XSD — sem ele a SEFAZ rejeita com mensagem
                             // genérica "Mensagem SOAP inválida" em vez de apontar o campo faltando.
