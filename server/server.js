@@ -1448,6 +1448,24 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
                 cst: icmsMatch ? icmsMatch[1] : '60'
             };
 
+            // Textos extraídos de XML vêm com entidades escapadas (&amp; em vez de &) — sem isso
+            // "RODRIGUES & MONTINI" aparecia literalmente como "RODRIGUES &amp; MONTINI" no PDF.
+            const unescapeXml = (s) => (s || '')
+                .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+                .replace(/&quot;/g, '"').replace(/&apos;/g, "'");
+
+            // Reduz o tamanho da fonte até o texto caber na largura disponível, evitando que nomes
+            // longos de emitente/destinatário invadam a caixa vizinha do DANFE.
+            const fitText = (text, maxWidth, startSize, minSize = 5.5) => {
+                let size = startSize;
+                doc.setFontSize(size);
+                while (doc.getTextWidth(text) > maxWidth && size > minSize) {
+                    size -= 0.5;
+                    doc.setFontSize(size);
+                }
+                return size;
+            };
+
             // Cores da identidade visual do sistema (verde primário / laranja de destaque)
             const BRAND_PRIMARY = [26, 86, 50];
             const BRAND_PRIMARY_DARK = [15, 56, 32];
@@ -1508,9 +1526,10 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
             doc.rect(10, 22, 85, 28);
             const xText = 38;
             doc.setFont("helvetica", "bold");
-            doc.setFontSize(8.5);
             doc.setTextColor(...BRAND_PRIMARY_DARK);
-            doc.text(configs['emit_nome'] || "M&M HF COMERCIO DE CEBOLAS LTDA", xText, 28);
+            const emitNomeText = configs['emit_nome'] || "M&M HF COMERCIO DE CEBOLAS LTDA";
+            fitText(emitNomeText, 55, 8.5);
+            doc.text(emitNomeText, xText, 28);
             doc.setTextColor(0, 0, 0);
             doc.setFontSize(7);
             doc.setFont("helvetica", "normal");
@@ -1601,7 +1620,9 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
 
             doc.rect(10, 73, 140, 8);
             doc.setFontSize(5.5); doc.setFont("helvetica", "normal"); doc.text("NOME / RAZÃO SOCIAL", 11.5, 76);
-            doc.setFontSize(8.5); doc.setFont("helvetica", "bold"); doc.text(row.dest_nome || "CONSUMIDOR FINAL", 11.5, 80);
+            const destNomeText = unescapeXml(row.dest_nome) || "CONSUMIDOR FINAL";
+            doc.setFont("helvetica", "bold"); fitText(destNomeText, 136, 8.5);
+            doc.text(destNomeText, 11.5, 80);
 
             doc.rect(150, 73, 50, 8);
             doc.setFontSize(5.5); doc.setFont("helvetica", "normal"); doc.text("CNPJ / CPF", 151.5, 76);
@@ -1609,11 +1630,11 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
 
             doc.rect(10, 81, 100, 8);
             doc.setFontSize(5.5); doc.text("ENDEREÇO", 11.5, 84);
-            doc.setFontSize(7.5); doc.text(row.dest_endereco || "", 11.5, 88);
+            doc.setFontSize(7.5); doc.text(unescapeXml(row.dest_endereco), 11.5, 88);
 
             doc.rect(110, 81, 40, 8);
             doc.setFontSize(5.5); doc.text("BAIRRO / DISTRITO", 111.5, 84);
-            doc.setFontSize(7.5); doc.text(row.dest_bairro || "", 111.5, 88);
+            doc.setFontSize(7.5); doc.text(unescapeXml(row.dest_bairro), 111.5, 88);
 
             doc.rect(150, 81, 25, 8);
             doc.setFontSize(5.5); doc.text("CEP", 151.5, 84);
@@ -1628,7 +1649,7 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
             doc.rect(10, 89, 165, 6);
             doc.setFontSize(5); doc.setFont("helvetica", "normal"); doc.text("MUNICÍPIO / UF", 11.5, 91.5);
             doc.setFontSize(7); doc.setFont("helvetica", "bold");
-            doc.text(`${row.dest_cidade || ''}${row.dest_uf ? ' - ' + row.dest_uf : ''}`, 11.5, 94.3);
+            doc.text(`${unescapeXml(row.dest_cidade)}${row.dest_uf ? ' - ' + row.dest_uf : ''}`, 11.5, 94.3);
             doc.rect(175, 89, 25, 6);
             doc.setFontSize(5); doc.setFont("helvetica", "normal"); doc.text("UF", 176.5, 91.5);
             doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.text(row.dest_uf || "", 176.5, 94.3);
