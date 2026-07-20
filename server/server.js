@@ -246,7 +246,17 @@ app.post('/api/movimentacoes', authenticateToken, (req, res) => {
     });
 });
 
-app.delete('/api/movimentacoes/:id', authenticateToken, (req, res) => db.run('DELETE FROM movimentacoes WHERE id = ?', [req.params.id], () => res.json({ success: true })));
+app.delete('/api/movimentacoes/:id', authenticateToken, (req, res) => {
+    // Excluir uma compra/venda mexe direto no saldo de estoque e no DRE — mesmo nível de
+    // sensibilidade das outras exclusões restritas do sistema (usuários, NF-e, reset), mas essa
+    // rota não tinha checagem de permissão nem ficava no log de auditoria.
+    if (req.user.role !== 'admin' && req.user.role !== 'chefe') return res.sendStatus(403);
+    db.run('DELETE FROM movimentacoes WHERE id = ?', [req.params.id], (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        registrarLog(req, 'MOVIMENTACAO_DELETE', `Excluiu movimentação ID: ${req.params.id}`);
+        res.json({ success: true });
+    });
+});
 
 app.get('/api/descartes', authenticateToken, (req, res) => {
     db.all('SELECT * FROM descartes ORDER BY data DESC', [], (err, rows) => {
