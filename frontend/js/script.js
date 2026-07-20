@@ -1896,17 +1896,58 @@ function shareNFeWhatsApp(id, produto, valor, chave, clientName) {
 async function gerarNFeParaVenda(vendaId) {
     const modal = document.getElementById('modal-gerar-nfe');
     if (!modal) { showError('Modal de NF-e não encontrado'); return; }
-    
+
     document.getElementById('nfe-venda-id').value = vendaId;
-    
+    const avulsaFields = document.getElementById('nfe-avulsa-fields');
+    if (avulsaFields) avulsaFields.style.display = 'none';
+
     // Preencher select de clientes
     const destSelect = document.getElementById('nfe-destinatario-id');
     if (destSelect) {
         destSelect.innerHTML = '<option value="">Selecione o destinatário...</option>' +
             appData.clients.map(c => `<option value="${c.id}">${c.nome} - ${c.documento || 'Sem doc'}</option>`).join('');
     }
-    
+
+    toggleDescPagamento();
     modal.classList.add('active');
+}
+
+function abrirNFeAvulsa() {
+    const modal = document.getElementById('modal-gerar-nfe');
+    if (!modal) { showError('Modal de NF-e não encontrado'); return; }
+
+    document.getElementById('nfe-venda-id').value = '';
+    const avulsaFields = document.getElementById('nfe-avulsa-fields');
+    if (avulsaFields) avulsaFields.style.display = 'flex';
+
+    const produtoSelect = document.getElementById('nfe-avulsa-produto');
+    if (produtoSelect) {
+        produtoSelect.innerHTML = '<option value="">Selecione um produto...</option>' +
+            (appData.products || []).map(p => `<option value="${p.nome}">${p.nome}</option>`).join('');
+    }
+    document.getElementById('nfe-avulsa-qtd').value = '';
+    document.getElementById('nfe-avulsa-valor').value = '';
+    document.getElementById('nfe-avulsa-baixa').checked = true;
+
+    const destSelect = document.getElementById('nfe-destinatario-id');
+    if (destSelect) {
+        destSelect.innerHTML = '<option value="">Selecione o destinatário...</option>' +
+            appData.clients.map(c => `<option value="${c.id}">${c.nome} - ${c.documento || 'Sem doc'}</option>`).join('');
+        destSelect.value = '';
+    }
+    ['nfe-dest-nome', 'nfe-dest-doc', 'nfe-dest-end', 'nfe-dest-uf', 'nfe-dest-cep'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+
+    toggleDescPagamento();
+    modal.classList.add('active');
+}
+
+function toggleDescPagamento() {
+    const forma = document.getElementById('nfe-forma-pagamento')?.value;
+    const group = document.getElementById('nfe-desc-pagamento-group');
+    if (group) group.style.display = forma === '99' ? 'block' : 'none';
 }
 
 function closeNFeModal() {
@@ -1919,31 +1960,49 @@ async function confirmarGerarNFe(event) {
     const destId = document.getElementById('nfe-destinatario-id').value;
     const destNome = document.getElementById('nfe-dest-nome').value;
     const destDoc = document.getElementById('nfe-dest-doc').value;
-    
-    if (!vendaId) { showError('Venda não identificada'); return; }
-    
+
     const clientObj = destId ? appData.clients.find(c => c.id == destId) : null;
-    const destinatario = { 
-        nome: destNome, 
+    const destinatario = {
+        nome: destNome,
         documento: destDoc,
         endereco: document.getElementById('nfe-dest-end')?.value || '',
         uf: document.getElementById('nfe-dest-uf')?.value || 'SP',
         cep: document.getElementById('nfe-dest-cep')?.value || '',
         ie: clientObj ? clientObj.ie : ''
     };
-    
+
     if (!destinatario?.nome) { showError('Informe o destinatário'); return; }
-    
+
+    const forma_pagamento = document.getElementById('nfe-forma-pagamento')?.value || '99';
+    const desc_pagamento = document.getElementById('nfe-desc-pagamento')?.value || '';
+
+    const payload = { destinatario, forma_pagamento, desc_pagamento, itens: [] };
+
+    if (vendaId) {
+        payload.venda_id = parseInt(vendaId);
+    } else {
+        const produto = document.getElementById('nfe-avulsa-produto')?.value;
+        const qtd_caixas = parseFloat(document.getElementById('nfe-avulsa-qtd')?.value || 0);
+        const valor = parseFloat(document.getElementById('nfe-avulsa-valor')?.value || 0);
+        const afeta_estoque = document.getElementById('nfe-avulsa-baixa')?.checked !== false;
+
+        if (!produto) { showError('Selecione o produto da nota avulsa'); return; }
+        if (!qtd_caixas || qtd_caixas <= 0) { showError('Informe a quantidade'); return; }
+        if (!valor || valor <= 0) { showError('Informe o valor total'); return; }
+
+        payload.venda_manual = { produto, qtd_caixas, valor, afeta_estoque };
+    }
+
     const btn = event.target.querySelector('button[type="submit"]') || event.submitter;
     const origText = btn?.innerHTML;
     if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando...'; btn.disabled = true; }
-    
+
     try {
         const res = await fetchWithAuth('/nfe/gerar', {
             method: 'POST',
-            body: JSON.stringify({ venda_id: parseInt(vendaId), destinatario, itens: [] })
+            body: JSON.stringify(payload)
         });
-        
+
         if (res && res.ok) {
             const data = await res.json();
             showSuccess(`NF-e gerada! Chave: ${(data.chave || '').substring(0, 20)}...`);

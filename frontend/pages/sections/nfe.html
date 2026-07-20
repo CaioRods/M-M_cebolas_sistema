@@ -8,6 +8,9 @@
             <i class="fas fa-search"></i>
             <input type="text" id="nfe-search-input" placeholder="Buscar por fornecedor, produto ou chave..." onkeyup="filterNFeBySearch(this.value)">
         </div>
+        <button class="btn-primary" onclick="abrirNFeAvulsa()" title="Emitir nota fiscal sem partir de uma venda já registrada">
+            <i class="fas fa-file-circle-plus"></i> Nota Avulsa
+        </button>
         <button class="btn-primary" onclick="loadNFeTable()" title="Atualizar lista">
             <i class="fas fa-sync-alt"></i>
         </button>

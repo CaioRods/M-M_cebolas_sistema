@@ -479,20 +479,47 @@
             </div>
             <form onsubmit="confirmarGerarNFe(event)" style="padding:24px;display:flex;flex-direction:column;gap:16px;">
                 <input type="hidden" id="nfe-venda-id">
-                
+
+                <div id="nfe-avulsa-fields" style="display:none;flex-direction:column;gap:16px;">
+                    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px;">
+                        <p style="font-size:0.85rem;color:#1e40af;font-weight:600;"><i class="fas fa-info-circle"></i> Nota avulsa: informe o produto vendido. Use o interruptor abaixo se o estoque desse produto já foi baixado por outro meio.</p>
+                    </div>
+                    <div class="form-group">
+                        <label>Produto</label>
+                        <select id="nfe-avulsa-produto"></select>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                        <div class="form-group">
+                            <label>Quantidade (caixas)</label>
+                            <input type="number" step="0.01" id="nfe-avulsa-qtd" placeholder="0">
+                        </div>
+                        <div class="form-group">
+                            <label>Valor Total (R$)</label>
+                            <input type="number" step="0.01" id="nfe-avulsa-valor" placeholder="0,00">
+                        </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:12px 16px;">
+                        <input type="checkbox" id="nfe-avulsa-baixa" checked style="width:20px;height:20px;flex-shrink:0;">
+                        <div>
+                            <p style="font-weight:600;font-size:0.85rem;cursor:pointer;" onclick="document.getElementById('nfe-avulsa-baixa').click()">Dar baixa no estoque</p>
+                            <p style="font-size:0.75rem;color:var(--text-muted);">Desligue se o estoque desse produto já foi baixado antes.</p>
+                        </div>
+                    </div>
+                </div>
+
                 <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;">
                     <p style="font-size:0.85rem;color:#166534;font-weight:600;"><i class="fas fa-info-circle"></i> Selecione o destinatário da NF-e ou informe manualmente.</p>
                 </div>
-                
+
                 <div class="form-group">
                     <label>Destinatário (Clientes cadastrados)</label>
                     <select id="nfe-destinatario-id" onchange="preencherDestNFe(this)">
                         <option value="">Selecione um cliente cadastrado...</option>
                     </select>
                 </div>
-                
+
                 <div style="text-align:center;color:var(--text-muted);font-size:0.8rem;">— ou informe manualmente —</div>
-                
+
                 <div class="form-group">
                     <label>Nome / Razão Social</label>
                     <input type="text" id="nfe-dest-nome" placeholder="Nome do destinatário">
@@ -515,7 +542,25 @@
                         <input type="text" id="nfe-dest-cep" placeholder="00000-000">
                     </div>
                 </div>
-                
+
+                <div class="form-group">
+                    <label>Forma de Pagamento</label>
+                    <select id="nfe-forma-pagamento" onchange="toggleDescPagamento()">
+                        <option value="01">Dinheiro</option>
+                        <option value="17">PIX</option>
+                        <option value="03">Cartão de Crédito</option>
+                        <option value="04">Cartão de Débito</option>
+                        <option value="15">Boleto Bancário</option>
+                        <option value="16">Depósito Bancário</option>
+                        <option value="18">Transferência Bancária</option>
+                        <option value="99" selected>Outros</option>
+                    </select>
+                </div>
+                <div class="form-group" id="nfe-desc-pagamento-group">
+                    <label>Descrição do Pagamento</label>
+                    <input type="text" id="nfe-desc-pagamento" placeholder="Ex: A combinar, Outros" value="Outros">
+                </div>
+
                 <div style="display:flex;gap:12px;margin-top:8px;">
                     <button type="button" class="btn-danger" onclick="closeNFeModal()" style="flex:1;">Cancelar</button>
                     <button type="submit" class="btn-primary" style="flex:2;background:#059669;">

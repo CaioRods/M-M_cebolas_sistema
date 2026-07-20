@@ -81,6 +81,11 @@ db.serialize(() => {
     safeMigrate(`ALTER TABLE clientes ADD COLUMN uf TEXT`, 'clientes.uf');
     safeMigrate(`ALTER TABLE fornecedores ADD COLUMN cep TEXT`, 'fornecedores.cep');
     safeMigrate(`ALTER TABLE fornecedores ADD COLUMN uf TEXT`, 'fornecedores.uf');
+    // afeta_estoque=0 identifica movimentações criadas só para vincular uma NF-e emitida para uma
+    // venda cuja baixa de estoque já tinha sido registrada por outro meio (evita duplicar a baixa
+    // e a receita nos relatórios). Ficam de fora das listagens/estatísticas gerais, mas continuam
+    // acessíveis via join direto pelas rotas de NF-e/DANFE.
+    safeMigrate(`ALTER TABLE movimentacoes ADD COLUMN afeta_estoque INTEGER DEFAULT 1`, 'movimentacoes.afeta_estoque');
 
     const upsertUser = async (label, username, envPassword, role) => {
         const password = process.env[envPassword] || '123';
@@ -179,10 +184,11 @@ app.post('/api/login', (req, res) => {
     });
 });
 
-app.get('/api/movimentacoes', authenticateToken, (req, res) => db.all('SELECT * FROM movimentacoes ORDER BY data DESC', [], (err, rows) => res.json(rows || [])));
+app.get('/api/movimentacoes', authenticateToken, (req, res) => db.all(`SELECT * FROM movimentacoes WHERE afeta_estoque IS NULL OR afeta_estoque = 1 ORDER BY data DESC`, [], (err, rows) => res.json(rows || [])));
 
 app.post('/api/movimentacoes', authenticateToken, (req, res) => {
-    const { tipo, produto, quantidade, valor, descricao, data, unidade, peso_kg, qtd_caixas } = req.body;
+    const { tipo, produto, quantidade, valor, descricao, data, unidade, peso_kg, qtd_caixas, afeta_estoque } = req.body;
+    const finalAfetaEstoque = afeta_estoque === false || afeta_estoque === 0 ? 0 : 1;
 
     // Calcular peso_kg e qtd_caixas com base na unidade
     let finalPesoKg = peso_kg || 0;
@@ -207,8 +213,8 @@ app.post('/api/movimentacoes', authenticateToken, (req, res) => {
 
         const inserirMovimentacao = () => {
             db.run(
-                `INSERT INTO movimentacoes (tipo, produto, quantidade, valor, descricao, data, unidade, peso_kg, qtd_caixas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [tipo, produto, finalQuantidade, valor, descricao, data, unidade || 'CX', finalPesoKg, finalQtdCaixas],
+                `INSERT INTO movimentacoes (tipo, produto, quantidade, valor, descricao, data, unidade, peso_kg, qtd_caixas, afeta_estoque) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [tipo, produto, finalQuantidade, valor, descricao, data, unidade || 'CX', finalPesoKg, finalQtdCaixas, finalAfetaEstoque],
                 function (err) {
                     if (err) return res.status(500).json({ error: err.message });
                     const unidadeLabel = unidade === 'AMBOS'
@@ -220,12 +226,16 @@ app.post('/api/movimentacoes', authenticateToken, (req, res) => {
             );
         };
 
-        if (tipo === 'saida') {
+        // Movimentação marcada como afeta_estoque=0 não mexe no saldo por definição (existe só
+        // para vincular uma NF-e a uma venda cuja baixa já foi dada por outro meio) — pula a
+        // checagem de estoque disponível, que não se aplica aqui.
+        if (tipo === 'saida' && finalAfetaEstoque === 1) {
             // Impede vender mais do que existe em estoque (estoque atual = entradas - saídas -
             // descartes já registrados para o produto).
             db.get(
                 `SELECT
-                    COALESCE(SUM(CASE WHEN tipo='entrada' THEN qtd_caixas WHEN tipo='saida' THEN -qtd_caixas ELSE 0 END), 0) AS saldo
+                    COALESCE(SUM(CASE WHEN tipo='entrada' AND (afeta_estoque IS NULL OR afeta_estoque=1) THEN qtd_caixas
+                                       WHEN tipo='saida' AND (afeta_estoque IS NULL OR afeta_estoque=1) THEN -qtd_caixas ELSE 0 END), 0) AS saldo
                  FROM movimentacoes WHERE produto = ?`,
                 [produto],
                 (errStock, rowStock) => {
@@ -291,7 +301,7 @@ app.delete('/api/descartes/:id', authenticateToken, (req, res) => {
 });
 
 app.get('/api/dashboard', authenticateToken, (req, res) => {
-    db.all('SELECT * FROM movimentacoes ORDER BY data DESC', [], (err, rows) => {
+    db.all(`SELECT * FROM movimentacoes WHERE afeta_estoque IS NULL OR afeta_estoque = 1 ORDER BY data DESC`, [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
 
         db.get("SELECT valor FROM configs WHERE chave = 'peso_por_caixa_padrao'", [], (err2, configRow) => {
@@ -847,15 +857,73 @@ async function buscarDadosCEP(cep) {
 }
 
 app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
-    const { venda_id, destinatario } = req.body;
-    
+    const { venda_id, destinatario, venda_manual, forma_pagamento, desc_pagamento } = req.body;
+
     if (!destinatario) {
         return res.status(400).json({ error: "Dados do destinatário não fornecidos." });
     }
 
-    db.get('SELECT * FROM movimentacoes WHERE id = ?', [venda_id], async (err, venda) => {
-        if (err || !venda) return res.status(404).json({ error: "Venda não encontrada" });
-        
+    // Resolve a venda a ser faturada de duas formas: (a) uma venda_id de uma movimentação já
+    // existente (fluxo normal, baixa já feita quando a venda foi registrada); ou (b) dados
+    // informados na hora (venda_manual) para o caso de emitir NF-e para produto cuja baixa de
+    // estoque já foi dada por outro meio — nesse caso venda_manual.afeta_estoque=false faz a
+    // movimentação criada apenas para vincular a nota, sem mexer no saldo/relatórios.
+    const resolverVenda = () => new Promise((resolve, reject) => {
+        if (venda_id) {
+            db.get('SELECT * FROM movimentacoes WHERE id = ?', [venda_id], (errV, venda) => {
+                if (errV) return reject({ status: 500, error: errV.message });
+                if (!venda) return reject({ status: 404, error: "Venda não encontrada" });
+                resolve(venda);
+            });
+            return;
+        }
+
+        if (!venda_manual || !venda_manual.produto || !venda_manual.qtd_caixas || !venda_manual.valor) {
+            return reject({ status: 400, error: "Informe uma venda existente ou os dados de produto, quantidade e valor." });
+        }
+
+        const afetaEstoque = (venda_manual.afeta_estoque === false || venda_manual.afeta_estoque === 0) ? 0 : 1;
+        const qtdCaixas = parseFloat(venda_manual.qtd_caixas) || 0;
+        const valorVenda = parseFloat(venda_manual.valor) || 0;
+        const dataVenda = venda_manual.data || new Date().toISOString().split('T')[0];
+
+        const criarMovimentacao = () => {
+            db.run(
+                `INSERT INTO movimentacoes (tipo, produto, quantidade, valor, descricao, data, unidade, peso_kg, qtd_caixas, afeta_estoque) VALUES ('saida', ?, ?, ?, ?, ?, 'CX', 0, ?, ?)`,
+                [venda_manual.produto, qtdCaixas, valorVenda, 'NF-e avulsa', dataVenda, qtdCaixas, afetaEstoque],
+                function (errIns) {
+                    if (errIns) return reject({ status: 500, error: errIns.message });
+                    db.get('SELECT * FROM movimentacoes WHERE id = ?', [this.lastID], (errSel, venda) => {
+                        if (errSel || !venda) return reject({ status: 500, error: 'Falha ao registrar a venda.' });
+                        resolve(venda);
+                    });
+                }
+            );
+        };
+
+        if (afetaEstoque === 0) return criarMovimentacao();
+
+        // Mesma checagem de estoque disponível usada no cadastro normal de saída.
+        db.get(
+            `SELECT COALESCE(SUM(CASE WHEN tipo='entrada' AND (afeta_estoque IS NULL OR afeta_estoque=1) THEN qtd_caixas
+                                       WHEN tipo='saida' AND (afeta_estoque IS NULL OR afeta_estoque=1) THEN -qtd_caixas ELSE 0 END), 0) AS saldo
+             FROM movimentacoes WHERE produto = ?`,
+            [venda_manual.produto],
+            (errStock, rowStock) => {
+                if (errStock) return reject({ status: 500, error: errStock.message });
+                db.get(`SELECT COALESCE(SUM(quantidade_caixas), 0) AS descartado FROM descartes WHERE produto = ?`, [venda_manual.produto], (errDesc, rowDesc) => {
+                    if (errDesc) return reject({ status: 500, error: errDesc.message });
+                    const estoqueAtual = (rowStock?.saldo || 0) - (rowDesc?.descartado || 0);
+                    if (qtdCaixas > estoqueAtual) {
+                        return reject({ status: 400, error: `Estoque insuficiente de "${venda_manual.produto}": disponível ${estoqueAtual} Sc, tentando vender ${qtdCaixas} Sc.` });
+                    }
+                    criarMovimentacao();
+                });
+            }
+        );
+    });
+
+    resolverVenda().then((venda) => {
         // Buscar configurações necessárias
         db.all('SELECT chave, valor FROM configs', [], async (err2, configs) => {
             if (err2) return res.status(500).json({ error: err2.message });
@@ -956,7 +1024,7 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                 // pode intercalar). Uma vez reservado, o número não é revertido mesmo se a
                 // transmissão falhar/for rejeitada — reaproveitar um número já colocado na rede
                 // pode gerar duplicidade real perante a SEFAZ.
-                const nfeProxNumero = parseInt(configMap['nfe_prox_numero'] || venda_id);
+                const nfeProxNumero = parseInt(configMap['nfe_prox_numero'] || venda.id);
                 const nfeSerie = parseInt(configMap['nfe_serie'] || '1');
                 const emitCrt = configMap['emit_crt'] || '3';
                 db.run("UPDATE configs SET valor = ? WHERE chave = 'nfe_prox_numero'", [String(nfeProxNumero + 1)]);
@@ -982,6 +1050,11 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                 const xLgr = endParts[0] ? endParts[0].trim() : 'Endereço não informado';
                 const nro = endParts[1] ? endParts[1].trim() : 'S/N';
                 const xBairro = endParts[2] ? endParts[2].trim() : 'Bairro';
+
+                // Códigos de forma de pagamento aceitos pela SEFAZ (tPag). Cai em '99' (Outros)
+                // se não vier nada ou vier um código não reconhecido.
+                const TPAG_VALIDOS = ['01', '02', '03', '04', '05', '10', '11', '12', '13', '15', '16', '17', '18', '19', '90', '99'];
+                const tPagFinal = TPAG_VALIDOS.includes(forma_pagamento) ? forma_pagamento : '99';
 
                 // Montar dados da NF-e
                 const nfeData = {
@@ -1134,12 +1207,10 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                     pag: {
                         detPag: {
                             indPag: '0',
-                            tPag: '99',
+                            tPag: tPagFinal,
                             // SEFAZ exige xPag (descrição) sempre que tPag=99 (Outros) — sem isso a
-                            // nota é rejeitada com cStat 441. O sistema ainda não guarda a forma de
-                            // pagamento de cada venda, então "Outros" com descrição genérica é o que
-                            // cobre qualquer meio de pagamento sem precisar adivinhar.
-                            xPag: 'Outros',
+                            // nota é rejeitada com cStat 441.
+                            ...(tPagFinal === '99' ? { xPag: desc_pagamento || 'Outros' } : {}),
                             vPag: venda.valor
                         }
                     },
@@ -1168,9 +1239,9 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                 const httpStatus = status === 'autorizada' ? 200 : (status === 'rejeitada' ? 422 : 502);
 
                 db.run(`INSERT INTO nfe (venda_id, chave_acesso, xml_content, status, data_emissao, protocolo_autorizacao, numero_nfe, serie_nfe) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [venda_id, chaveAcesso, xmlAssinado, status, dataEmissao, transmissaoResult.protocolo || '', nfeProxNumero, nfeSerie], function (err3) {
+                    [venda.id, chaveAcesso, xmlAssinado, status, dataEmissao, transmissaoResult.protocolo || '', nfeProxNumero, nfeSerie], function (err3) {
                         if (err3) return res.status(500).json({ error: err3.message });
-                        registrarLog(req, 'NFE_GERAR', `NF-e gerada para venda #${venda_id} - Status: ${status}`);
+                        registrarLog(req, 'NFE_GERAR', `NF-e gerada para venda #${venda.id} - Status: ${status}`);
                         res.status(httpStatus).json({
                             id: this.lastID,
                             chave: chaveAcesso,
@@ -1185,6 +1256,8 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                 res.status(500).json({ error: "Erro ao gerar NF-e: " + nfeErr.message });
             }
         });
+    }).catch((e) => {
+        res.status(e.status || 500).json({ error: e.error || 'Erro ao gerar NF-e.' });
     });
 });
 
