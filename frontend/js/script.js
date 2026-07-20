@@ -1912,7 +1912,7 @@ async function gerarNFeParaVenda(vendaId) {
     modal.classList.add('active');
 }
 
-function abrirNFeAvulsa() {
+function abrirNFeAvulsa(prefill = null) {
     const modal = document.getElementById('modal-gerar-nfe');
     if (!modal) { showError('Modal de NF-e não encontrado'); return; }
 
@@ -1924,9 +1924,11 @@ function abrirNFeAvulsa() {
     if (produtoSelect) {
         produtoSelect.innerHTML = '<option value="">Selecione um produto...</option>' +
             (appData.products || []).map(p => `<option value="${p.nome}">${p.nome}</option>`).join('');
+        if (prefill?.produto) produtoSelect.value = prefill.produto;
     }
-    document.getElementById('nfe-avulsa-qtd').value = '';
-    document.getElementById('nfe-avulsa-valor').value = '';
+    document.getElementById('nfe-avulsa-qtd').value = prefill?.qtd_caixas || '';
+    document.getElementById('nfe-avulsa-valor').value = prefill?.valor || '';
+    document.getElementById('nfe-avulsa-data').value = prefill?.data || '';
     document.getElementById('nfe-avulsa-baixa').checked = true;
 
     const destSelect = document.getElementById('nfe-destinatario-id');
@@ -1985,12 +1987,13 @@ async function confirmarGerarNFe(event) {
         const qtd_caixas = parseFloat(document.getElementById('nfe-avulsa-qtd')?.value || 0);
         const valor = parseFloat(document.getElementById('nfe-avulsa-valor')?.value || 0);
         const afeta_estoque = document.getElementById('nfe-avulsa-baixa')?.checked !== false;
+        const dataVenda = document.getElementById('nfe-avulsa-data')?.value || '';
 
         if (!produto) { showError('Selecione o produto da nota avulsa'); return; }
         if (!qtd_caixas || qtd_caixas <= 0) { showError('Informe a quantidade'); return; }
         if (!valor || valor <= 0) { showError('Informe o valor total'); return; }
 
-        payload.venda_manual = { produto, qtd_caixas, valor, afeta_estoque };
+        payload.venda_manual = { produto, qtd_caixas, valor, afeta_estoque, data: dataVenda || undefined };
     }
 
     const btn = event.target.querySelector('button[type="submit"]') || event.submitter;
@@ -2710,6 +2713,18 @@ async function saveMovimentacao(type, event) {
     if (!produto) { showError('Selecione um produto na vitrine acima.'); return; }
     if (quantidade <= 0 && qtd_caixas <= 0) { showError('Informe a quantidade.'); return; }
 
+    const valor = parseFloat(document.getElementById(`${prefix}-value`)?.value || 0);
+    const dataVenda = document.getElementById(`${prefix}-date`)?.value || new Date().toISOString().split('T')[0];
+
+    // Para saída, pergunta ANTES de registrar: se for emitir NF-e agora, a baixa de estoque fica
+    // a cargo do modal de NF-e (com o interruptor "Dar baixa no estoque"), em vez de já debitar o
+    // estoque aqui e só depois tentar a nota — isso evita baixa duplicada/descontrolada quando a
+    // nota é rejeitada ou reemitida.
+    if (type === 'saida' && confirm('Deseja emitir uma NF-e para esta venda?')) {
+        abrirNFeAvulsa({ produto, qtd_caixas: qtd_caixas || quantidade, valor, data: dataVenda });
+        return;
+    }
+
     const data = {
         tipo: type,
         produto,
@@ -2717,9 +2732,9 @@ async function saveMovimentacao(type, event) {
         unidade,
         peso_kg,
         qtd_caixas,
-        valor: parseFloat(document.getElementById(`${prefix}-value`)?.value || 0),
+        valor,
         descricao: document.getElementById(`${prefix}-desc`)?.value || '',
-        data: document.getElementById(`${prefix}-date`)?.value || new Date().toISOString().split('T')[0]
+        data: dataVenda
     };
 
     const btn = event.target.querySelector('[type="submit"]');
@@ -2730,16 +2745,7 @@ async function saveMovimentacao(type, event) {
     if (res && res.ok) {
         const saved = await res.json();
         showSuccess(type === 'entrada' ? 'Compra registrada!' : 'Venda registrada!');
-        
-        // Offer to generate NF-e for sales
-        if (type === 'saida' && saved.id) {
-            setTimeout(() => {
-                if (confirm('Deseja emitir uma NF-e para esta venda?')) {
-                    gerarNFeParaVenda(saved.id);
-                }
-            }, 500);
-        }
-        
+
         await loadDataFromAPI();
         event.target.reset();
         const dateInput = document.getElementById(`${prefix}-date`);
