@@ -341,36 +341,38 @@ class NFeService {
             const seq = String(nSeqEvento).padStart(2, '0');
             const idEvento = `ID110111${chaveAcesso}${seq}`;
 
+            // Assina só o <evento> (mesmo padrão da emissão: assina o elemento interno primeiro,
+            // depois envolve por fora via concatenação de string). Construir o <envEvento> completo
+            // e só então assinar com xpath apontando para 'evento' resultava na <Signature> como
+            // IRMÃ de <evento> dentro de <envEvento>, em vez de FILHA de <evento> como o schema
+            // exige — SEFAZ rejeitava com "Falha no schema XML" (cStat 225) sem detalhar o motivo.
             const eventoObj = {
-                envEvento: {
+                evento: {
                     '@xmlns': 'http://www.portalfiscal.inf.br/nfe',
                     '@versao': '1.00',
-                    idLote: Math.floor(Date.now() / 1000),
-                    evento: {
-                        '@versao': '1.00',
-                        infEvento: {
-                            '@Id': idEvento,
-                            cOrgao: cUF,
-                            tpAmb,
-                            CNPJ: cnpj,
-                            chNFe: chaveAcesso,
-                            dhEvento,
-                            tpEvento: '110111',
-                            nSeqEvento: nSeqEvento,
-                            verEvento: '1.00',
-                            detEvento: {
-                                '@versao': '1.00',
-                                descEvento: 'Cancelamento',
-                                nProt: nProtAutorizacao,
-                                xJust: motivo
-                            }
+                    infEvento: {
+                        '@Id': idEvento,
+                        cOrgao: cUF,
+                        tpAmb,
+                        CNPJ: cnpj,
+                        chNFe: chaveAcesso,
+                        dhEvento,
+                        tpEvento: '110111',
+                        nSeqEvento: nSeqEvento,
+                        verEvento: '1.00',
+                        detEvento: {
+                            '@versao': '1.00',
+                            descEvento: 'Cancelamento',
+                            nProt: nProtAutorizacao,
+                            xJust: motivo
                         }
                     }
                 }
             };
 
             const xml = create({ version: '1.0', encoding: 'UTF-8' }, eventoObj).end({ prettyPrint: false, headless: true });
-            const xmlAssinado = this._signXML(xml, 'infEvento', 'evento');
+            const eventoAssinado = this._signXML(xml, 'infEvento', 'evento');
+            const xmlAssinado = `<envEvento xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.00"><idLote>${Math.floor(Date.now() / 1000)}</idLote>${eventoAssinado}</envEvento>`;
 
             const url = wsdlUrl.replace(/\?WSDL$/i, '');
             const bodyInnerXml = `<nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4">${xmlAssinado}</nfeDadosMsg>`;
