@@ -1,0 +1,13 @@
+#!/usr/bin/expect -f
+set timeout 600
+spawn scp -r -o StrictHostKeyChecking=no frontend/dist root@85.31.231.151:/var/www/mm_cebolas/frontend/
+expect {
+    "password:" {
+        send "@@Cebolas2025\r"
+    }
+    timeout {
+        send_user "Timeout enviando pasta dist\n"
+        exit 1
+    }
+}
+expect eof

@@ -163,7 +163,7 @@ app.use(express.static(path.join(__dirname, '../frontend')));
 app.get(['/downloads', '/downloads/'], (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/download.html'));
 });
-app.use('/downloads', express.static(path.join(__dirname, '../dist')));
+app.use('/downloads', express.static(path.join(__dirname, '../frontend/dist')));
 
 function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
