@@ -6,7 +6,7 @@
     <div style="display: flex; gap: 12px; align-items: center;">
         <div class="search-box-pro" style="width: 400px;">
             <i class="fas fa-search"></i>
-            <input type="text" id="nfe-search-input" placeholder="Buscar por fornecedor, produto ou chave..." onkeyup="filterNFeBySearch(this.value)">
+            <input type="text" id="nfe-search-input" placeholder="Buscar por cliente, produto ou chave..." onkeyup="filterNFeBySearch(this.value)">
         </div>
         <button class="btn-primary admin-only" onclick="abrirNFeAvulsa()" title="Emitir nota fiscal sem partir de uma venda já registrada">
             <i class="fas fa-file-circle-plus"></i> Nota Avulsa
@@ -48,7 +48,7 @@
         <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
             <h4 style="font-weight: 800; display:flex; align-items:center; gap:8px;"><i class="fas fa-box-archive" style="color:var(--primary);"></i> Arquivo de Notas Fiscais</h4>
             <div class="filter-group-pro">
-                <button onclick="setNFeGrouping('fornecedor')" class="filter-btn active" id="btn-group-forn"><i class="fas fa-user-tie"></i> Fornecedor</button>
+                <button onclick="setNFeGrouping('fornecedor')" class="filter-btn active" id="btn-group-forn"><i class="fas fa-user-tie"></i> Cliente</button>
                 <button onclick="setNFeGrouping('data')" class="filter-btn" id="btn-group-data"><i class="fas fa-calendar"></i> Data</button>
                 <button onclick="setNFeGrouping('status')" class="filter-btn" id="btn-group-status"><i class="fas fa-tag"></i> Status</button>
             </div>

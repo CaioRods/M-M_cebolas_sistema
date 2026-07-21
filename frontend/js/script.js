@@ -1665,8 +1665,8 @@ async function loadNFeTable() {
     
     // Apply search filter
     if (searchVal) {
-        filteredData = filteredData.filter(n => 
-            (n.descricao || '').toLowerCase().includes(searchVal) ||
+        filteredData = filteredData.filter(n =>
+            (n.dest_nome || '').toLowerCase().includes(searchVal) ||
             (n.produto || '').toLowerCase().includes(searchVal) ||
             (n.chave_acesso || '').toLowerCase().includes(searchVal)
         );
@@ -1674,7 +1674,7 @@ async function loadNFeTable() {
 
     filteredData.forEach(n => {
         let key;
-        if (nfeGroupingMode === 'fornecedor') key = n.descricao || 'Não Identificado';
+        if (nfeGroupingMode === 'fornecedor') key = n.dest_nome || 'Não Identificado';
         else if (nfeGroupingMode === 'data') key = new Date(n.data_emissao).toLocaleDateString('pt-BR', {month:'long', year:'numeric'});
         else key = n.status || 'pendente';
         

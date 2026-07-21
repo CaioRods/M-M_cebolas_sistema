@@ -834,9 +834,9 @@ app.delete('/api/cadastros/:type/:id', authenticateToken, (req, res) => {
 app.get('/api/nfe', authenticateToken, (req, res) => {
     const search = req.query.search || '';
     const query = search
-        ? `SELECT n.*, m.produto, m.quantidade, m.valor, m.unidade FROM nfe n LEFT JOIN movimentacoes m ON n.venda_id = m.id WHERE n.chave_acesso LIKE ? OR m.produto LIKE ? ORDER BY n.data_emissao DESC`
+        ? `SELECT n.*, m.produto, m.quantidade, m.valor, m.unidade FROM nfe n LEFT JOIN movimentacoes m ON n.venda_id = m.id WHERE n.chave_acesso LIKE ? OR m.produto LIKE ? OR n.dest_nome LIKE ? ORDER BY n.data_emissao DESC`
         : `SELECT n.*, m.produto, m.quantidade, m.valor, m.unidade FROM nfe n LEFT JOIN movimentacoes m ON n.venda_id = m.id ORDER BY n.data_emissao DESC`;
-    const params = search ? [`%${search}%`, `%${search}%`] : [];
+    const params = search ? [`%${search}%`, `%${search}%`, `%${search}%`] : [];
     db.all(query, params, (err, rows) => res.json(rows || []));
 });
 
