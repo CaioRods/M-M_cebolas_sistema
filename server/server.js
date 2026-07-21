@@ -160,6 +160,10 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(express.static(path.join(__dirname, '../frontend')));
+app.get(['/downloads', '/downloads/'], (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/download.html'));
+});
+app.use('/downloads', express.static(path.join(__dirname, '../dist')));
 
 function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
