@@ -35,8 +35,9 @@
     <form onsubmit="saveEntrada(event)" class="form-grid" style="padding: 24px;">
         <div class="form-group span-2">
             <label>Fornecedor / Origem</label>
+            <input type="hidden" id="entry-fornecedor-id">
             <div style="display: flex; gap: 10px;">
-                <input type="text" id="entry-desc" placeholder="Ex: Fazenda Bela Vista ou Nome do Fornecedor" style="flex: 1;" required>
+                <input type="text" id="entry-desc" placeholder="Ex: Fazenda Bela Vista ou Nome do Fornecedor" style="flex: 1;" required oninput="document.getElementById('entry-fornecedor-id').value=''">
                 <button type="button" class="btn-primary" onclick="openSearchModal('fornecedor')" style="padding: 12px;"><i class="fas fa-search"></i></button>
             </div>
         </div>

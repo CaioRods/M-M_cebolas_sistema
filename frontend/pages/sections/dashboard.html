@@ -3,7 +3,7 @@
         <h2 class="page-title" id="dash-greeting" style="display: flex; align-items: center; gap: 8px;">Painel de Controle</h2>
         <p style="color: var(--text-muted); font-size: 0.9rem; font-weight: 500;" id="dash-date-subtitle">Carregando informações...</p>
     </div>
-    <div style="display: flex; gap: 12px; align-items: center;">
+    <div class="funcionario-hide" style="display: flex; gap: 12px; align-items: center;">
         <div class="dashboard-filters">
             <button onclick="setDashboardPeriod('hoje')" class="filter-btn active" id="btn-period-hoje">Hoje</button>
             <button onclick="setDashboardPeriod('semana')" class="filter-btn" id="btn-period-semana">Semana</button>
@@ -18,11 +18,11 @@
 </header>
 
 <!-- DASHBOARD CONFIGURÁVEL: GRID DE KPIS -->
-<div id="kpi-container" class="kpi-grid-pro animate-fade-up delay-1">
+<div id="kpi-container" class="kpi-grid-pro animate-fade-up delay-1 funcionario-hide">
     <!-- Os cards serão injetados e podem ser reordenados ou ocultados via config -->
 </div>
 
-<div class="toggle-kpis-wrapper animate-fade-up" style="display: flex; justify-content: center; margin: -12px 0 24px 0;">
+<div class="toggle-kpis-wrapper animate-fade-up funcionario-hide" style="display: flex; justify-content: center; margin: -12px 0 24px 0;">
     <button id="btn-toggle-kpis" onclick="toggleKPIsExpansion()" class="btn-secondary" style="display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 10px; font-weight: 700; background: var(--bg-panel); border: 1px solid var(--border); cursor: pointer; transition: all 0.2s ease; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); font-size: 0.85rem; color: var(--text-main);">
         <span id="text-toggle-kpis">Ver mais</span>
         <i id="icon-toggle-kpis" class="fas fa-chevron-down" style="font-size: 0.75rem;"></i>
@@ -30,7 +30,7 @@
 </div>
 
 <!-- SEÇÃO DE ANÁLISE GRÁFICA AVANÇADA -->
-<div class="analysis-row animate-fade-up delay-2">
+<div class="analysis-row animate-fade-up delay-2 funcionario-hide">
     <div class="panel main-chart">
         <div class="panel-header">
             <div style="display: flex; flex-direction: column;">
@@ -68,7 +68,7 @@
 </div>
 
 <!-- TABELAS DE GESTÃO ORGANIZADAS -->
-<div class="data-row animate-fade-up delay-3">
+<div class="data-row animate-fade-up delay-3 funcionario-hide">
     <!-- RANKING DE CLIENTES (Vendas) -->
     <div class="panel">
         <div class="panel-header">
@@ -136,7 +136,7 @@
 </div>
 
 <!-- DRE - DEMONSTRATIVO DO RESULTADO DO EXERCÍCIO -->
-<div class="panel animate-fade-up delay-5" style="margin-bottom: 24px;">
+<div class="panel animate-fade-up delay-5 funcionario-hide" style="margin-bottom: 24px;">
     <div class="panel-header" style="background: rgba(255,255,255,0.4); border-bottom: 1px solid var(--border);">
         <div style="display: flex; align-items: center; gap: 8px;">
             <i class="fas fa-coins" style="color: #2563eb; font-size: 1.2rem;"></i>
@@ -192,7 +192,7 @@
 </div>
 
 <!-- ÚLTIMAS TRANSAÇÕES COM FILTRO GLOBAL -->
-<div class="panel animate-fade-up delay-5">
+<div class="panel animate-fade-up delay-5 funcionario-hide">
     <div class="panel-header">
         <h4 style="font-weight: 700; color: var(--primary-dark); display: flex; align-items: center; gap: 8px;"><i class="fas fa-exchange-alt"></i> Fluxo de Operações Recentes</h4>
         <div style="display: flex; gap: 10px;">

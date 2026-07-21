@@ -57,7 +57,7 @@
                     <i class="fas fa-chart-line"></i> Dashboard
                 </button>
             </div>
-            <div class="nav-group">
+            <div class="nav-group funcionario-hide">
                 <span class="nav-label">OPERACIONAL</span>
                 <button class="nav-item" onclick="showSection('entrada')">
                     <i class="fas fa-shopping-cart"></i> Compra
@@ -69,7 +69,7 @@
                     <i class="fas fa-boxes"></i> Estoque
                 </button>
             </div>
-            <div class="nav-group">
+            <div class="nav-group funcionario-hide">
                 <span class="nav-label">GESTÃO</span>
                 <button class="nav-item" onclick="showSection('cadastro')">
                     <i class="fas fa-address-book"></i> Cadastros
@@ -81,7 +81,7 @@
                     <i class="fas fa-wallet"></i> Financeiro
                 </button>
             </div>
-            <div class="nav-group">
+            <div class="nav-group funcionario-hide">
                 <span class="nav-label">SISTEMA</span>
                 <button class="nav-item" onclick="showSection('config')">
                     <i class="fas fa-cog"></i> Configurações
@@ -107,69 +107,83 @@
 
     <!-- Modal de Edição de Contatos -->
     <div id="modal-edit" class="modal-overlay">
-        <div class="edit-modal">
-            <div class="modal-header" style="background: var(--primary); color: white; padding: 20px 24px; border-radius: 20px 20px 0 0; display:flex; justify-content:space-between; align-items:center;">
-                <h3 id="modal-title" style="margin: 0; font-size:1.1rem;">Novo Cadastro</h3>
-                <button onclick="closeEditModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:white;line-height:1;">&times;</button>
+        <div class="edit-modal" style="max-width:600px;">
+            <div class="modal-header" style="background:linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);color:white;padding:22px 24px;border-radius:20px 20px 0 0;display:flex;justify-content:space-between;align-items:center;">
+                <h3 style="margin:0;font-size:1.15rem;display:flex;align-items:center;gap:10px;"><i id="modal-title-icon" class="fas fa-user-plus"></i> <span id="modal-title">Novo Cadastro</span></h3>
+                <button onclick="closeEditModal()" style="background:rgba(255,255,255,0.15);border:none;width:32px;height:32px;border-radius:9px;font-size:1.3rem;cursor:pointer;color:white;line-height:1;">&times;</button>
             </div>
-            <form onsubmit="saveCadastro(event)" class="form-grid" style="padding:24px;">
+            <form onsubmit="saveCadastro(event)" style="padding:24px;display:flex;flex-direction:column;gap:18px;">
                 <input type="hidden" id="edit-type">
                 <input type="hidden" id="edit-id">
-                
-                <div class="form-group">
-                    <label>Tipo de Documento</label>
-                    <select id="edit-doc-type" onchange="updateDocMask()">
-                        <option value="CNPJ">CNPJ (Empresa)</option>
-                        <option value="CPF">CPF (Pessoa Física)</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label id="label-doc">CNPJ</label>
-                    <div style="display:flex;gap:8px;">
-                        <input type="text" id="edit-doc" placeholder="00.000.000/0000-00" style="flex:1;">
-                        <button type="button" class="btn-primary" onclick="consultarDocumento()" title="Buscar dados automaticamente" style="padding:12px 14px;flex-shrink:0;">
-                            <i class="fas fa-search"></i>
-                        </button>
+
+                <div class="nfe-modal-section tint-blue">
+                    <div class="nfe-modal-section-title"><i class="fas fa-id-card"></i> Documento</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                        <div class="form-group">
+                            <label>Tipo de Documento</label>
+                            <select id="edit-doc-type" onchange="updateDocMask()">
+                                <option value="CNPJ">CNPJ (Empresa)</option>
+                                <option value="CPF">CPF (Pessoa Física)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label id="label-doc">CNPJ</label>
+                            <div style="display:flex;gap:8px;">
+                                <input type="text" id="edit-doc" placeholder="00.000.000/0000-00" style="flex:1;">
+                                <button type="button" class="btn-primary" onclick="consultarDocumento()" title="Buscar dados automaticamente" style="padding:12px 14px;flex-shrink:0;">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                    <small style="color:var(--text-muted);display:block;margin-top:4px;font-size:0.75rem;"><i class="fas fa-magic"></i> Clique na lupa para preencher automaticamente via CNPJ</small>
+                    <small style="color:#1e40af;font-size:0.78rem;"><i class="fas fa-magic"></i> Clique na lupa para preencher os dados automaticamente via CNPJ</small>
                 </div>
-                
-                <div class="form-group span-2">
+
+                <div class="form-group">
                     <label>Nome / Razão Social *</label>
                     <input type="text" id="edit-nome" required placeholder="Nome completo ou Razão Social">
                 </div>
-                <div class="form-group">
-                    <label>Inscrição Estadual</label>
-                    <input type="text" id="edit-ie" placeholder="Isento ou Número">
-                </div>
-                <div class="form-group">
-                    <label>Telefone / WhatsApp</label>
-                    <input type="text" id="edit-tel" placeholder="(00) 00000-0000">
-                </div>
-                <div class="form-group span-2">
-                    <label>E-mail</label>
-                    <input type="email" id="edit-email" placeholder="email@exemplo.com">
-                </div>
-                <div class="form-group">
-                    <label>CEP</label>
-                    <div style="display:flex;gap:8px;">
-                        <input type="text" id="edit-cep" placeholder="00000-000" onblur="consultarCEP()" style="flex:1;">
-                        <button type="button" class="btn-primary" onclick="consultarCEP()" title="Buscar endereço pelo CEP" style="padding:12px 14px;flex-shrink:0;">
-                            <i class="fas fa-map-marker-alt"></i>
-                        </button>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                    <div class="form-group">
+                        <label>Inscrição Estadual</label>
+                        <input type="text" id="edit-ie" placeholder="Isento ou Número">
+                    </div>
+                    <div class="form-group">
+                        <label>Telefone / WhatsApp</label>
+                        <input type="text" id="edit-tel" placeholder="(00) 00000-0000">
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>UF</label>
-                    <input type="text" id="edit-uf" placeholder="SP" maxlength="2" style="text-transform:uppercase;">
+                    <label>E-mail</label>
+                    <input type="email" id="edit-email" placeholder="email@exemplo.com">
                 </div>
-                <div class="form-group span-2">
-                    <label>Endereço Completo</label>
-                    <input type="text" id="edit-end" placeholder="Rua, Número, Bairro, Cidade - UF">
+
+                <div class="nfe-modal-section tint-green">
+                    <div class="nfe-modal-section-title"><i class="fas fa-map-marker-alt"></i> Endereço</div>
+                    <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;">
+                        <div class="form-group">
+                            <label>CEP</label>
+                            <div style="display:flex;gap:8px;">
+                                <input type="text" id="edit-cep" placeholder="00000-000" onblur="consultarCEP()" style="flex:1;">
+                                <button type="button" class="btn-primary" onclick="consultarCEP()" title="Buscar endereço pelo CEP" style="padding:12px 14px;flex-shrink:0;">
+                                    <i class="fas fa-location-crosshairs"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>UF</label>
+                            <input type="text" id="edit-uf" placeholder="SP" maxlength="2" style="text-transform:uppercase;">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Endereço Completo</label>
+                        <input type="text" id="edit-end" placeholder="Rua, Número, Bairro, Cidade - UF">
+                    </div>
                 </div>
-                <div style="display:flex;gap:12px;margin-top:8px;" class="span-2">
+
+                <div style="display:flex;gap:12px;margin-top:4px;">
                     <button type="button" class="btn-danger" onclick="closeEditModal()" style="flex:1;">Cancelar</button>
-                    <button type="submit" class="btn-primary" style="flex:2;">
+                    <button type="submit" class="btn-primary" style="flex:2;background:linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);">
                         <i class="fas fa-save"></i> Salvar Cadastro
                     </button>
                 </div>
@@ -207,6 +221,29 @@
                 <div id="produto-detalhe-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px;"></div>
                 <h4 style="font-weight:700;font-size:0.9rem;margin-bottom:12px;display:flex;align-items:center;gap:8px;"><i class="fas fa-clock-rotate-left" style="color:var(--primary);"></i> Histórico de Movimentações</h4>
                 <div id="produto-detalhe-historico" style="max-height:40vh;overflow-y:auto;border:1px solid var(--border);border-radius:12px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Detalhe da Movimentação (histórico, dados não alteráveis) -->
+    <div id="modal-mov-detalhe" class="modal-overlay">
+        <div class="edit-modal" style="max-width: 620px; width: 95%; max-height: 88vh;">
+            <div class="modal-header" id="mov-detalhe-header" style="background: var(--primary); color: white; padding: 20px 24px; border-radius: 20px 20px 0 0; display:flex; justify-content:space-between; align-items:center;">
+                <h3 id="mov-detalhe-titulo" style="margin: 0; font-size:1.1rem; display:flex; align-items:center; gap:10px;"><i class="fas fa-receipt"></i> Detalhe da Movimentação</h3>
+                <button onclick="closeMovDetalheModal()" style="background:rgba(255,255,255,0.15); border:none; width:32px; height:32px; border-radius:9px; font-size: 1.3rem; cursor: pointer; color: white; line-height: 1;">&times;</button>
+            </div>
+            <div style="padding:24px;display:flex;flex-direction:column;gap:18px;">
+                <div id="mov-detalhe-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;"></div>
+
+                <div class="nfe-modal-section tint-green">
+                    <div class="nfe-modal-section-title"><i class="fas fa-user"></i> <span id="mov-detalhe-contato-label">Cliente</span></div>
+                    <div id="mov-detalhe-contato"></div>
+                </div>
+
+                <div id="mov-detalhe-nfe-box" class="nfe-modal-section tint-blue">
+                    <div class="nfe-modal-section-title"><i class="fas fa-file-invoice"></i> Nota Fiscal</div>
+                    <div id="mov-detalhe-nfe-conteudo"></div>
+                </div>
             </div>
         </div>
     </div>

@@ -99,6 +99,11 @@ db.serialize(() => {
     safeMigrate(`ALTER TABLE nfe ADD COLUMN dest_cidade TEXT`, 'nfe.dest_cidade');
     safeMigrate(`ALTER TABLE nfe ADD COLUMN dest_uf TEXT`, 'nfe.dest_uf');
     safeMigrate(`ALTER TABLE nfe ADD COLUMN dest_cep TEXT`, 'nfe.dest_cep');
+    // Antes só se guardava o nome do cliente/fornecedor como texto livre em "descricao" — sem
+    // vínculo real ao cadastro. Isso impedia mostrar os dados completos do contato ao detalhar
+    // uma movimentação.
+    safeMigrate(`ALTER TABLE movimentacoes ADD COLUMN cliente_id INTEGER`, 'movimentacoes.cliente_id');
+    safeMigrate(`ALTER TABLE movimentacoes ADD COLUMN fornecedor_id INTEGER`, 'movimentacoes.fornecedor_id');
 
     const upsertUser = async (label, username, envPassword, role) => {
         const password = process.env[envPassword] || '123';
@@ -204,7 +209,10 @@ app.post('/api/login', (req, res) => {
 app.get('/api/movimentacoes', authenticateToken, (req, res) => db.all(`SELECT * FROM movimentacoes WHERE afeta_estoque IS NULL OR afeta_estoque = 1 ORDER BY data DESC`, [], (err, rows) => res.json(rows || [])));
 
 app.post('/api/movimentacoes', authenticateToken, (req, res) => {
-    const { tipo, produto, quantidade, valor, descricao, data, unidade, peso_kg, qtd_caixas, afeta_estoque } = req.body;
+    // Funcionário só enxerga estoque (leitura) — registrar compra/venda é tarefa de chefe/admin.
+    if (req.user.role !== 'admin' && req.user.role !== 'chefe') return res.sendStatus(403);
+
+    const { tipo, produto, quantidade, valor, descricao, data, unidade, peso_kg, qtd_caixas, afeta_estoque, cliente_id, fornecedor_id } = req.body;
     const finalAfetaEstoque = afeta_estoque === false || afeta_estoque === 0 ? 0 : 1;
 
     // Calcular peso_kg e qtd_caixas com base na unidade
@@ -212,8 +220,24 @@ app.post('/api/movimentacoes', authenticateToken, (req, res) => {
     let finalQtdCaixas = qtd_caixas || 0;
     let finalQuantidade = quantidade || 0;
 
-    db.get("SELECT valor FROM configs WHERE chave = 'peso_por_caixa_padrao'", [], (err, row) => {
-        const pesoPorCaixa = row ? parseFloat(row.valor) : 20;
+    db.all("SELECT chave, valor FROM configs WHERE chave IN ('peso_por_caixa_padrao', 'venda_valor_min', 'venda_valor_max')", [], (err, rows) => {
+        const cfgMap = {};
+        rows?.forEach(r => cfgMap[r.chave] = r.valor);
+        const pesoPorCaixa = cfgMap['peso_por_caixa_padrao'] ? parseFloat(cfgMap['peso_por_caixa_padrao']) : 20;
+
+        // Limite de valor de venda definido por admin/chefe (configs) — vale para qualquer usuário,
+        // sem exceção, inclusive admin/chefe, exatamente como pedido.
+        if (tipo === 'saida') {
+            const vendaMin = cfgMap['venda_valor_min'] ? parseFloat(cfgMap['venda_valor_min']) : null;
+            const vendaMax = cfgMap['venda_valor_max'] ? parseFloat(cfgMap['venda_valor_max']) : null;
+            const valorVenda = parseFloat(valor) || 0;
+            if (vendaMin !== null && valorVenda < vendaMin) {
+                return res.status(400).json({ error: `Valor da venda (R$ ${valorVenda.toFixed(2)}) abaixo do mínimo permitido (R$ ${vendaMin.toFixed(2)}).` });
+            }
+            if (vendaMax !== null && valorVenda > vendaMax) {
+                return res.status(400).json({ error: `Valor da venda (R$ ${valorVenda.toFixed(2)}) acima do máximo permitido (R$ ${vendaMax.toFixed(2)}).` });
+            }
+        }
 
         if (unidade === 'CX') {
             finalQtdCaixas = finalQuantidade;
@@ -230,8 +254,8 @@ app.post('/api/movimentacoes', authenticateToken, (req, res) => {
 
         const inserirMovimentacao = () => {
             db.run(
-                `INSERT INTO movimentacoes (tipo, produto, quantidade, valor, descricao, data, unidade, peso_kg, qtd_caixas, afeta_estoque) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [tipo, produto, finalQuantidade, valor, descricao, data, unidade || 'CX', finalPesoKg, finalQtdCaixas, finalAfetaEstoque],
+                `INSERT INTO movimentacoes (tipo, produto, quantidade, valor, descricao, data, unidade, peso_kg, qtd_caixas, afeta_estoque, cliente_id, fornecedor_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [tipo, produto, finalQuantidade, valor, descricao, data, unidade || 'CX', finalPesoKg, finalQtdCaixas, finalAfetaEstoque, cliente_id || null, fornecedor_id || null],
                 function (err) {
                     if (err) return res.status(500).json({ error: err.message });
                     const unidadeLabel = unidade === 'AMBOS'
@@ -286,6 +310,33 @@ app.delete('/api/movimentacoes/:id', authenticateToken, (req, res) => {
         if (err) return res.status(500).json({ error: err.message });
         registrarLog(req, 'MOVIMENTACAO_DELETE', `Excluiu movimentação ID: ${req.params.id}`);
         res.json({ success: true });
+    });
+});
+
+// Detalhe completo e imutável de uma movimentação: dados do cliente/fornecedor vinculado (se
+// houver) e se já existe NF-e emitida para ela — usado no modal de detalhe do histórico.
+app.get('/api/movimentacoes/:id/detalhe', authenticateToken, (req, res) => {
+    db.get('SELECT * FROM movimentacoes WHERE id = ?', [req.params.id], (err, mov) => {
+        if (err || !mov) return res.status(404).json({ error: "Movimentação não encontrada" });
+
+        const contatoTable = mov.tipo === 'saida' ? 'clientes' : 'fornecedores';
+        const contatoId = mov.tipo === 'saida' ? mov.cliente_id : mov.fornecedor_id;
+
+        const buscarNfe = (contato) => {
+            db.get(`SELECT id, status, chave_acesso, numero_nfe FROM nfe WHERE venda_id = ? ORDER BY id DESC LIMIT 1`, [mov.id], (errN, nfe) => {
+                res.json({
+                    movimentacao: mov,
+                    contato: contato || null,
+                    nfe: (nfe && nfe.status !== 'rejeitada') ? nfe : null
+                });
+            });
+        };
+
+        if (contatoId) {
+            db.get(`SELECT * FROM ${contatoTable} WHERE id = ?`, [contatoId], (errC, contato) => buscarNfe(contato));
+        } else {
+            buscarNfe(null);
+        }
     });
 });
 
@@ -648,6 +699,7 @@ app.get('/api/consultar/:type/:doc', authenticateToken, async (req, res) => {
 
 app.get('/api/clientes', authenticateToken, (req, res) => db.all('SELECT * FROM clientes', [], (err, rows) => res.json(rows || [])));
 app.post('/api/clientes', authenticateToken, (req, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'chefe') return res.sendStatus(403);
     const { id, nome, documento, telefone, ie, email, endereco, cep, uf } = req.body;
     if (!nome) return res.status(400).json({ error: 'Nome é obrigatório' });
 
@@ -668,6 +720,7 @@ app.post('/api/clientes', authenticateToken, (req, res) => {
 
 app.get('/api/fornecedores', authenticateToken, (req, res) => db.all('SELECT * FROM fornecedores', [], (err, rows) => res.json(rows || [])));
 app.post('/api/fornecedores', authenticateToken, (req, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'chefe') return res.sendStatus(403);
     const { id, nome, documento, telefone, ie, email, endereco, cep, uf } = req.body;
     if (!nome) return res.status(400).json({ error: 'Nome é obrigatório' });
 
@@ -874,6 +927,10 @@ async function buscarDadosCEP(cep) {
 }
 
 app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
+    // Emissão de NF-e é ação exclusiva do admin (envolve custo real de transmissão à SEFAZ e
+    // responsabilidade fiscal — chefe/funcionário só podem visualizar notas já emitidas).
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+
     const { venda_id, destinatario, venda_manual, forma_pagamento, desc_pagamento } = req.body;
 
     if (!destinatario) {
@@ -904,6 +961,23 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
         const valorVenda = parseFloat(venda_manual.valor) || 0;
         const dataVenda = venda_manual.data || new Date().toISOString().split('T')[0];
 
+        const seguirComLimite = (cb) => {
+            db.all("SELECT chave, valor FROM configs WHERE chave IN ('venda_valor_min', 'venda_valor_max')", [], (errCfg, rows) => {
+                if (errCfg) return reject({ status: 500, error: errCfg.message });
+                const cfgMap = {};
+                rows?.forEach(r => cfgMap[r.chave] = r.valor);
+                const vendaMin = cfgMap['venda_valor_min'] ? parseFloat(cfgMap['venda_valor_min']) : null;
+                const vendaMax = cfgMap['venda_valor_max'] ? parseFloat(cfgMap['venda_valor_max']) : null;
+                if (vendaMin !== null && valorVenda < vendaMin) {
+                    return reject({ status: 400, error: `Valor da venda (R$ ${valorVenda.toFixed(2)}) abaixo do mínimo permitido (R$ ${vendaMin.toFixed(2)}).` });
+                }
+                if (vendaMax !== null && valorVenda > vendaMax) {
+                    return reject({ status: 400, error: `Valor da venda (R$ ${valorVenda.toFixed(2)}) acima do máximo permitido (R$ ${vendaMax.toFixed(2)}).` });
+                }
+                cb();
+            });
+        };
+
         const criarMovimentacao = () => {
             db.run(
                 `INSERT INTO movimentacoes (tipo, produto, quantidade, valor, descricao, data, unidade, peso_kg, qtd_caixas, afeta_estoque) VALUES ('saida', ?, ?, ?, ?, ?, 'CX', 0, ?, ?)`,
@@ -918,10 +992,10 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
             );
         };
 
-        if (afetaEstoque === 0) return criarMovimentacao();
+        if (afetaEstoque === 0) return seguirComLimite(criarMovimentacao);
 
         // Mesma checagem de estoque disponível usada no cadastro normal de saída.
-        db.get(
+        seguirComLimite(() => db.get(
             `SELECT COALESCE(SUM(CASE WHEN tipo='entrada' AND (afeta_estoque IS NULL OR afeta_estoque=1) THEN qtd_caixas
                                        WHEN tipo='saida' AND (afeta_estoque IS NULL OR afeta_estoque=1) THEN -qtd_caixas ELSE 0 END), 0) AS saldo
              FROM movimentacoes WHERE produto = ?`,
@@ -937,7 +1011,7 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                     criarMovimentacao();
                 });
             }
-        );
+        ));
     });
 
     resolverVenda().then((venda) => {
@@ -1887,7 +1961,7 @@ const CONFIGS_PUBLICAS = ['peso_por_caixa_padrao', 'nfe_cert_notify'];
 
 app.post('/api/configs', authenticateToken, (req, res) => {
     const { chave, valor } = req.body;
-    if (!CONFIGS_PUBLICAS.includes(chave) && req.user.role !== 'admin') {
+    if (!CONFIGS_PUBLICAS.includes(chave) && req.user.role !== 'admin' && req.user.role !== 'chefe') {
         return res.sendStatus(403);
     }
     db.run('INSERT OR REPLACE INTO configs (chave, valor) VALUES (?, ?)', [chave, valor], () => {

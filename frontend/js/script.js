@@ -150,6 +150,12 @@ function checkEnvironment() {
         document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
     }
 
+    // Funcionário só enxerga o resumo de estoque (quantidades/totais) — sem financeiro, cadastro,
+    // NF-e, config ou qualquer dado de lucro/valor de venda.
+    if (userRole === 'funcionario') {
+        document.querySelectorAll('.funcionario-hide').forEach(el => el.style.display = 'none');
+    }
+
     // Inicializa a TabBar Mobile
     renderMobileTabbar();
 
@@ -389,6 +395,14 @@ function syncMobileTabbar(id) {
 }
 
 function showSection(id) {
+    // Funcionário não tem acesso a nenhuma outra seção além do Dashboard (visão restrita de
+    // estoque) — protege contra navegação manual além dos itens já escondidos no menu.
+    const userDataGuard = JSON.parse(localStorage.getItem('mm_user') || '{}');
+    const roleGuard = (userDataGuard.user || userDataGuard).role;
+    if (roleGuard === 'funcionario' && id !== 'dashboard') {
+        id = 'dashboard';
+    }
+
     currentSectionId = id;
     
     // Limpa o timer do relógio se estiver navegando para fora da Home
@@ -499,7 +513,7 @@ function initSection(id) {
         renderEstoqueResumo();
     }
     if (id === 'nfe') loadNFeSection();
-    if (id === 'config') loadConfigSection(isAdmin);
+    if (id === 'config') loadConfigSection(isAdmin || userRole === 'chefe');
     if (id === 'perfil') loadProfilePage();
     if (id === 'admin') {
         if (!isAdmin) { showSection('dashboard'); return; }
@@ -1374,10 +1388,12 @@ function openEditModal(type, data = null) {
     
     const title = document.getElementById('modal-title');
     if (title) title.innerText = data ? `Editar ${type === 'cliente' ? 'Cliente' : 'Fornecedor'}` : `Novo ${type === 'cliente' ? 'Cliente' : 'Fornecedor'}`;
-    
+    const titleIcon = document.getElementById('modal-title-icon');
+    if (titleIcon) titleIcon.className = type === 'cliente' ? 'fas fa-user-tie' : 'fas fa-truck-field';
+
     document.getElementById('edit-type').value = type;
     document.getElementById('edit-id').value = data ? data.id : '';
-    document.getElementById('edit-doc-type').value = data?.documento?.replace(/\D/g,'').length === 14 ? 'CNPJ' : 'CPF';
+    document.getElementById('edit-doc-type').value = data ? (data.documento?.replace(/\D/g,'').length === 14 ? 'CNPJ' : 'CPF') : 'CNPJ';
     document.getElementById('edit-doc').value = data ? data.documento : '';
     document.getElementById('edit-nome').value = data ? data.nome : '';
     document.getElementById('edit-ie').value = data ? (data.ie || '') : '';
@@ -2074,6 +2090,11 @@ async function loadConfigSection(isAdmin) {
     const pesoCxEl = document.getElementById('config-peso-cx');
     if (pesoCxEl) pesoCxEl.value = appData.configs.peso_por_caixa_padrao || 20;
 
+    const vendaMinEl = document.getElementById('config-venda-min');
+    const vendaMaxEl = document.getElementById('config-venda-max');
+    if (vendaMinEl) vendaMinEl.value = appData.configs.venda_valor_min || '';
+    if (vendaMaxEl) vendaMaxEl.value = appData.configs.venda_valor_max || '';
+
     // NFe mode
     const nfeModo = appData.configs.nfe_modo || 'homologacao';
     document.querySelectorAll(`input[name="nfe_modo"]`).forEach(r => {
@@ -2210,6 +2231,86 @@ function closeProdutoDetalheModal() {
     document.getElementById('modal-produto-detalhe')?.classList.remove('active');
 }
 
+async function abrirMovDetalheModal(id) {
+    const modal = document.getElementById('modal-mov-detalhe');
+    if (!modal) return;
+
+    const res = await fetchWithAuth(`/movimentacoes/${id}/detalhe`);
+    if (!res || !res.ok) { showError('Erro ao carregar detalhe da movimentação'); return; }
+    const { movimentacao: m, contato, nfe } = await res.json();
+
+    const isVenda = m.tipo === 'saida';
+    const corHeader = isVenda ? '#dc2626' : m.tipo === 'entrada' ? '#059669' : 'var(--primary)';
+    document.getElementById('mov-detalhe-header').style.background = corHeader;
+    document.getElementById('mov-detalhe-titulo').innerHTML = `<i class="fas fa-receipt"></i> ${isVenda ? 'Detalhe da Venda' : m.tipo === 'entrada' ? 'Detalhe da Compra' : 'Detalhe da Despesa'} #${m.id}`;
+
+    const unidadeLabel = m.unidade === 'AMBOS' ? `${m.qtd_caixas}Sc / ${m.peso_kg}Kg` : `${m.qtd_caixas || m.quantidade || 0}${m.unidade === 'KG' ? 'Kg' : 'Sc'}`;
+    const kpi = (label, value) => `
+        <div style="background:#f8fafc;border-radius:12px;padding:12px;">
+            <p style="font-size:0.62rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px;">${label}</p>
+            <h5 style="font-weight:800;font-size:0.9rem;">${value}</h5>
+        </div>`;
+    document.getElementById('mov-detalhe-kpis').innerHTML =
+        kpi('Produto', m.produto || '-') +
+        kpi('Quantidade', unidadeLabel) +
+        kpi('Valor', `R$ ${(m.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`) +
+        kpi('Data', new Date(m.data).toLocaleDateString('pt-BR'));
+
+    document.getElementById('mov-detalhe-contato-label').textContent = isVenda ? 'Cliente' : m.tipo === 'entrada' ? 'Fornecedor' : 'Descrição';
+    const contatoEl = document.getElementById('mov-detalhe-contato');
+    if (contato) {
+        contatoEl.innerHTML = `
+            <p style="font-weight:700;font-size:0.95rem;">${contato.nome}</p>
+            <p style="font-size:0.8rem;color:var(--text-muted);">${contato.documento || 'Sem documento'}${contato.ie ? ' · IE ' + contato.ie : ''}</p>
+            ${contato.telefone ? `<p style="font-size:0.8rem;"><i class="fas fa-phone" style="width:16px;color:var(--text-muted);"></i> ${contato.telefone}</p>` : ''}
+            ${contato.email ? `<p style="font-size:0.8rem;"><i class="fas fa-envelope" style="width:16px;color:var(--text-muted);"></i> ${contato.email}</p>` : ''}
+            ${contato.endereco ? `<p style="font-size:0.8rem;"><i class="fas fa-map-marker-alt" style="width:16px;color:var(--text-muted);"></i> ${contato.endereco}${contato.cep ? ' - CEP ' + contato.cep : ''}${contato.uf ? ' - ' + contato.uf : ''}</p>` : ''}
+        `;
+    } else {
+        contatoEl.innerHTML = `
+            <p style="font-weight:700;font-size:0.95rem;">${m.descricao || 'Não informado'}</p>
+            <p style="font-size:0.78rem;color:var(--text-muted);margin-top:4px;"><i class="fas fa-info-circle"></i> Não vinculado a um cadastro completo de ${isVenda ? 'cliente' : 'fornecedor'}.</p>
+        `;
+    }
+
+    const nfeBox = document.getElementById('mov-detalhe-nfe-box');
+    const nfeContent = document.getElementById('mov-detalhe-nfe-conteudo');
+    const userDataMov = JSON.parse(localStorage.getItem('mm_user') || '{}');
+    const isAdminMov = (userDataMov.user || userDataMov).role === 'admin';
+
+    if (!isVenda) {
+        nfeBox.style.display = 'none';
+    } else {
+        nfeBox.style.display = 'flex';
+        if (nfe) {
+            nfeContent.innerHTML = `
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span class="badge ${nfe.status === 'autorizada' ? 'entrada' : 'saida'}" style="flex-shrink:0;">${nfe.status === 'autorizada' ? 'NF-e EMITIDA' : (nfe.status || 'PENDENTE').toUpperCase()}</span>
+                    <span style="font-size:0.78rem;color:var(--text-muted);">${nfe.numero_nfe ? 'Nº ' + nfe.numero_nfe : ''}</span>
+                </div>
+                <button class="btn-primary" style="margin-top:12px;width:100%;" onclick="closeMovDetalheModal(); showSection('nfe');">
+                    <i class="fas fa-file-invoice"></i> Ver Nota Fiscal
+                </button>
+            `;
+        } else if (isAdminMov) {
+            nfeContent.innerHTML = `
+                <p style="font-size:0.82rem;color:#1e40af;margin-bottom:12px;"><i class="fas fa-circle-exclamation"></i> Nenhuma NF-e emitida para esta venda ainda.</p>
+                <button class="btn-primary" style="width:100%;background:#059669;" onclick="closeMovDetalheModal(); gerarNFeParaVenda(${m.id});">
+                    <i class="fas fa-file-invoice"></i> Emitir Nota Fiscal
+                </button>
+            `;
+        } else {
+            nfeContent.innerHTML = `<p style="font-size:0.82rem;color:#1e40af;"><i class="fas fa-circle-exclamation"></i> Nenhuma NF-e emitida para esta venda ainda. Apenas o administrador pode emitir.</p>`;
+        }
+    }
+
+    modal.classList.add('active');
+}
+
+function closeMovDetalheModal() {
+    document.getElementById('modal-mov-detalhe')?.classList.remove('active');
+}
+
 function closeCertExpirationModal() {
     const modal = document.getElementById('cert-expiration-modal');
     if (modal) modal.classList.remove('active');
@@ -2280,6 +2381,24 @@ async function savePesoPorCaixa() {
     if (res && res.ok) {
         appData.configs.peso_por_caixa_padrao = val;
         showSuccess('Configuração salva!');
+    }
+}
+
+async function saveVendaLimites() {
+    const min = document.getElementById('config-venda-min')?.value || '';
+    const max = document.getElementById('config-venda-max')?.value || '';
+    if (min && max && parseFloat(min) > parseFloat(max)) {
+        showError('O valor mínimo não pode ser maior que o máximo');
+        return;
+    }
+    const resMin = await fetchWithAuth('/configs', { method: 'POST', body: JSON.stringify({ chave: 'venda_valor_min', valor: min }) });
+    const resMax = await fetchWithAuth('/configs', { method: 'POST', body: JSON.stringify({ chave: 'venda_valor_max', valor: max }) });
+    if (resMin && resMin.ok && resMax && resMax.ok) {
+        appData.configs.venda_valor_min = min;
+        appData.configs.venda_valor_max = max;
+        showSuccess('Limite de venda salvo!');
+    } else {
+        showError('Erro ao salvar limite de venda');
     }
 }
 
@@ -2824,7 +2943,9 @@ async function saveMovimentacao(type, event) {
     // a cargo do modal de NF-e (com o interruptor "Dar baixa no estoque"), em vez de já debitar o
     // estoque aqui e só depois tentar a nota — isso evita baixa duplicada/descontrolada quando a
     // nota é rejeitada ou reemitida.
-    if (type === 'saida' && confirm('Deseja emitir uma NF-e para esta venda?')) {
+    const userDataNfe = JSON.parse(localStorage.getItem('mm_user') || '{}');
+    const isAdminForNfe = (userDataNfe.user || userDataNfe).role === 'admin';
+    if (type === 'saida' && isAdminForNfe && confirm('Deseja emitir uma NF-e para esta venda?')) {
         abrirNFeAvulsa({ produto, qtd_caixas: qtd_caixas || quantidade, valor, data: dataVenda });
         return;
     }
@@ -2838,6 +2959,8 @@ async function saveMovimentacao(type, event) {
         qtd_caixas,
         valor,
         descricao: document.getElementById(`${prefix}-desc`)?.value || '',
+        cliente_id: type === 'saida' ? (document.getElementById('exit-cliente-id')?.value || null) : null,
+        fornecedor_id: type === 'entrada' ? (document.getElementById('entry-fornecedor-id')?.value || null) : null,
         data: dataVenda
     };
 
@@ -2892,7 +3015,7 @@ function renderStockTable() {
         return;
     }
     tbody.innerHTML = appData.transactions.map(t => `
-        <tr>
+        <tr onclick="abrirMovDetalheModal(${t.id})" style="cursor:pointer;" title="Ver detalhe">
             <td>${new Date(t.data).toLocaleDateString('pt-BR')}</td>
             <td><span class="badge ${t.tipo}">${t.tipo.toUpperCase()}</span></td>
             <td>${t.produto}</td>
@@ -2901,7 +3024,7 @@ function renderStockTable() {
             <td style="font-weight:700">${t.peso_kg || 0} Kg</td>
             <td>R$ ${t.valor.toLocaleString('pt-BR')}</td>
             <td>
-                <button class="btn-icon text-danger" onclick="deleteMovimentacao(${t.id})"><i class="fas fa-trash"></i></button>
+                <button class="btn-icon text-danger" onclick="event.stopPropagation(); deleteMovimentacao(${t.id})"><i class="fas fa-trash"></i></button>
             </td>
         </tr>`).join('') || '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-muted)">Nenhuma movimentação</td></tr>';
 }
@@ -3342,23 +3465,25 @@ function openSearchModal(type) {
     if (!results) return;
     results.innerHTML = items.length > 0 ? items.map(item => `
         <tr>
-            <td class="search-item" onclick="selectContact('${type}', '${item.nome.replace(/'/g, "\\'")}')" style="cursor:pointer">
+            <td class="search-item" onclick="selectContact('${type}', '${item.nome.replace(/'/g, "\\'")}', ${item.id})" style="cursor:pointer">
                 <strong>${item.nome}</strong><br>
                 <small style="color:var(--text-muted)">${item.documento || 'Sem documento'} | ${item.telefone || 'Sem telefone'}</small>
             </td>
         </tr>`).join('')
     : '<tr><td style="text-align:center;padding:20px;color:var(--text-muted)">Nenhum cadastro encontrado</td></tr>';
-    
+
     modal._type = type;
 }
 
-function selectContact(type, nome) {
-    const prefix = document.getElementById('entry-desc') ? 'entry' : 'exit';
-    const field = type === 'cliente' 
+function selectContact(type, nome, id) {
+    const field = type === 'cliente'
         ? (document.getElementById('exit-desc') ? 'exit-desc' : 'entry-desc')
         : (document.getElementById('entry-desc') ? 'entry-desc' : 'exit-desc');
+    const idField = type === 'cliente' ? 'exit-cliente-id' : 'entry-fornecedor-id';
     const el = document.getElementById(field);
     if (el) el.value = nome;
+    const idEl = document.getElementById(idField);
+    if (idEl) idEl.value = id || '';
     closeSearchModal();
 }
 

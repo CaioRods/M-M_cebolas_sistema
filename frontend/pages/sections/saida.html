@@ -19,8 +19,9 @@
     <form onsubmit="saveSaida(event)" class="form-grid" style="padding: 24px;">
         <div class="form-group span-2">
             <label>Cliente / Destinatário</label>
+            <input type="hidden" id="exit-cliente-id">
             <div style="display: flex; gap: 10px;">
-                <input type="text" id="exit-desc" placeholder="Ex: Mercado Central ou Nome do Cliente" style="flex: 1;" required>
+                <input type="text" id="exit-desc" placeholder="Ex: Mercado Central ou Nome do Cliente" style="flex: 1;" required oninput="document.getElementById('exit-cliente-id').value=''">
                 <button type="button" class="btn-primary" onclick="openSearchModal('cliente')" style="padding: 12px;"><i class="fas fa-search"></i></button>
             </div>
         </div>
