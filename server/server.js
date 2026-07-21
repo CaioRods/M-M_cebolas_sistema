@@ -1750,14 +1750,14 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
             field(48, Y_IMP+5, 38, 10, "VALOR DO ICMS", "0,00");
             field(86, Y_IMP+5, 38, 10, "BASE DE CÁLCULO DO ICMS S.T.", "0,00");
             field(124, Y_IMP+5, 38, 10, "VALOR DO ICMS S.T.", "0,00");
-            field(162, Y_IMP+5, 38, 10, "VALOR TOTAL DOS PRODUTOS", row.valor.toLocaleString('pt-BR', {minimumFractionDigits:2}));
+            field(162, Y_IMP+5, 38, 10, "VALOR TOTAL DOS PRODUTOS", (row.valor || 0).toLocaleString('pt-BR', {minimumFractionDigits:2}));
 
             field(10, Y_IMP+15, 30, 10, "VALOR DO FRETE", "0,00");
             field(40, Y_IMP+15, 30, 10, "VALOR DO SEGURO", "0,00");
             field(70, Y_IMP+15, 30, 10, "DESCONTO", "0,00");
             field(100, Y_IMP+15, 31, 10, "OUTRAS DESPESAS ACESSÓRIAS", "0,00");
             field(131, Y_IMP+15, 31, 10, "VALOR DO IPI", "0,00");
-            field(162, Y_IMP+15, 38, 10, "VALOR TOTAL DA NOTA", row.valor.toLocaleString('pt-BR', {minimumFractionDigits:2}));
+            field(162, Y_IMP+15, 38, 10, "VALOR TOTAL DA NOTA", (row.valor || 0).toLocaleString('pt-BR', {minimumFractionDigits:2}));
 
             // 9. TRANSPORTADOR (com espaçamento de segurança para não sobrepor a linha acima)
             const Y_TRA = Y_IMP + 15 + 10 + 4;
@@ -1797,8 +1797,8 @@ app.get('/api/nfe/:id/pdf', authenticateToken, (req, res) => {
                 cfop: fiscal.cfop,
                 un: unidadeLabel,
                 qtd: (qtdValue || 1).toString(),
-                vunit: (row.valor / (qtdValue || 1)).toLocaleString('pt-BR', {minimumFractionDigits:2}),
-                vtotal: row.valor.toLocaleString('pt-BR', {minimumFractionDigits:2})
+                vunit: ((row.valor || 0) / (qtdValue || 1)).toLocaleString('pt-BR', {minimumFractionDigits:2}),
+                vtotal: (row.valor || 0).toLocaleString('pt-BR', {minimumFractionDigits:2})
             }];
 
             console.log(`Generating DANFE for sale ${row.venda_id}`);
