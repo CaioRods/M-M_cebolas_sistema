@@ -395,11 +395,12 @@ function syncMobileTabbar(id) {
 }
 
 function showSection(id) {
-    // Funcionário não tem acesso a nenhuma outra seção além do Dashboard (visão restrita de
-    // estoque) — protege contra navegação manual além dos itens já escondidos no menu.
+    // Funcionário só acessa Dashboard (visão restrita de estoque), Compra, Venda, Estoque e Notas
+    // Fiscais — protege contra navegação manual além dos itens já escondidos no menu.
+    const FUNCIONARIO_ALLOWED = ['dashboard', 'entrada', 'saida', 'estoque', 'nfe'];
     const userDataGuard = JSON.parse(localStorage.getItem('mm_user') || '{}');
     const roleGuard = (userDataGuard.user || userDataGuard).role;
-    if (roleGuard === 'funcionario' && id !== 'dashboard') {
+    if (roleGuard === 'funcionario' && !FUNCIONARIO_ALLOWED.includes(id)) {
         id = 'dashboard';
     }
 
@@ -2275,8 +2276,6 @@ async function abrirMovDetalheModal(id) {
 
     const nfeBox = document.getElementById('mov-detalhe-nfe-box');
     const nfeContent = document.getElementById('mov-detalhe-nfe-conteudo');
-    const userDataMov = JSON.parse(localStorage.getItem('mm_user') || '{}');
-    const isAdminMov = (userDataMov.user || userDataMov).role === 'admin';
 
     if (!isVenda) {
         nfeBox.style.display = 'none';
@@ -2292,16 +2291,23 @@ async function abrirMovDetalheModal(id) {
                     <i class="fas fa-file-invoice"></i> Ver Nota Fiscal
                 </button>
             `;
-        } else if (isAdminMov) {
+        } else {
             nfeContent.innerHTML = `
                 <p style="font-size:0.82rem;color:#1e40af;margin-bottom:12px;"><i class="fas fa-circle-exclamation"></i> Nenhuma NF-e emitida para esta venda ainda.</p>
                 <button class="btn-primary" style="width:100%;background:#059669;" onclick="closeMovDetalheModal(); gerarNFeParaVenda(${m.id});">
                     <i class="fas fa-file-invoice"></i> Emitir Nota Fiscal
                 </button>
             `;
-        } else {
-            nfeContent.innerHTML = `<p style="font-size:0.82rem;color:#1e40af;"><i class="fas fa-circle-exclamation"></i> Nenhuma NF-e emitida para esta venda ainda. Apenas o administrador pode emitir.</p>`;
         }
+    }
+
+    // Quem realizou a transação — chefe/admin precisam saber qual conta lançou cada movimentação
+    if (m.usuario_nome) {
+        document.getElementById('mov-detalhe-kpis').innerHTML += `
+            <div style="background:#f8fafc;border-radius:12px;padding:12px;grid-column:span 2;">
+                <p style="font-size:0.62rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px;">Realizado por</p>
+                <h5 style="font-weight:800;font-size:0.9rem;"><i class="fas fa-user" style="color:var(--text-muted);margin-right:4px;"></i>${m.usuario_nome}</h5>
+            </div>`;
     }
 
     modal.classList.add('active');
@@ -2585,7 +2591,19 @@ function openUsuarioModal(data = null) {
     document.getElementById('user-username').value = data ? data.username : '';
     document.getElementById('user-password').value = '';
     document.getElementById('user-role').value = data ? data.role : 'funcionario';
-    
+
+    // Chefe só pode gerenciar contas de funcionário — trava o nível de acesso para não deixar
+    // criar/promover ninguém a chefe ou admin.
+    const userDataSelf = JSON.parse(localStorage.getItem('mm_user') || '{}');
+    const selfRole = (userDataSelf.user || userDataSelf).role;
+    const roleSelect = document.getElementById('user-role');
+    if (selfRole === 'chefe') {
+        roleSelect.value = 'funcionario';
+        roleSelect.disabled = true;
+    } else {
+        roleSelect.disabled = false;
+    }
+
     const passLabel = modal.querySelector('label[for="user-password"]');
     if (passLabel) passLabel.textContent = data ? 'Nova Senha (deixe em branco para manter)' : 'Senha *';
 }
@@ -2943,9 +2961,7 @@ async function saveMovimentacao(type, event) {
     // a cargo do modal de NF-e (com o interruptor "Dar baixa no estoque"), em vez de já debitar o
     // estoque aqui e só depois tentar a nota — isso evita baixa duplicada/descontrolada quando a
     // nota é rejeitada ou reemitida.
-    const userDataNfe = JSON.parse(localStorage.getItem('mm_user') || '{}');
-    const isAdminForNfe = (userDataNfe.user || userDataNfe).role === 'admin';
-    if (type === 'saida' && isAdminForNfe && confirm('Deseja emitir uma NF-e para esta venda?')) {
+    if (type === 'saida' && confirm('Deseja emitir uma NF-e para esta venda?')) {
         abrirNFeAvulsa({ produto, qtd_caixas: qtd_caixas || quantidade, valor, data: dataVenda });
         return;
     }
@@ -3032,6 +3048,8 @@ function renderStockTable() {
 function renderEstoqueResumo() {
     const container = document.getElementById('estoque-resumo');
     if (!container) return;
+    const userDataEstoque = JSON.parse(localStorage.getItem('mm_user') || '{}');
+    const isFuncionarioView = (userDataEstoque.user || userDataEstoque).role === 'funcionario';
     if (!isGlobalDataLoaded) {
         container.innerHTML = Array(3).fill(0).map(() => `
             <div class="panel" style="padding: 20px; border-radius: var(--radius); background: var(--bg-panel); border: 1px solid var(--border);">
@@ -3100,17 +3118,19 @@ function renderEstoqueResumo() {
                     <span style="font-size:1rem; font-weight:700; color:var(--text-muted);">Sacos</span>
                 </div>
                 
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:20px;">
+                <div style="display:grid; grid-template-columns:${isFuncionarioView ? '1fr' : '1fr 1fr'}; gap:15px; margin-bottom:20px;">
                     <div style="background:#f8fafc; padding:12px; border-radius:12px;">
                         <p style="font-size:0.65rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; margin-bottom:4px;">Peso Total</p>
                         <h5 style="font-weight:800; font-size:1rem; color:var(--text-main);">${stockKg.toLocaleString('pt-BR')} Kg</h5>
                     </div>
+                    ${isFuncionarioView ? '' : `
                     <div style="background:#f8fafc; padding:12px; border-radius:12px;">
                         <p style="font-size:0.65rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; margin-bottom:4px;">Custo Médio/Sc</p>
                         <h5 style="font-weight:800; font-size:1rem; color:var(--text-main);">R$ ${avgBuy}</h5>
-                    </div>
+                    </div>`}
                 </div>
-                
+
+                ${isFuncionarioView ? '' : `
                 <div style="margin-bottom:15px;">
                     <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:0.7rem; font-weight:700;">
                         <span>Fluxo de Saída</span>
@@ -3119,7 +3139,7 @@ function renderEstoqueResumo() {
                     <div style="height:8px; background:#f1f5f9; border-radius:4px; overflow:hidden;">
                         <div style="width:${Math.min(100, totalIn > 0 ? (totalOut/totalIn)*100 : 0)}%; height:100%; background:${p.cor || '#1A5632'}; border-radius:4px;"></div>
                     </div>
-                </div>
+                </div>`}
 
                 <div style="border-top:1px solid #f1f5f9; padding-top:15px; display:flex; justify-content:space-between; align-items:center;">
                     <div style="display:flex; flex-direction:column;">
@@ -3898,11 +3918,17 @@ async function loadOtherProfilesRealTime() {
         const res = await fetchWithAuth('/usuarios');
         if (res && res.ok) {
             const users = await res.json();
+            const userDataSelf = JSON.parse(localStorage.getItem('mm_user') || '{}');
+            const selfRole = (userDataSelf.user || userDataSelf).role;
+
             tbody.innerHTML = users.map(u => {
                 const birthDate = u.data_nascimento ? new Date(u.data_nascimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-';
-                const avatarHTML = u.foto 
+                const avatarHTML = u.foto
                     ? `<img src="${u.foto}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border);">`
                     : `<div style="width: 32px; height: 32px; border-radius: 50%; background: #e2e8f0; display:flex; align-items:center; justify-content:center; color: var(--text-muted);"><i class="fas fa-user" style="font-size:0.8rem;"></i></div>`;
+
+                // Chefe só pode alterar contas de funcionário; admin pode alterar qualquer uma.
+                const podeEditar = selfRole === 'admin' || (selfRole === 'chefe' && u.role === 'funcionario');
 
                 return `
                     <tr>
@@ -3910,10 +3936,13 @@ async function loadOtherProfilesRealTime() {
                         <td style="vertical-align: middle;"><strong>${u.label}</strong></td>
                         <td style="vertical-align: middle;"><code>${u.apelido || '-'}</code></td>
                         <td style="vertical-align: middle;">${birthDate}</td>
-                        <td style="text-align: right; vertical-align: middle;">
+                        <td style="text-align: center; vertical-align: middle;">
                             <span class="badge ${u.role === 'admin' ? 'admin' : u.role === 'chefe' ? 'entrada' : 'operador'}">
                                 ${u.role.toUpperCase()}
                             </span>
+                        </td>
+                        <td style="text-align: right; vertical-align: middle;">
+                            ${podeEditar ? `<button class="btn-icon" title="Editar conta" onclick='openUsuarioModal(${JSON.stringify(u).replace(/'/g, "&apos;")})'><i class="fas fa-edit"></i></button>` : ''}
                         </td>
                     </tr>
                 `;

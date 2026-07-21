@@ -104,6 +104,10 @@ db.serialize(() => {
     // uma movimentação.
     safeMigrate(`ALTER TABLE movimentacoes ADD COLUMN cliente_id INTEGER`, 'movimentacoes.cliente_id');
     safeMigrate(`ALTER TABLE movimentacoes ADD COLUMN fornecedor_id INTEGER`, 'movimentacoes.fornecedor_id');
+    // Registra quem de fato realizou a compra/venda — para chefe/admin conseguirem saber qual
+    // conta lançou uma movimentação específica.
+    safeMigrate(`ALTER TABLE movimentacoes ADD COLUMN usuario_id INTEGER`, 'movimentacoes.usuario_id');
+    safeMigrate(`ALTER TABLE movimentacoes ADD COLUMN usuario_nome TEXT`, 'movimentacoes.usuario_nome');
 
     const upsertUser = async (label, username, envPassword, role) => {
         const password = process.env[envPassword] || '123';
@@ -209,8 +213,6 @@ app.post('/api/login', (req, res) => {
 app.get('/api/movimentacoes', authenticateToken, (req, res) => db.all(`SELECT * FROM movimentacoes WHERE afeta_estoque IS NULL OR afeta_estoque = 1 ORDER BY data DESC`, [], (err, rows) => res.json(rows || [])));
 
 app.post('/api/movimentacoes', authenticateToken, (req, res) => {
-    // Funcionário só enxerga estoque (leitura) — registrar compra/venda é tarefa de chefe/admin.
-    if (req.user.role !== 'admin' && req.user.role !== 'chefe') return res.sendStatus(403);
 
     const { tipo, produto, quantidade, valor, descricao, data, unidade, peso_kg, qtd_caixas, afeta_estoque, cliente_id, fornecedor_id } = req.body;
     const finalAfetaEstoque = afeta_estoque === false || afeta_estoque === 0 ? 0 : 1;
@@ -254,8 +256,8 @@ app.post('/api/movimentacoes', authenticateToken, (req, res) => {
 
         const inserirMovimentacao = () => {
             db.run(
-                `INSERT INTO movimentacoes (tipo, produto, quantidade, valor, descricao, data, unidade, peso_kg, qtd_caixas, afeta_estoque, cliente_id, fornecedor_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [tipo, produto, finalQuantidade, valor, descricao, data, unidade || 'CX', finalPesoKg, finalQtdCaixas, finalAfetaEstoque, cliente_id || null, fornecedor_id || null],
+                `INSERT INTO movimentacoes (tipo, produto, quantidade, valor, descricao, data, unidade, peso_kg, qtd_caixas, afeta_estoque, cliente_id, fornecedor_id, usuario_id, usuario_nome) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [tipo, produto, finalQuantidade, valor, descricao, data, unidade || 'CX', finalPesoKg, finalQtdCaixas, finalAfetaEstoque, cliente_id || null, fornecedor_id || null, req.user.id, req.user.username],
                 function (err) {
                     if (err) return res.status(500).json({ error: err.message });
                     const unidadeLabel = unidade === 'AMBOS'
@@ -633,39 +635,75 @@ app.put('/api/usuarios/me', authenticateToken, (req, res) => {
 });
 
 app.post('/api/usuarios', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'admin') return res.sendStatus(403);
+    // Chefe tem o mesmo acesso do admin à área de perfil, mas só pode alterar contas de
+    // funcionário (não pode criar/editar outro chefe ou admin, nem promover ninguém).
+    const isChefe = req.user.role === 'chefe';
+    if (req.user.role !== 'admin' && !isChefe) return res.sendStatus(403);
+
     const { id, label, username, password, role } = req.body;
-    const hash = password ? await bcrypt.hash(password, 10) : null;
-    if (id) {
-        if (hash) {
-            db.run(`UPDATE usuarios SET label = ?, username = ?, password = ?, role = ? WHERE id = ?`, [label, username, hash, role, id], (err) => {
-                if (err) return res.status(500).json({ error: err.message });
-                registrarLog(req, 'USER_EDIT', `Editou usuário: ${username}`);
-                res.json({ success: true });
-            });
-        } else {
-            db.run(`UPDATE usuarios SET label = ?, username = ?, role = ? WHERE id = ?`, [label, username, role, id], (err) => {
-                if (err) return res.status(500).json({ error: err.message });
-                registrarLog(req, 'USER_EDIT', `Editou usuário: ${username}`);
-                res.json({ success: true });
-            });
-        }
-    } else {
-        db.run(`INSERT INTO usuarios (label, username, password, role) VALUES (?, ?, ?, ?)`, [label, username, hash, role], function (err) {
-            if (err) return res.status(500).json({ error: err.message });
-            registrarLog(req, 'USER_ADD', `Adicionou usuário: ${username}`);
-            res.json({ id: this.lastID });
+    if (isChefe && role !== 'funcionario') return res.sendStatus(403);
+
+    const finishWrite = () => {
+        const hash = password ? bcrypt.hash(password, 10) : Promise.resolve(null);
+        hash.then((hashed) => {
+            if (id) {
+                if (hashed) {
+                    db.run(`UPDATE usuarios SET label = ?, username = ?, password = ?, role = ? WHERE id = ?`, [label, username, hashed, role, id], (err) => {
+                        if (err) return res.status(500).json({ error: err.message });
+                        registrarLog(req, 'USER_EDIT', `Editou usuário: ${username}`);
+                        res.json({ success: true });
+                    });
+                } else {
+                    db.run(`UPDATE usuarios SET label = ?, username = ?, role = ? WHERE id = ?`, [label, username, role, id], (err) => {
+                        if (err) return res.status(500).json({ error: err.message });
+                        registrarLog(req, 'USER_EDIT', `Editou usuário: ${username}`);
+                        res.json({ success: true });
+                    });
+                }
+            } else {
+                db.run(`INSERT INTO usuarios (label, username, password, role) VALUES (?, ?, ?, ?)`, [label, username, hashed, role], function (err) {
+                    if (err) return res.status(500).json({ error: err.message });
+                    registrarLog(req, 'USER_ADD', `Adicionou usuário: ${username}`);
+                    res.json({ id: this.lastID });
+                });
+            }
         });
+    };
+
+    if (id && isChefe) {
+        // Confirma que o alvo já era funcionário antes de deixar o chefe editar — evita que ele
+        // altere um chefe/admin só passando um id existente com role='funcionario' no corpo.
+        db.get('SELECT role FROM usuarios WHERE id = ?', [id], (errT, target) => {
+            if (errT) return res.status(500).json({ error: errT.message });
+            if (!target || target.role !== 'funcionario') return res.sendStatus(403);
+            finishWrite();
+        });
+    } else {
+        finishWrite();
     }
 });
 
 app.delete('/api/usuarios/:id', authenticateToken, (req, res) => {
-    if (req.user.role !== 'admin') return res.sendStatus(403);
-    db.run(`DELETE FROM usuarios WHERE id = ?`, [req.params.id], (err) => {
-        if (err) return res.status(500).json({ error: err.message });
-        registrarLog(req, 'USER_DELETE', `Excluiu usuário ID: ${req.params.id}`);
-        res.json({ success: true });
-    });
+    const isChefe = req.user.role === 'chefe';
+    if (req.user.role !== 'admin' && !isChefe) return res.sendStatus(403);
+
+    const excluir = () => {
+        db.run(`DELETE FROM usuarios WHERE id = ?`, [req.params.id], (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            registrarLog(req, 'USER_DELETE', `Excluiu usuário ID: ${req.params.id}`);
+            res.json({ success: true });
+        });
+    };
+
+    if (isChefe) {
+        db.get('SELECT role FROM usuarios WHERE id = ?', [req.params.id], (errT, target) => {
+            if (errT) return res.status(500).json({ error: errT.message });
+            if (!target || target.role !== 'funcionario') return res.sendStatus(403);
+            excluir();
+        });
+    } else {
+        excluir();
+    }
 });
 
 app.get('/api/logs', authenticateToken, (req, res) => {
@@ -937,9 +975,6 @@ async function buscarDadosCEP(cep) {
 }
 
 app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
-    // Emissão de NF-e é ação exclusiva do admin (envolve custo real de transmissão à SEFAZ e
-    // responsabilidade fiscal — chefe/funcionário só podem visualizar notas já emitidas).
-    if (req.user.role !== 'admin') return res.sendStatus(403);
 
     const { venda_id, destinatario, venda_manual, forma_pagamento, desc_pagamento } = req.body;
 
@@ -990,8 +1025,8 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
 
         const criarMovimentacao = () => {
             db.run(
-                `INSERT INTO movimentacoes (tipo, produto, quantidade, valor, descricao, data, unidade, peso_kg, qtd_caixas, afeta_estoque) VALUES ('saida', ?, ?, ?, ?, ?, 'CX', 0, ?, ?)`,
-                [venda_manual.produto, qtdCaixas, valorVenda, 'NF-e avulsa', dataVenda, qtdCaixas, afetaEstoque],
+                `INSERT INTO movimentacoes (tipo, produto, quantidade, valor, descricao, data, unidade, peso_kg, qtd_caixas, afeta_estoque, usuario_id, usuario_nome) VALUES ('saida', ?, ?, ?, ?, ?, 'CX', 0, ?, ?, ?, ?)`,
+                [venda_manual.produto, qtdCaixas, valorVenda, 'NF-e avulsa', dataVenda, qtdCaixas, afetaEstoque, req.user.id, req.user.username],
                 function (errIns) {
                     if (errIns) return reject({ status: 500, error: errIns.message });
                     db.get('SELECT * FROM movimentacoes WHERE id = ?', [this.lastID], (errSel, venda) => {
