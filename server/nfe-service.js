@@ -156,7 +156,11 @@ class NFeService {
         return this._signXML(xml, 'infNFe');
     }
 
-    _signXML(xml, tagId) {
+    // locationTag é o elemento pai onde a <Signature> deve ser anexada (enveloped signature).
+    // Na NF-e é sempre <NFe>; no evento de cancelamento não existe tag <NFe> nenhuma — é <evento>
+    // que envolve <infEvento> — assinar com o local errado gera uma assinatura fora de lugar e a
+    // SEFAZ rejeita com "Falha no schema XML" (cStat 225) sem indicar o motivo real.
+    _signXML(xml, tagId, locationTag = 'NFe') {
         if (!this.certInfo) {
             throw new Error("Certificado não carregado. Verifique a senha.");
         }
@@ -185,7 +189,7 @@ class NFeService {
         };
 
         sig.computeSignature(xml, {
-            location: { xpath: "//*[local-name(.)='NFe']", action: 'append' }
+            location: { xpath: `//*[local-name(.)='${locationTag}']`, action: 'append' }
         });
 
         return sig.getSignedXml();
@@ -366,7 +370,7 @@ class NFeService {
             };
 
             const xml = create({ version: '1.0', encoding: 'UTF-8' }, eventoObj).end({ prettyPrint: false, headless: true });
-            const xmlAssinado = this._signXML(xml, 'infEvento');
+            const xmlAssinado = this._signXML(xml, 'infEvento', 'evento');
 
             const url = wsdlUrl.replace(/\?WSDL$/i, '');
             const bodyInnerXml = `<nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4">${xmlAssinado}</nfeDadosMsg>`;
