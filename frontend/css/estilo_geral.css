@@ -1716,3 +1716,15 @@ tr:hover td { background-color: rgba(248, 250, 252, 0.9); }
     transform: translateY(-3px);
     box-shadow: 0 12px 24px -8px rgba(15, 23, 42, 0.15);
 }
+
+/* ===================================================
+   CARDS DE ESTOQUE POR PRODUTO
+   =================================================== */
+.product-stock-card {
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease;
+}
+
+.product-stock-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 32px -8px rgba(15, 23, 42, 0.18) !important;
+}

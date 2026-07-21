@@ -162,11 +162,64 @@
 
 .nfe-list-item {
     display: grid;
-    grid-template-columns: 100px 1fr 120px 110px 180px;
+    grid-template-columns: 90px 1fr 110px 100px 170px;
     padding: 14px 20px;
     border-bottom: 1px solid #f1f5f9;
     border-left: 3px solid transparent;
     align-items: center;
+}
+
+.nfe-actions-wrap {
+    position: relative;
+    display: inline-block;
+}
+
+.nfe-actions-menu {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 38px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.15);
+    z-index: 100;
+    min-width: 170px;
+    padding: 6px;
+}
+
+.nfe-actions-menu.open {
+    display: block;
+    animation: slideDown 0.15s ease-out;
+}
+
+.nfe-actions-menu button {
+    width: 100%;
+    text-align: left;
+    padding: 9px 10px;
+    border: none;
+    background: none;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.nfe-actions-menu button:hover {
+    background: #f1f5f9;
+}
+
+.nfe-actions-menu button.text-danger {
+    color: var(--danger);
+}
+
+.nfe-actions-menu button.text-danger:hover {
+    background: #fef2f2;
 }
 
 .nfe-list-item.status-autorizada { border-left-color: #10b981; }

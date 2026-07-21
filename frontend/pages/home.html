@@ -193,6 +193,24 @@
         </div>
     </div>
 
+    <!-- Modal de Detalhe do Produto (histórico de entradas/saídas) -->
+    <div id="modal-produto-detalhe" class="modal-overlay">
+        <div class="edit-modal" style="max-width: 720px; width: 95%; max-height: 88vh;">
+            <div class="modal-header" id="produto-detalhe-header" style="background: var(--primary); color: white; padding: 20px 24px; border-radius: 20px 20px 0 0; display:flex; justify-content:space-between; align-items:center;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div id="produto-detalhe-icon" style="width:40px;height:40px;background:rgba(255,255,255,0.2);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;"></div>
+                    <h3 id="produto-detalhe-nome" style="font-weight: 800; margin: 0; font-size:1.15rem;">Produto</h3>
+                </div>
+                <button onclick="closeProdutoDetalheModal()" style="background: rgba(255,255,255,0.15); border: none; width:32px; height:32px; border-radius:9px; font-size: 1.3rem; cursor: pointer; color: white; line-height: 1;">&times;</button>
+            </div>
+            <div style="padding:24px;">
+                <div id="produto-detalhe-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px;"></div>
+                <h4 style="font-weight:700;font-size:0.9rem;margin-bottom:12px;display:flex;align-items:center;gap:8px;"><i class="fas fa-clock-rotate-left" style="color:var(--primary);"></i> Histórico de Movimentações</h4>
+                <div id="produto-detalhe-historico" style="max-height:40vh;overflow-y:auto;border:1px solid var(--border);border-radius:12px;"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal de Notificação de Vencimento do Certificado -->
     <div id="cert-expiration-modal" class="modal-overlay">
         <div class="edit-modal" style="max-width: 480px; text-align: center; padding: 32px 24px;">

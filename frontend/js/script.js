@@ -162,6 +162,16 @@ function checkEnvironment() {
     }
 }
 
+// O ícone "cebola" é uma imagem customizada (mask-image), não uma classe do FontAwesome — usar
+// diretamente como `<i class="fas ${p.icone}">` quebra silenciosamente (classe inexistente).
+function renderProductIcon(p, extraStyle = '', colorOverride = null) {
+    const color = colorOverride || p.cor || '#1A5632';
+    if (p.icone === 'icon-cebola') {
+        return `<div class="custom-icon icon-cebola" style="background-color:${color};${extraStyle}"></div>`;
+    }
+    return `<i class="fas ${p.icone || 'fa-box'}" style="color:${color};${extraStyle}"></i>`;
+}
+
 async function loadDataFromAPI() {
     try {
         const userData = JSON.parse(localStorage.getItem('mm_user') || '{}');
@@ -1331,7 +1341,7 @@ function renderProdutosTable() {
     }
     tbody.innerHTML = appData.products.length > 0 ? appData.products.map(p => `
         <tr style="border-left: 4px solid ${p.cor || '#1A5632'}">
-            <td><i class="fas ${p.icone || 'fa-box'}" style="color:${p.cor};margin-right:8px;"></i> <strong>${p.nome}</strong></td>
+            <td>${renderProductIcon(p, 'margin-right:8px;width:14px;height:14px;display:inline-block;vertical-align:middle;')} <strong>${p.nome}</strong></td>
             <td>${p.ncm || '-'}</td>
             <td>R$ ${(p.preco_venda || 0).toLocaleString('pt-BR', {minimumFractionDigits:2})}</td>
             <td>${p.peso_por_caixa || 20} Kg/Sc</td>
@@ -1679,27 +1689,32 @@ async function loadNFeTable() {
                 </div>
             </div>
             <div id="group-${idx}" class="nfe-items-list">
-                <div style="display:grid;grid-template-columns:100px 1fr 120px 110px 180px;padding:8px 20px;background:#f8fafc;font-size:0.7rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;border-bottom:1px solid var(--border);">
+                <div style="display:grid;grid-template-columns:90px 1fr 110px 100px 170px;padding:8px 20px;background:#f8fafc;font-size:0.7rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;border-bottom:1px solid var(--border);">
                     <span>Data</span><span>Produto / Chave</span><span style="text-align:right">Valor</span><span style="text-align:center">Status</span><span style="text-align:right">Ações</span>
                 </div>
                 ${items.map(n => `
-                    <div class="nfe-list-item status-${n.status || 'pendente'}">
+                    <div class="nfe-list-item status-${n.status || 'pendente'}" style="grid-template-columns:90px 1fr 110px 100px 170px;">
                         <span class="date">${new Date(n.data_emissao).toLocaleDateString('pt-BR')}</span>
                         <div class="info">
                             <span style="font-weight:700">${n.produto || '-'}</span>
                             <br><small style="color:var(--text-muted);font-size:0.7rem">${(n.chave_acesso || '').substring(0, 25)}...</small>
                         </div>
                         <span class="value" style="text-align:right; font-size:0.85rem; font-weight:700;">R$ ${(n.valor || 0).toLocaleString('pt-BR', {minimumFractionDigits:2})}</span>
-                        <div class="status" style="margin-right: 12px;">
+                        <div class="status">
                             <span class="badge ${n.status === 'autorizada' ? 'entrada' : n.status === 'cancelada' ? 'saida' : 'despesa'}">${(n.status || 'pendente').toUpperCase()}</span>
                         </div>
-                        <div class="actions" style="display:flex;gap:4px;justify-content:flex-end">
+                        <div class="actions" style="display:flex;gap:3px;justify-content:flex-end;align-items:center;">
                             <button class="btn-icon" style="color: #10b981;" title="Enviar por WhatsApp" onclick="shareNFeWhatsApp(${n.id}, \`${n.produto || ''}\`, ${n.valor || 0}, '${n.chave_acesso || ''}', \`${(n.descricao || '').replace(/`/g, '\\`').replace(/'/g, "\\'")}\`)"><i class="fab fa-whatsapp"></i></button>
                             <button class="btn-icon" title="Ver PDF" onclick="previewPDF(${n.id}, event)"><i class="fas fa-eye"></i></button>
                             <button class="btn-icon" title="Baixar PDF" onclick="downloadPDF(${n.id}, event)"><i class="fas fa-file-pdf"></i></button>
-                            <button class="btn-icon" title="Baixar XML" onclick="downloadXML(${n.id})"><i class="fas fa-file-code"></i></button>
-                            ${n.status === 'autorizada' ? `<button class="btn-icon text-danger" title="Cancelar NF-e" onclick="cancelarNFe(${n.id})"><i class="fas fa-ban"></i></button>` : ''}
-                            <button class="btn-icon text-danger" title="Excluir" onclick="deleteNFe(${n.id})"><i class="fas fa-trash"></i></button>
+                            <div class="nfe-actions-wrap">
+                                <button class="btn-icon" title="Mais ações" onclick="toggleNFeActionsMenu(event, ${n.id})"><i class="fas fa-ellipsis-vertical"></i></button>
+                                <div class="nfe-actions-menu" id="nfe-actions-${n.id}">
+                                    <button onclick="downloadXML(${n.id})"><i class="fas fa-file-code"></i> Baixar XML</button>
+                                    ${n.status === 'autorizada' ? `<button onclick="cancelarNFe(${n.id})"><i class="fas fa-ban"></i> Cancelar NF-e</button>` : ''}
+                                    <button class="text-danger" onclick="deleteNFe(${n.id})"><i class="fas fa-trash"></i> Excluir</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 `).join('')}
@@ -1707,6 +1722,17 @@ async function loadNFeTable() {
         </div>`;
     }).join('');
 }
+
+function toggleNFeActionsMenu(event, id) {
+    event.stopPropagation();
+    document.querySelectorAll('.nfe-actions-menu.open').forEach(m => {
+        if (m.id !== `nfe-actions-${id}`) m.classList.remove('open');
+    });
+    document.getElementById(`nfe-actions-${id}`)?.classList.toggle('open');
+}
+document.addEventListener('click', () => {
+    document.querySelectorAll('.nfe-actions-menu.open').forEach(m => m.classList.remove('open'));
+});
 
 function toggleNFeGroup(id) {
     const el = document.getElementById(id);
@@ -2124,6 +2150,66 @@ function closeDanfeModal() {
     }
 }
 
+function abrirDetalheProduto(nomeProduto) {
+    const modal = document.getElementById('modal-produto-detalhe');
+    const p = appData.products.find(x => x.nome === nomeProduto);
+    if (!modal || !p) return;
+
+    document.getElementById('produto-detalhe-header').style.background = p.cor || 'var(--primary)';
+    document.getElementById('produto-detalhe-icon').innerHTML = renderProductIcon(p, 'width:20px;height:20px;', 'white');
+    document.getElementById('produto-detalhe-nome').textContent = p.nome;
+
+    const trans = appData.transactions.filter(t => t.produto === p.nome).sort((a, b) => new Date(b.data) - new Date(a.data));
+    const descartes = (appData.descartes || []).filter(d => d.produto === p.nome);
+    const descarteCx = descartes.reduce((acc, d) => acc + (d.quantidade_caixas || 0), 0);
+    const descarteKg = descartes.reduce((acc, d) => acc + (d.peso_kg || 0), 0);
+    const stockCx = trans.reduce((acc, t) => acc + (t.tipo === 'entrada' ? (t.qtd_caixas || 0) : -(t.qtd_caixas || 0)), 0) - descarteCx;
+    const stockKg = trans.reduce((acc, t) => acc + (t.tipo === 'entrada' ? (t.peso_kg || 0) : -(t.peso_kg || 0)), 0) - descarteKg;
+    const totalIn = trans.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + (t.qtd_caixas || 0), 0);
+    const totalOut = trans.filter(t => t.tipo === 'saida').reduce((acc, t) => acc + (t.qtd_caixas || 0), 0);
+    const avgBuy = totalIn > 0
+        ? (trans.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + t.valor, 0) / totalIn).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+        : '0,00';
+
+    const kpi = (label, value, color) => `
+        <div style="background:#f8fafc;border-radius:12px;padding:12px;border-left:3px solid ${color};">
+            <p style="font-size:0.62rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px;">${label}</p>
+            <h5 style="font-weight:800;font-size:0.95rem;">${value}</h5>
+        </div>`;
+
+    document.getElementById('produto-detalhe-kpis').innerHTML =
+        kpi('Estoque Atual', `${stockCx} Sc`, p.cor || 'var(--primary)') +
+        kpi('Peso Total', `${stockKg.toLocaleString('pt-BR')} Kg`, '#3b82f6') +
+        kpi('Total Comprado', `${totalIn} Sc`, '#059669') +
+        kpi('Total Vendido', `${totalOut} Sc`, '#dc2626') +
+        kpi('Custo Médio/Sc', `R$ ${avgBuy}`, 'var(--accent)') +
+        kpi('Perdas/Descartes', `${descarteCx} Sc`, '#6b7280');
+
+    const histEl = document.getElementById('produto-detalhe-historico');
+    if (trans.length === 0) {
+        histEl.innerHTML = `<div style="text-align:center;padding:30px;color:var(--text-muted);"><i class="fas fa-inbox" style="font-size:1.5rem;display:block;margin-bottom:8px;color:#cbd5e1;"></i>Nenhuma movimentação registrada.</div>`;
+    } else {
+        histEl.innerHTML = trans.map(t => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #f1f5f9;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span class="badge ${t.tipo === 'entrada' ? 'entrada' : t.tipo === 'saida' ? 'saida' : 'despesa'}" style="min-width:64px;text-align:center;justify-content:center;">${t.tipo === 'entrada' ? 'COMPRA' : t.tipo === 'saida' ? 'VENDA' : 'DESPESA'}</span>
+                    <div>
+                        <p style="font-weight:600;font-size:0.85rem;">${(t.qtd_caixas || t.quantidade || 0)} ${t.unidade === 'KG' ? 'Kg' : 'Sc'}${t.peso_kg ? ` · ${t.peso_kg.toLocaleString('pt-BR')} Kg` : ''}</p>
+                        <p style="font-size:0.7rem;color:var(--text-muted);">${new Date(t.data).toLocaleDateString('pt-BR')}${t.descricao ? ' · ' + t.descricao : ''}</p>
+                    </div>
+                </div>
+                <span style="font-weight:700;font-size:0.85rem;color:${t.tipo === 'entrada' ? '#059669' : '#dc2626'};">R$ ${(t.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            </div>
+        `).join('');
+    }
+
+    modal.classList.add('active');
+}
+
+function closeProdutoDetalheModal() {
+    document.getElementById('modal-produto-detalhe')?.classList.remove('active');
+}
+
 function closeCertExpirationModal() {
     const modal = document.getElementById('cert-expiration-modal');
     if (modal) modal.classList.remove('active');
@@ -2358,7 +2444,7 @@ function renderAdminProdutosTable() {
             <td>
                 <div style="display:flex;align-items:center;gap:10px;">
                     <div style="width:32px;height:32px;background:${p.cor || '#1A5632'}20;color:${p.cor || '#1A5632'};border-radius:8px;display:flex;align-items:center;justify-content:center;">
-                        <i class="fas ${p.icone || 'fa-box'}"></i>
+                        ${renderProductIcon(p, 'width:16px;height:16px;')}
                     </div>
                     <strong>${p.nome}</strong>
                 </div>
@@ -2874,14 +2960,14 @@ function renderEstoqueResumo() {
             : '0,00';
 
         return `
-        <div class="panel" style="padding:0; overflow:hidden; border:none; box-shadow:0 4px 20px rgba(0,0,0,0.08); display:flex; flex-direction:column;">
+        <div class="panel product-stock-card" onclick="abrirDetalheProduto('${p.nome.replace(/'/g, "\\'")}')" style="padding:0; overflow:hidden; border:none; box-shadow:0 4px 20px rgba(0,0,0,0.08); display:flex; flex-direction:column; cursor:pointer;">
             <div style="background:${p.cor || '#1A5632'}; padding:20px; color:white; display:flex; justify-content:space-between; align-items:center;">
                 <div>
                     <h4 style="font-weight:800; font-size:1.1rem; margin:0;">${p.nome}</h4>
                     <span style="font-size:0.7rem; opacity:0.8; text-transform:uppercase; letter-spacing:1px;">Estoque Atual</span>
                 </div>
                 <div style="width:45px; height:45px; background:rgba(255,255,255,0.2); border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.4rem;">
-                    <i class="fas ${p.icone || 'fa-box'}"></i>
+                    ${renderProductIcon(p, 'width:22px;height:22px;', 'white')}
                 </div>
             </div>
             
@@ -2908,7 +2994,7 @@ function renderEstoqueResumo() {
                         <span>${totalIn > 0 ? Math.round((totalOut/totalIn)*100) : 0}%</span>
                     </div>
                     <div style="height:8px; background:#f1f5f9; border-radius:4px; overflow:hidden;">
-                        <div style="width:${Math.min(100, totalIn > 0 ? (totalOut/totalIn)*100 : 0)}%; height:100%; background:linear-gradient(90deg, ${p.cor || '#1A5632'}, #e89c31); border-radius:4px;"></div>
+                        <div style="width:${Math.min(100, totalIn > 0 ? (totalOut/totalIn)*100 : 0)}%; height:100%; background:${p.cor || '#1A5632'}; border-radius:4px;"></div>
                     </div>
                 </div>
 
@@ -2917,7 +3003,7 @@ function renderEstoqueResumo() {
                         <span style="font-size:0.65rem; color:var(--text-muted); font-weight:700;">ÚLTIMA MOV.</span>
                         <span style="font-size:0.8rem; font-weight:600;">${lastTrans}</span>
                     </div>
-                    <button class="btn-icon" style="background:#f1f5f9; color:var(--primary); width:32px; height:32px; border-radius:8px;" onclick="showSection('estoque')">
+                    <button class="btn-icon" style="background:#f1f5f9; color:var(--primary); width:32px; height:32px; border-radius:8px;" title="Ver histórico completo">
                         <i class="fas fa-chevron-right"></i>
                     </button>
                 </div>
@@ -3160,7 +3246,7 @@ function renderProductShowcase(section) {
              style="${isOutOfStock ? 'opacity:0.55; cursor:not-allowed; filter:grayscale(1);' : 'cursor:pointer;'}">
             
             <div class="product-icon-circle" style="background:${p.cor || '#1A5632'}15; color:${p.cor || '#1A5632'}; box-shadow: 0 8px 16px ${p.cor || '#1A5632'}15;">
-                ${p.icone === 'icon-cebola' ? `<div class="custom-icon icon-cebola" style="background-color: ${p.cor || '#1A5632'};"></div>` : `<i class="fas ${p.icone || 'fa-box'}"></i>`}
+                ${renderProductIcon(p)}
             </div>
             
             <div class="product-name">${p.nome}</div>
