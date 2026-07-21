@@ -306,10 +306,20 @@ app.delete('/api/movimentacoes/:id', authenticateToken, (req, res) => {
     // sensibilidade das outras exclusões restritas do sistema (usuários, NF-e, reset), mas essa
     // rota não tinha checagem de permissão nem ficava no log de auditoria.
     if (req.user.role !== 'admin' && req.user.role !== 'chefe') return res.sendStatus(403);
-    db.run('DELETE FROM movimentacoes WHERE id = ?', [req.params.id], (err) => {
-        if (err) return res.status(500).json({ error: err.message });
-        registrarLog(req, 'MOVIMENTACAO_DELETE', `Excluiu movimentação ID: ${req.params.id}`);
-        res.json({ success: true });
+
+    // Excluir uma movimentação com NF-e autorizada vinculada órfa a nota: o DANFE/detalhe perde
+    // produto e valor (só existiam via join), mesmo a nota continuando válida na SEFAZ. Bloqueia
+    // para preservar o vínculo — cancelar a nota primeiro, se for o caso.
+    db.get(`SELECT id, status, chave_acesso FROM nfe WHERE venda_id = ? AND status = 'autorizada'`, [req.params.id], (errN, nfe) => {
+        if (errN) return res.status(500).json({ error: errN.message });
+        if (nfe) {
+            return res.status(400).json({ error: `Esta venda tem a NF-e Nº ${nfe.chave_acesso ? nfe.chave_acesso.slice(-9, -1) : nfe.id} autorizada vinculada. Cancele a nota fiscal antes de excluir a venda.` });
+        }
+        db.run('DELETE FROM movimentacoes WHERE id = ?', [req.params.id], (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            registrarLog(req, 'MOVIMENTACAO_DELETE', `Excluiu movimentação ID: ${req.params.id}`);
+            res.json({ success: true });
+        });
     });
 });
 
