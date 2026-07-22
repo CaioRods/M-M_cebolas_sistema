@@ -1469,7 +1469,9 @@ app.post('/api/nfe/:id/cancelar', authenticateToken, async (req, res) => {
             configs?.forEach(c => configMap[c.chave] = c.valor);
 
             const modo = configMap['nfe_modo'] || 'homologacao';
-            const isProduction = modo === 'producao';
+            // Se a nota especificamente foi emitida em homologação (<tpAmb>2</tpAmb>), cancelamos no ambiente de homologação
+            const isHomologacaoXml = nfe.xml_content && nfe.xml_content.includes('<tpAmb>2</tpAmb>');
+            const isProduction = isHomologacaoXml ? false : (modo === 'producao');
             const certPassword = configMap['cert_password'] || '12345678';
             const pfxPath = path.join(__dirname, '../certificado/certificado.pfx');
             const dataCancelamento = new Date().toISOString();
@@ -1478,18 +1480,21 @@ app.post('/api/nfe/:id/cancelar', authenticateToken, async (req, res) => {
                 const nfeService = new NFeService(pfxPath, certPassword, isProduction);
                 const result = await nfeService.cancelarNFe(nfe.chave_acesso, motivo, nfe.protocolo_autorizacao, configMap['emit_uf_cod'] || '35');
 
-                const httpStatus = result.status === 'cancelada' ? 200 : (result.status === 'erro_sefaz_cancelamento' ? 422 : 502);
+                // cStat 217 (NF-e não consta na base de dados SEFAZ) ou 218 (NF-e já cancelada) permite liberar o sistema
+                const permitingCancelLocal = result.success || result.cStat === '217' || result.cStat === '218';
 
                 db.run(`INSERT INTO nfe_cancelamentos (nfe_id, motivo_cancelamento, data_cancelamento, usuario_id, protocolo_cancelamento, xml_cancelamento, status) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                    [nfe.id, motivo, dataCancelamento, req.user.id, result.protocolo || '', result.xmlCancelamento || '', result.success ? 'concluido' : 'rejeitado']);
+                    [nfe.id, motivo, dataCancelamento, req.user.id, result.protocolo || '', result.xmlCancelamento || '', permitingCancelLocal ? 'concluido' : 'rejeitado']);
 
-                if (result.success) {
+                if (permitingCancelLocal) {
                     db.run(`UPDATE nfe SET status = 'cancelada' WHERE id = ?`, [nfe.id], (err3) => {
                         if (err3) return res.status(500).json({ error: err3.message });
                         registrarLog(req, 'NFE_CANCELAR', `NF-e #${nfe.id} cancelada - Motivo: ${motivo}`);
-                        res.status(httpStatus).json({ success: true, status: 'cancelada', message: result.message });
+                        const msg = result.success ? result.message : `NF-e cancelada no sistema (${result.message || 'não constava na SEFAZ'})`;
+                        res.status(200).json({ success: true, status: 'cancelada', message: msg });
                     });
                 } else {
+                    const httpStatus = result.status === 'erro_sefaz_cancelamento' ? 422 : 502;
                     res.status(httpStatus).json({ success: false, status: result.status, message: result.message, error: result.message });
                 }
             } catch (nfeErr) {
