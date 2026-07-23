@@ -1,0 +1,6 @@
+#!/usr/bin/expect -f
+set timeout 600
+spawn scp -r -o StrictHostKeyChecking=no /private/var/folders/33/c_tkyvpx1qgcn4_183g58nh80000gn/T/sandbox-b89ccddb-cc8e-479f-8fa5-0cf2acea888e/frontend/dist root@85.31.231.151:/var/www/portalmmcebolas/frontend/
+expect "password:"
+send "@@Cebolas2025\r"
+expect eof

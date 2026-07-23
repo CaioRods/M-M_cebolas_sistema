@@ -20,6 +20,12 @@ function formatSefazDateTime(date = new Date()) {
     return `${y}-${mo}-${d}T${h}:${mi}:${s}-03:00`;
 }
 
+function formatDec2(val) {
+    if (val === undefined || val === null) return undefined;
+    const num = typeof val === 'number' ? val : parseFloat(val);
+    return isNaN(num) ? String(val) : num.toFixed(2);
+}
+
 class NFeService {
     constructor(pfxPath, password, isProduction = false) {
         const defaultPfxPath = path.join(__dirname, '../certificado/certificado.pfx');
@@ -130,20 +136,29 @@ class NFeService {
                         IE: (dest.ie || '').replace(/\D/g, '') || undefined,
                         email: dest.email || undefined
                     },
-                    det: det.map((item, index) => ({
-                        '@nItem': index + 1,
-                        prod: item.prod,
-                        imposto: item.imposto
-                    })),
+                    det: det.map((item, index) => {
+                        const prodCopy = { ...item.prod };
+                        if (prodCopy.vUnCom !== undefined) prodCopy.vUnCom = formatDec2(prodCopy.vUnCom);
+                        if (prodCopy.vProd !== undefined) prodCopy.vProd = formatDec2(prodCopy.vProd);
+                        if (prodCopy.vUnTrib !== undefined) prodCopy.vUnTrib = formatDec2(prodCopy.vUnTrib);
+                        return {
+                            '@nItem': index + 1,
+                            prod: prodCopy,
+                            imposto: item.imposto
+                        };
+                    }),
                     total: {
-                        ICMSTot: total.icmsTot,
-                        ...(total.ibscbsTot ? { IBSCBSTot: total.ibscbsTot } : {})
+                        ICMSTot: Object.fromEntries(
+                            Object.entries(total.icmsTot || {}).map(([k, v]) => [k, formatDec2(v)])
+                        )
                     },
                     transp: {
                         modFrete: transp.modFrete
                     },
                     pag: {
-                        detPag: pag.detPag
+                        detPag: Array.isArray(pag.detPag)
+                            ? pag.detPag.map(p => ({ ...p, vPag: formatDec2(p.vPag) }))
+                            : { ...pag.detPag, vPag: formatDec2(pag.detPag.vPag) }
                     },
                     infAdic: {
                         infCpl: infAdic.infCpl
@@ -266,7 +281,7 @@ class NFeService {
             // Estrutura exata exigida pela SEFAZ 4.00: o XML assinado já contém a tag <NFe>,
             // precisamos envolvê-lo em <enviNFe>. Sem declaração XML interna (não é um documento
             // separado, é conteúdo embutido dentro do <nfeDadosMsg>).
-            const xmlNFeClean = xmlAssinado.replace(/^<\?xml.*?\?>/, '');
+            const xmlNFeClean = xmlAssinado.replace(/^<\?xml.*?\?>/, '').trim();
             const enviNFe = `<enviNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><idLote>${Math.floor(Date.now() / 1000)}</idLote><indSinc>1</indSinc>${xmlNFeClean}</enviNFe>`;
             const bodyInnerXml = `<nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4">${enviNFe}</nfeDadosMsg>`;
 
@@ -288,11 +303,19 @@ class NFeService {
                     return { success: false, status: 'erro_comunicacao', message: 'SEFAZ retornou autorização mas o protocolo não pôde ser lido da resposta. Verifique manualmente na SEFAZ antes de considerar esta nota válida.' };
                 }
 
+                // Extrai a tag <protNFe ...>...</protNFe> completa do retorno da SEFAZ
+                const fullProtMatch = rawResponse.match(/<protNFe[\s\S]*?<\/protNFe>/);
+                const protXml = fullProtMatch ? fullProtMatch[0] : null;
+                const xmlProc = protXml
+                    ? `<nfeProc versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe">${xmlNFeClean}${protXml}</nfeProc>`
+                    : xmlAssinado;
+
                 return {
                     success: true,
                     status: 'autorizada',
                     protocolo: protMatch[1],
                     cStat: '100',
+                    xmlProc,
                     message: 'NF-e Autorizada com Sucesso na SEFAZ'
                 };
             } else {

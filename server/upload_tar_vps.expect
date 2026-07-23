@@ -1,0 +1,11 @@
+#!/usr/bin/expect -f
+set timeout 600
+spawn scp -o StrictHostKeyChecking=no dist.tar.gz root@85.31.231.151:/var/www/portalmmcebolas/frontend/
+expect "password:"
+send "@@Cebolas2025\r"
+expect eof
+
+spawn ssh -o StrictHostKeyChecking=no root@85.31.231.151 "tar -xzf /var/www/portalmmcebolas/frontend/dist.tar.gz -C /var/www/portalmmcebolas/frontend/ && rm /var/www/portalmmcebolas/frontend/dist.tar.gz && ls -lh /var/www/portalmmcebolas/frontend/dist"
+expect "password:"
+send "@@Cebolas2025\r"
+expect eof
