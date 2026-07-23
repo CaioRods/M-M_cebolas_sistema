@@ -2212,7 +2212,7 @@ function abrirDetalheProduto(nomeProduto) {
         histEl.innerHTML = `<div style="text-align:center;padding:30px;color:var(--text-muted);"><i class="fas fa-inbox" style="font-size:1.5rem;display:block;margin-bottom:8px;color:#cbd5e1;"></i>Nenhuma movimentação registrada.</div>`;
     } else {
         histEl.innerHTML = trans.map(t => `
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #f1f5f9;">
+            <div onclick="abrirMovDetalheModal(${t.id})" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #f1f5f9;cursor:pointer;" title="Clique para ver detalhes">
                 <div style="display:flex;align-items:center;gap:10px;">
                     <span class="badge ${t.tipo === 'entrada' ? 'entrada' : t.tipo === 'saida' ? 'saida' : 'despesa'}" style="min-width:64px;text-align:center;justify-content:center;">${t.tipo === 'entrada' ? 'COMPRA' : t.tipo === 'saida' ? 'VENDA' : 'DESPESA'}</span>
                     <div>
@@ -2313,6 +2313,14 @@ async function abrirMovDetalheModal(id) {
                 <p style="font-size:0.62rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px;">Realizado por</p>
                 <h5 style="font-weight:800;font-size:0.9rem;"><i class="fas fa-user" style="color:var(--text-muted);margin-right:4px;"></i>${m.usuario_nome}</h5>
             </div>`;
+    }
+
+    const actionsBox = document.getElementById('mov-detalhe-actions');
+    if (actionsBox) {
+        actionsBox.innerHTML = `
+            <button class="btn-primary" style="width:100%;background:#ef4444;border-color:#ef4444;font-weight:800;padding:12px;border-radius:10px;display:flex;align-items:center;justify-content:center;gap:8px;" onclick="closeMovDetalheModal(); deleteMovimentacao(${m.id});">
+                <i class="fas fa-trash-alt"></i> Excluir movimentação #${m.id}
+            </button>`;
     }
 
     modal.classList.add('active');
