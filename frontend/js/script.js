@@ -2220,7 +2220,12 @@ function abrirDetalheProduto(nomeProduto) {
                         <p style="font-size:0.7rem;color:var(--text-muted);">${new Date(t.data).toLocaleDateString('pt-BR')}${t.descricao ? ' · ' + t.descricao : ''}</p>
                     </div>
                 </div>
-                <span style="font-weight:700;font-size:0.85rem;color:${t.tipo === 'entrada' ? '#059669' : '#dc2626'};">R$ ${(t.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <span style="font-weight:700;font-size:0.85rem;color:${t.tipo === 'entrada' ? '#059669' : '#dc2626'};">R$ ${(t.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <button class="btn-icon text-danger" onclick="event.stopPropagation(); deleteMovimentacao(${t.id})" title="Excluir movimentação">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
             </div>
         `).join('');
     }
@@ -3161,6 +3166,16 @@ async function deleteMovimentacao(id) {
     if (res && res.ok) {
         showSuccess('Movimentação excluída!');
         await loadDataFromAPI();
+        renderEstoqueResumo();
+        renderStockTable();
+        const modalProd = document.getElementById('modal-produto-detalhe');
+        if (modalProd && modalProd.classList.contains('active')) {
+            const nomeProd = document.getElementById('produto-detalhe-nome')?.textContent;
+            if (nomeProd) abrirDetalheProduto(nomeProd);
+        }
+    } else {
+        const errData = res ? await res.json().catch(() => ({})) : {};
+        showError(errData.error || 'Erro ao excluir movimentação');
     }
 }
 

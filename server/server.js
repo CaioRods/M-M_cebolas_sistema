@@ -304,23 +304,20 @@ app.post('/api/movimentacoes', authenticateToken, (req, res) => {
 });
 
 app.delete('/api/movimentacoes/:id', authenticateToken, (req, res) => {
-    // Excluir uma compra/venda mexe direto no saldo de estoque e no DRE — mesmo nível de
-    // sensibilidade das outras exclusões restritas do sistema (usuários, NF-e, reset), mas essa
-    // rota não tinha checagem de permissão nem ficava no log de auditoria.
-    if (req.user.role !== 'admin' && req.user.role !== 'chefe') return res.sendStatus(403);
-
-    // Excluir uma movimentação com NF-e autorizada vinculada órfa a nota: o DANFE/detalhe perde
-    // produto e valor (só existiam via join), mesmo a nota continuando válida na SEFAZ. Bloqueia
-    // para preservar o vínculo — cancelar a nota primeiro, se for o caso.
+    // Excluir uma compra/venda altera o estoque e o DRE. Operadores (funcionários), chefes e admins
+    // podem excluir lançamentos manuais ou por engano, desde que não haja NF-e autorizada vinculada.
     db.get(`SELECT id, status, chave_acesso FROM nfe WHERE venda_id = ? AND status = 'autorizada'`, [req.params.id], (errN, nfe) => {
         if (errN) return res.status(500).json({ error: errN.message });
         if (nfe) {
             return res.status(400).json({ error: `Esta venda tem a NF-e Nº ${nfe.chave_acesso ? nfe.chave_acesso.slice(-9, -1) : nfe.id} autorizada vinculada. Cancele a nota fiscal antes de excluir a venda.` });
         }
-        db.run('DELETE FROM movimentacoes WHERE id = ?', [req.params.id], (err) => {
-            if (err) return res.status(500).json({ error: err.message });
-            registrarLog(req, 'MOVIMENTACAO_DELETE', `Excluiu movimentação ID: ${req.params.id}`);
-            res.json({ success: true });
+        db.run('UPDATE nfe SET venda_id = NULL WHERE venda_id = ?', [req.params.id], (errUpd) => {
+            if (errUpd) console.error("Erro ao desvincular NF-e não autorizadas:", errUpd.message);
+            db.run('DELETE FROM movimentacoes WHERE id = ?', [req.params.id], (err) => {
+                if (err) return res.status(500).json({ error: err.message });
+                registrarLog(req, 'MOVIMENTACAO_DELETE', `Excluiu movimentação ID: ${req.params.id}`);
+                res.json({ success: true });
+            });
         });
     });
 });
@@ -1258,42 +1255,22 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                             CFOP: (destUF !== emitUF) ? '6102' : '5102',
                             uCom: 'CX',
                             qCom: venda.qtd_caixas || 1,
-                            vUnCom: venda.valor / (venda.qtd_caixas || 1),
-                            vProd: venda.valor,
+                            vUnCom: (venda.valor / (venda.qtd_caixas || 1)).toFixed(2),
+                            vProd: (venda.valor || 0).toFixed(2),
                             cEANTrib: 'SEM GTIN',
                             uTrib: 'CX',
                             qTrib: venda.qtd_caixas || 1,
-                            vUnTrib: venda.valor / (venda.qtd_caixas || 1),
+                            vUnTrib: (venda.valor / (venda.qtd_caixas || 1)).toFixed(2),
                             indTot: '1'
                         },
                         imposto: {
                             // CST 60 (ICMS já retido por substituição tributária) + PIS/COFINS
                             // alíquota básica (CST 01): mesma classificação usada em NF-e reais já
-                            // autorizadas deste CNPJ para este mesmo tipo de produto (cebola). Evita
-                            // adivinhar uma combinação de CST/cClassTrib que nunca foi comprovada.
+                            // autorizadas deste CNPJ para este mesmo tipo de produto (cebola).
                             ICMS: { ICMS60: { orig: '0', CST: '60', vBCSTRet: '0.00', pST: '0.00', vICMSSubstituto: '0.00', vICMSSTRet: '0.00' } },
-                            // Opcional no XSD, mas presente em toda NF-e real deste CNPJ — replicado
-                            // da mesma forma (CST 99 = não tributado).
                             IPI: { cEnq: '999', IPITrib: { CST: '99', vBC: '0.00', pIPI: '0.00', vIPI: '0.00' } },
                             PIS: { PISAliq: { CST: '01', vBC: '0.00', pPIS: '0.00', vPIS: '0.00' } },
-                            COFINS: { COFINSAliq: { CST: '01', vBC: '0.00', pCOFINS: '0.00', vCOFINS: '0.00' } },
-                            // Grupo IBS/CBS da Reforma Tributária (obrigatório na prática desde 2026,
-                            // mesmo com minOccurs=0 no XSD — sem ele a SEFAZ rejeita com mensagem
-                            // genérica "Mensagem SOAP inválida" em vez de apontar o campo faltando.
-                            // Estrutura e valores replicados de uma NF-e real autorizada deste mesmo
-                            // CNPJ/certificado (cClassTrib 000001 = tributação padrão, sem incidência
-                            // efetiva de IBS/CBS nesta fase de transição).
-                            IBSCBS: {
-                                CST: '000',
-                                cClassTrib: '000001',
-                                gIBSCBS: {
-                                    vBC: '0.00',
-                                    gIBSUF: { pIBSUF: '0.1000', vIBSUF: '0.00' },
-                                    gIBSMun: { pIBSMun: '0.0000', vIBSMun: '0.00' },
-                                    vIBS: '0.00',
-                                    gCBS: { pCBS: '0.9000', vCBS: '0.00' }
-                                }
-                            }
+                            COFINS: { COFINSAliq: { CST: '01', vBC: '0.00', pCOFINS: '0.00', vCOFINS: '0.00' } }
                         }
                     }],
                     total: {
@@ -1306,7 +1283,7 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                             vST: '0.00',
                             vFCPST: '0.00',
                             vFCPSTRet: '0.00',
-                            vProd: venda.valor,
+                            vProd: (venda.valor || 0).toFixed(2),
                             vFrete: '0.00',
                             vSeg: '0.00',
                             vDesc: '0.00',
@@ -1316,25 +1293,7 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                             vPIS: '0.00',
                             vCOFINS: '0.00',
                             vOutro: '0.00',
-                            vNF: venda.valor
-                        },
-                        ibscbsTot: {
-                            vBCIBSCBS: '0.00',
-                            gIBS: {
-                                gIBSUF: { vDif: '0.00', vDevTrib: '0.00', vIBSUF: '0.00' },
-                                gIBSMun: { vDif: '0.00', vDevTrib: '0.00', vIBSMun: '0.00' },
-                                vIBS: '0.00',
-                                vCredPres: '0.00',
-                                vCredPresCondSus: '0.00'
-                            },
-                            gCBS: {
-                                vDif: '0.00',
-                                vDevTrib: '0.00',
-                                vCBS: '0.00',
-                                vCredPres: '0.00',
-                                vCredPresCondSus: '0.00'
-                            },
-                            gEstornoCred: { vIBSEstCred: '0.00', vCBSEstCred: '0.00' }
+                            vNF: (venda.valor || 0).toFixed(2)
                         }
                     },
                     transp: {
@@ -1347,7 +1306,7 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                             // SEFAZ exige xPag (descrição) sempre que tPag=99 (Outros) — sem isso a
                             // nota é rejeitada com cStat 441.
                             ...(tPagFinal === '99' ? { xPag: desc_pagamento || 'Outros' } : {}),
-                            vPag: venda.valor
+                            vPag: (venda.valor || 0).toFixed(2)
                         }
                     },
                     infAdic: {
@@ -1367,6 +1326,7 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
 
                 const dataEmissao = new Date().toISOString();
                 const status = transmissaoResult.status;
+                const xmlFinalSalvar = transmissaoResult.xmlProc || xmlAssinado;
 
                 // Status HTTP reflete o resultado real: 200 só quando realmente autorizada pela
                 // SEFAZ; 422 quando a SEFAZ recusou explicitamente a nota (dado inválido, precisa
@@ -1375,7 +1335,7 @@ app.post('/api/nfe/gerar', authenticateToken, async (req, res) => {
                 const httpStatus = status === 'autorizada' ? 200 : (status === 'rejeitada' ? 422 : 502);
 
                 db.run(`INSERT INTO nfe (venda_id, chave_acesso, xml_content, status, data_emissao, protocolo_autorizacao, numero_nfe, serie_nfe, dest_nome, dest_doc, dest_endereco, dest_bairro, dest_cidade, dest_uf, dest_cep) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [venda.id, chaveAcesso, xmlAssinado, status, dataEmissao, transmissaoResult.protocolo || '', nfeProxNumero, nfeSerie, destNome, destinatario.documento || '', destEnd, xBairro, xMunFinal, destUF, destCEP], function (err3) {
+                    [venda.id, chaveAcesso, xmlFinalSalvar, status, dataEmissao, transmissaoResult.protocolo || '', nfeProxNumero, nfeSerie, destNome, destinatario.documento || '', destEnd, xBairro, xMunFinal, destUF, destCEP], function (err3) {
                         if (err3) return res.status(500).json({ error: err3.message });
                         registrarLog(req, 'NFE_GERAR', `NF-e gerada para venda #${venda.id} - Status: ${status}`);
                         res.status(httpStatus).json({
@@ -1427,8 +1387,9 @@ app.post('/api/nfe/:id/transmitir', authenticateToken, async (req, res) => {
                 const httpStatus = transmissaoResult.status === 'autorizada' ? 200 : (transmissaoResult.status === 'rejeitada' ? 422 : 502);
 
                 if (transmissaoResult.status === 'autorizada') {
-                    db.run(`UPDATE nfe SET status = ?, protocolo_autorizacao = ? WHERE id = ?`,
-                        [transmissaoResult.status, transmissaoResult.protocolo, req.params.id], (err3) => {
+                    const xmlFinalSalvar = transmissaoResult.xmlProc || nfe.xml_content;
+                    db.run(`UPDATE nfe SET status = ?, protocolo_autorizacao = ?, xml_content = ? WHERE id = ?`,
+                        [transmissaoResult.status, transmissaoResult.protocolo, xmlFinalSalvar, req.params.id], (err3) => {
                             if (err3) return res.status(500).json({ error: err3.message });
                             res.status(httpStatus).json({ success: true, status: transmissaoResult.status, message: transmissaoResult.message });
                         });
@@ -1506,10 +1467,20 @@ app.post('/api/nfe/:id/cancelar', authenticateToken, async (req, res) => {
 
 app.delete('/api/nfe/:id', authenticateToken, (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
-    db.run('DELETE FROM nfe WHERE id = ?', [req.params.id], (err) => {
-        if (err) return res.status(500).json({ error: err.message });
-        registrarLog(req, 'NFE_DELETE', `Removeu NF-e ID: ${req.params.id}`);
-        res.json({ success: true });
+    db.get('SELECT * FROM nfe WHERE id = ?', [req.params.id], (errNfe, nfe) => {
+        if (errNfe || !nfe) return res.status(404).json({ error: "NF-e não encontrada" });
+        db.run('DELETE FROM nfe WHERE id = ?', [req.params.id], (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (nfe.venda_id) {
+                db.get('SELECT * FROM movimentacoes WHERE id = ?', [nfe.venda_id], (errMov, mov) => {
+                    if (mov && (mov.descricao === 'NF-e avulsa' || mov.afeta_estoque === 0)) {
+                        db.run('DELETE FROM movimentacoes WHERE id = ?', [nfe.venda_id]);
+                    }
+                });
+            }
+            registrarLog(req, 'NFE_DELETE', `Removeu NF-e ID: ${req.params.id}`);
+            res.json({ success: true });
+        });
     });
 });
 
