@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Sistema Safra Tomate 2026</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="top-loader" id="topLoader"></div>
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <span>Carregando dados...</span>
+</div>
+<div class="app">
+  <!-- ===================== SIDEBAR ===================== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <img src="LOGO2.png" alt="Safra Tomate" class="mark-img">
+      <div class="bt"><b>Safra Tomate</b><span>RECEBIMENTO 2026</span></div>
+    </div>
+    <nav class="nav">
+      <div class="grp">Operação</div>
+      <button class="active" data-view="chegada">
+        <svg class="ni" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18M9 4v16"/></svg>
+        <span>Planilha de Chegada</span></button>
+      <button data-view="patio">
+        <svg class="ni" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <span>Pátio</span><span class="cnt" id="navPatio">0</span></button>
+      <button data-view="moagem">
+        <svg class="ni" viewBox="0 0 24 24"><path d="M3 13h4l2.5 6L14 5l2.5 8H21"/></svg>
+        <span>Moagem</span><span class="cnt" id="navMoagem">0</span></button>
+      <button data-view="todos">
+        <svg class="ni" viewBox="0 0 24 24"><path d="M1 3h15v13H1zM16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+        <span>Todos os Caminhões</span><span class="cnt" id="navTodos">0</span></button>
+      <div class="grp">Gestão</div>
+      <button data-view="painel">
+        <svg class="ni" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+        <span>Painel</span></button>
+      <button data-view="relatorios">
+        <svg class="ni" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h6"/></svg>
+        <span>Relatórios</span></button>
+      <button data-view="cadastros">
+        <svg class="ni" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>
+        <span>Cadastros</span></button>
+    </nav>
+    <div class="side-foot">
+      <div class="clockcard">
+        <div class="ct tnum" id="clockTime">--:--:--</div>
+        <div class="cr"><span class="cd tnum" id="clockDate">—</span><span class="tno" id="turnoAtual">—</span></div>
+      </div>
+      <div class="fb">
+        <button class="btn subtle sm" onclick="backupJSON()">Backup</button>
+        <button class="btn subtle sm" onclick="document.getElementById('importFile').click()">Importar</button>
+        <input type="file" id="importFile" accept=".json" hidden onchange="importJSON(event)">
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===================== MAIN ===================== -->
+  <main class="main">
+    <header class="topbar">
+      <button class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')" aria-label="Menu">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+      <div class="pt"><h1 id="pageTitle">Planilha de Chegada</h1><span class="sub" id="pageSub">Registro de entrada dos caminhões</span></div>
+      <div class="spacer"></div>
+      <button class="btn primary" onclick="openEntry()">
+        <svg viewBox="0 0 24 24" width="17" height="17"><path d="M12 5v14M5 12h14"/></svg>Registrar Entrada</button>
+    </header>
+
+    <div class="content">
+      <!-- ============ CHEGADA ============ -->
+      <section class="view active" id="view-chegada">
+        <div class="toolbar">
+          <div class="search">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input id="regSearch" placeholder="Buscar motorista, placa, produtor, NF, GTL..." oninput="renderChegada()">
+          </div>
+          <input type="date" class="inp" id="regDate" onchange="renderChegada()">
+          <div class="segmented" id="regChips">
+            <button class="seg active" data-flt="todos" onclick="setFilter(this)">Todos</button>
+            <button class="seg" data-flt="patio" onclick="setFilter(this)">Pátio</button>
+            <button class="seg" data-flt="liberado" onclick="setFilter(this)">Liberado</button>
+            <button class="seg" data-flt="aguardando_moagem" onclick="setFilter(this)">Aguard.</button>
+            <button class="seg" data-flt="em_moagem" onclick="setFilter(this)">Moendo</button>
+            <button class="seg" data-flt="moido" onclick="setFilter(this)">Moído</button>
+          </div>
+          <div class="spacer"></div>
+          <button class="btn subtle sm" onclick="openPdfExport('chegada')">
+            <svg viewBox="0 0 24 24" width="15" height="15"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+            PDF Chegada
+          </button>
+          <button class="btn primary sm" onclick="openPdfExport('pesagem')">
+            <svg viewBox="0 0 24 24" width="15" height="15"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+            PDF Pesagem Completa
+          </button>
+          <button class="btn subtle sm" onclick="exportPrincipal()">Excel (CSV)</button>
+        </div>
+
+        <div class="gridwrap">
+          <div class="gridscroll">
+            <table class="grid" id="regTable">
+              <thead><tr>
+                <th>Status</th><th>Nº</th><th>Data</th><th>Motorista</th><th>Placa</th><th>Produtor</th>
+                <th>GTL</th><th>Nota Fiscal</th><th>Chegada</th><th class="r">P. 1ª</th>
+                <th class="r">P. Bruto</th><th class="r">Tara</th><th class="r">Líquido</th>
+                <th>Situação</th><th></th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+            <div class="empty" id="regEmpty" hidden>
+              <svg viewBox="0 0 24 24" width="36" height="36"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 4v16"/></svg>
+              <p>Nenhum caminhão registrado.<br>Use <b>Registrar Entrada</b> para começar.</p>
+            </div>
+          </div>
+          <div class="gridfoot" id="regFoot"></div>
+        </div>
+        <p class="hinttext">
+          <svg viewBox="0 0 24 24" width="15" height="15"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+          Edite <b>P. Bruto</b> e <b>Tara</b> diretamente na planilha (clique na célula tracejada). A 2ª pesagem e a saída são registradas em tempo real.
+        </p>
+      </section>
+
+      <!-- ============ PÁTIO ============ -->
+      <section class="view" id="view-patio">
+        <div class="kpirow" id="patioKpis"></div>
+        <div id="patioSections"></div>
+      </section>
+
+      <!-- ============ MOAGEM ============ -->
+      <section class="view" id="view-moagem">
+        <div class="kanban" id="kanban"></div>
+      </section>
+
+      <!-- ============ TODOS OS CAMINHÕES ============ -->
+      <section class="view" id="view-todos">
+        <div class="toolbar">
+          <div class="search" style="flex:1; max-width:480px;">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input id="todosSearch" placeholder="Buscar por código (ex: 94B2A), motorista, NF, peso kg, placa, produtor..." oninput="renderTodos()">
+          </div>
+          <div class="segmented" id="todosChips">
+            <button class="seg active" data-flt="todos" onclick="setTodosFilter(this)">Todos</button>
+            <button class="seg" data-flt="patio" onclick="setTodosFilter(this)">Pátio</button>
+            <button class="seg" data-flt="liberado" onclick="setTodosFilter(this)">Liberado</button>
+            <button class="seg" data-flt="aguardando_moagem" onclick="setTodosFilter(this)">Aguard.</button>
+            <button class="seg" data-flt="em_moagem" onclick="setTodosFilter(this)">Moendo</button>
+            <button class="seg" data-flt="moido" onclick="setTodosFilter(this)">Moído</button>
+          </div>
+          <div class="spacer"></div>
+          <span class="badge b-info" id="todosCountBadge">0 cargas</span>
+        </div>
+
+        <div class="gridwrap">
+          <div class="gridscroll">
+            <table class="grid" id="todosTable">
+              <thead><tr>
+                <th>Status</th><th>Código</th><th>Data</th><th>Nº</th><th>Motorista</th><th>Placa</th><th>Produtor</th>
+                <th>Nota Fiscal</th><th>Chegada</th><th class="r">P. 1ª</th>
+                <th class="r">P. Bruto</th><th class="r">Tara</th><th class="r">Líquido</th>
+                <th>Ações</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+            <div class="empty" id="todosEmpty" hidden>
+              <svg viewBox="0 0 24 24" width="36" height="36"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 4v16"/></svg>
+              <p>Nenhum caminhão encontrado com os filtros aplicados.</p>
+            </div>
+          </div>
+          <div class="gridfoot" id="todosFoot"></div>
+        </div>
+      </section>
+
+      <!-- ============ PAINEL ============ -->
+      <section class="view" id="view-painel">
+        <div class="toolbar" style="margin-bottom:18px; flex-wrap:wrap; gap:10px;">
+          <span class="tblabel" style="font-weight:700;">Data Operacional / Turno:</span>
+          <input type="date" class="inp" id="dashDate" onchange="renderPainel()">
+          <button class="btn subtle sm" onclick="setPainelToday()">Hoje (Atual)</button>
+          <div class="spacer"></div>
+          <span class="badge b-info" id="dashShiftBadge">Turno Atual: —</span>
+        </div>
+        <div class="kpirow" id="dashKpis"></div>
+        <div class="turnos" id="turnosRow"></div>
+        <div class="panel">
+          <div class="ph"><h3>Aguardando 2ª Pesagem</h3><span class="tag">liberação após 12h da chegada</span></div>
+          <div class="gridscroll" style="max-height:340px">
+            <table class="grid" id="dashWaitTable" style="min-width:720px"><thead><tr>
+              <th>Nº</th><th>Motorista</th><th>Produtor</th><th>Chegada</th><th class="r">Peso 1ª</th><th>Libera em</th><th>Status</th></tr></thead>
+              <tbody></tbody></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ RELATÓRIOS ============ -->
+      <section class="view" id="view-relatorios">
+        <div class="toolbar">
+          <span class="tblabel">Período</span>
+          <input type="date" class="inp" id="repFrom" onchange="renderRelatorios()">
+          <span class="tbsep">até</span>
+          <input type="date" class="inp" id="repTo" onchange="renderRelatorios()">
+        </div>
+        <div class="kpirow" id="repKpis"></div>
+        <div class="grid2">
+          <div class="panel"><div class="ph"><h3>Top Produtores</h3><span class="tag">nº de cargas</span></div><div class="pb" id="repProdutores"></div></div>
+          <div class="panel"><div class="ph"><h3>Peso Líquido por Produtor</h3><span class="tag">kg</span></div><div class="pb" id="repPeso"></div></div>
+        </div>
+        <div class="panel"><div class="ph"><h3>Moagem por Turno</h3></div><div class="pb" id="repTurnos"></div></div>
+        <div class="panel"><div class="ph"><h3>Cargas por Dia</h3></div><div class="pb" id="repDias"></div></div>
+      </section>
+
+      <!-- ============ CADASTROS ============ -->
+      <section class="view" id="view-cadastros">
+        <div class="segmented big" id="cadTabs">
+          <button class="seg active" data-cad="produtores">Produtores / Roças</button>
+          <button class="seg" data-cad="motoristas">Motoristas</button>
+          <button class="seg" data-cad="placas">Placas</button>
+          <button class="seg" data-cad="variedades">Variedades</button>
+        </div>
+        <div class="panel" style="margin-bottom:16px"><div class="pb" id="cadFormPanel"></div></div>
+        <div class="panel"><div class="pb" style="padding:0"><div class="gridscroll" style="max-height:420px" id="cadListWrap"></div></div></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<!-- ===================== WIZARD (Registrar Entrada) ===================== -->
+<div class="modal-bg" id="entryModal">
+  <div class="modal wizard">
+    <div class="mh">
+      <div><h2 id="entryTitle">Registrar Entrada</h2><div class="msub">Ao confirmar, a GTL e a capa são emitidas automaticamente</div></div>
+      <button class="x" onclick="closeModal('entryModal')" aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="stepper" id="stepper">
+      <div class="stp active" data-s="1"><span class="sn">1</span><span class="sl">Chegada</span></div>
+      <div class="stpline"></div>
+      <div class="stp" data-s="2"><span class="sn">2</span><span class="sl">Veículo &amp; Produtor</span></div>
+      <div class="stpline"></div>
+      <div class="stp" data-s="3"><span class="sn">3</span><span class="sl">Nota Fiscal</span></div>
+    </div>
+    <div class="mb">
+      <!-- STEP 1 -->
+      <div class="step active" data-step="1">
+        <div class="fgrid">
+          <div class="fg"><label>Data da Chegada <i>*</i></label><input type="date" id="f_data"></div>
+          <div class="fg"><label>Nº de Chegada <i>*</i></label><input id="f_numeroChegada" placeholder="ex: 1"></div>
+          <div class="fg"><label>Nº da Guia (GTL)</label><input id="f_numeroGuia" placeholder="ex: 52426"></div>
+          <div class="fg"><label>Hora da Chegada <i>*</i></label>
+            <div class="inrow"><input type="time" id="f_horaChegada"><button type="button" class="btn subtle sm" onclick="fillNow()">Agora</button></div></div>
+          <div class="fg"><label>Peso 1ª Pesagem (kg) <i>*</i></label><input type="number" id="f_pesoChegada" placeholder="kg"></div>
+          <div class="fg"><label>Responsável (Portaria) <i>*</i></label><input id="f_responsavel" placeholder="Nome"></div>
+        </div>
+      </div>
+      <!-- STEP 2 -->
+      <div class="step" data-step="2">
+        <div class="fgrid">
+          <div class="fg c2"><label>Nome do Motorista <i>*</i></label><input id="f_motorista" list="dl_motoristas" autocomplete="off" onchange="onMotoristaPick()"></div>
+          <div class="fg"><label>Placa(s) do Veículo <i>*</i></label><input id="f_placaVeiculo" list="dl_placas" autocomplete="off" placeholder="ABC1D23 / DEF4G56"></div>
+          <div class="fg"><label>Tipo de Caminhão <i>*</i></label><select id="f_tipoCaminhao">
+            <option value="">Selecione…</option><option>Truck</option><option>Bitruck</option><option>Carreta</option><option>Bitrem</option></select></div>
+          <div class="fg"><label>Número GTL (sistema) <i>*</i></label><input id="f_gtlId" placeholder="ex: 52426"></div>
+          <div class="fg"><label>Produtor / Roça <i>*</i></label><input id="f_produtor" list="dl_produtores" autocomplete="off" onchange="onProdutorPick()"></div>
+          <div class="fg"><label>Código da Roça</label><input id="f_codigoRoca" placeholder="ex: 4600002015"></div>
+          <div class="fg"><label>Cidade da Roça</label><input id="f_cidade" list="dl_cidades" autocomplete="off"></div>
+          <div class="fg"><label>Variedade do Tomate</label><input id="f_variedade" list="dl_variedades" autocomplete="off"></div>
+          <div class="fg"><label>Tipo de Embalagem</label><select id="f_tipoEmbalagem"><option>Granel</option><option>Caixa</option></select></div>
+          <div class="fg"><label>Tipo de Colheita</label><select id="f_tipoColheita"><option>Manual</option><option>Mecânica</option></select></div>
+        </div>
+      </div>
+      <!-- STEP 3 -->
+      <div class="step" data-step="3">
+        <div class="fgrid">
+          <div class="fg"><label>Número da Nota Fiscal <i>*</i></label><input id="f_notaFiscal" placeholder="Nº NF"></div>
+          <div class="fg"><label>Peso NF (kg)</label><input type="number" id="f_pesoNF" placeholder="opcional"></div>
+          <div class="fg c3"><label>Observações</label><textarea id="f_observacoes" rows="2" placeholder="Opcional"></textarea></div>
+        </div>
+        <div class="review" id="entryReview"></div>
+      </div>
+      <!-- hidden fields (2ª pesagem/saída — preenchidos na planilha) -->
+      <input type="hidden" id="f_horaPesoBruto"><input type="hidden" id="f_pesoBruto"><input type="hidden" id="f_pesoMotorista">
+      <input type="hidden" id="f_pesagemAntecipada"><input type="hidden" id="f_obsPesagem">
+      <input type="hidden" id="f_horaSaida"><input type="hidden" id="f_pesoTara">
+    </div>
+    <div class="mf">
+      <button class="btn subtle" id="wizBack" onclick="wizGo(-1)">Voltar</button>
+      <div class="spacer"></div>
+      <button class="btn" onclick="closeModal('entryModal')">Cancelar</button>
+      <button class="btn primary" id="wizNext" onclick="wizNext()">Continuar</button>
+    </div>
+  </div>
+</div>
+
+<datalist id="dl_motoristas"></datalist>
+<datalist id="dl_produtores"></datalist>
+<datalist id="dl_cidades"></datalist>
+<datalist id="dl_placas"></datalist>
+<datalist id="dl_variedades"></datalist>
+
+<!-- ===================== EDIT MODAL (edição completa) ===================== -->
+<div class="modal-bg" id="editModal">
+  <div class="modal">
+    <div class="mh"><div><h2>Editar Caminhão</h2><div class="msub">Ajuste qualquer informação do registro</div></div>
+      <button class="x" onclick="closeModal('editModal')"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="mb"><div class="fgrid" id="editBody"></div></div>
+    <div class="mf">
+      <button class="btn danger" id="editDelete">Excluir</button>
+      <button class="btn subtle" id="editPrint">Emitir GTL</button>
+      <div class="spacer"></div>
+      <button class="btn" onclick="closeModal('editModal')">Cancelar</button>
+      <button class="btn primary" id="editSave">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== EXPORTAR PDF MODAL ===================== -->
+<div class="modal-bg" id="exportPdfModal">
+  <div class="modal wide" style="max-width:880px;">
+    <div class="mh">
+      <div>
+        <h2 id="exportPdfTitle">Exportar Relatório PDF</h2>
+        <div class="msub" id="exportPdfSub">Selecione o período para visualizar os caminhões que serão incluídos no PDF</div>
+      </div>
+      <button class="x" onclick="closeModal('exportPdfModal')"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="mb">
+      <div class="toolbar" style="margin-bottom:14px; gap:10px; flex-wrap:wrap;">
+        <span style="font-weight:700; font-size:13px; color:var(--ink-2);">Filtrar por Período:</span>
+        <span style="font-size:12px; color:var(--ink-3);">De</span>
+        <input type="date" class="inp" id="pdfFrom" onchange="renderPdfPreview()">
+        <span style="font-size:12px; color:var(--ink-3);">Até</span>
+        <input type="date" class="inp" id="pdfTo" onchange="renderPdfPreview()">
+        <div class="spacer"></div>
+        <span class="badge b-info" id="pdfCountBadge">0 registros</span>
+      </div>
+      <div class="panel" style="margin-bottom:0; background:var(--surface);">
+        <div class="ph" style="padding:10px 14px; border-bottom:1px solid var(--line);">
+          <h3 style="font-size:13px; font-weight:800;">Lista de Caminhões Incluídos no PDF</h3>
+          <span class="tag" id="pdfTypeTag">Pré-visualização</span>
+        </div>
+        <div style="max-height:360px; overflow-y:auto;" id="pdfPreviewListWrap">
+          <!-- Tabela estilizada de pré-visualização -->
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <div class="spacer"></div>
+      <button class="btn" onclick="closeModal('exportPdfModal')">Cancelar</button>
+      <button class="btn primary" onclick="generatePdfReport()">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+        Gerar e Baixar PDF
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== PREVIEW ===================== -->
+<div class="modal-bg" id="previewModal">
+  <div class="modal wide">
+    <div class="mh"><div><h2>Pré-visualização</h2><div class="msub">GTL + Capa — páginas separadas e sequenciais</div></div>
+      <button class="x" onclick="closeModal('previewModal')"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div id="previewBody"></div>
+    <div class="mf"><div class="spacer"></div><button class="btn" onclick="closeModal('previewModal')">Fechar</button>
+      <button class="btn primary" onclick="doPrint()">Imprimir</button></div>
+  </div>
+</div>
+
+<div class="ctxmenu" id="ctxmenu"></div>
+<div id="printRoot"></div>
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
